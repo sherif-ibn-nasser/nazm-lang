@@ -31,8 +31,14 @@ pub fn read_files() -> HashMap<String, Vec<String>>{
 
     let mut file_errors = false;
     
-    
-    let err_msg_str="يُتوقع ملف بامتداد *.نظم أو *.نَظْم، ولكن تم العثور على";
+    let err_msg_str=format!(
+        "{} {} {} {}{}",
+        "يُتوقع ملف بامتداد".bold(),
+        "*.نظم".bright_yellow().bold(),
+        "أو".bold(),
+        "*.نَظْم".bright_yellow().bold(),
+        "، ولكن تم العثور على".bold()
+    );
 
     for file_path in files_paths {
 
@@ -44,7 +50,7 @@ pub fn read_files() -> HashMap<String, Vec<String>>{
 
                 if ext != "نظم" && ext != "نَظْم"{
                     file_errors=true;
-                    print_err(format!("{}{}", err_msg_str.bold() ,file_path_str.bright_red().bold()));
+                    print_err(format!("{} {}", err_msg_str ,file_path_str.bright_red().bold()));
                     continue;
                 }
 
@@ -52,7 +58,7 @@ pub fn read_files() -> HashMap<String, Vec<String>>{
 
             None => {
                 file_errors=true;
-                print_err(format!("{}{}", err_msg_str.bold() ,file_path_str.bright_red().bold()));
+                print_err(format!("{} {}", err_msg_str ,file_path_str.bright_red().bold()));
                 continue;
             },
         }
