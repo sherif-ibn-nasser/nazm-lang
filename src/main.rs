@@ -3,6 +3,8 @@ use std::{collections::HashMap, fs, path::PathBuf, process::exit};
 
 use bpaf::Bpaf;
 
+use owo_colors::{colors::*, OwoColorize};
+
 #[derive(Clone, Debug, Bpaf)]
 #[bpaf(options, version)]
 /// The official compiler of Nazm programming language 
@@ -12,6 +14,15 @@ struct CLI{
     files: Vec<PathBuf>,
 }
 
+fn print_err(msg: String){
+
+    let err = "خطأ".bold();
+    let err_col = ":".bold();
+    let err_dot = ".".bold();
+
+    println!("{}{} {}{}",err.bright_red(),err_col,msg,err_dot)
+}
+
 pub fn read_files() -> HashMap<String, Vec<String>>{
 
     let mut files: HashMap<String, Vec<String>> = HashMap::new();
@@ -19,17 +30,21 @@ pub fn read_files() -> HashMap<String, Vec<String>>{
     let files_paths=c_l_i().fallback_to_usage().run().files;
 
     let mut file_errors = false;
+    
+    
+    let err_msg_str="يُتوقع ملف بامتداد *.نظم أو *.نَظْم، ولكن تم العثور على";
 
     for file_path in files_paths {
 
         let file_path_str = file_path.to_str().unwrap().to_string();
+
 
         match file_path.extension() {
             Some(ext) => {
 
                 if ext != "نظم" && ext != "نَظْم"{
                     file_errors=true;
-                    println!("يُتوقع ملف بامتداد *.نظم أو *.نَظْم، ولكن تم العثور على {}.", file_path_str);
+                    print_err(format!("{}{}", err_msg_str.bold() ,file_path_str.bright_red().bold()));
                     continue;
                 }
 
@@ -37,7 +52,7 @@ pub fn read_files() -> HashMap<String, Vec<String>>{
 
             None => {
                 file_errors=true;
-                println!("يُتوقع ملف بامتداد *.نظم أو *.نَظْم، ولكن تم العثور على {}.", file_path_str);
+                print_err(format!("{}{}", err_msg_str.bold() ,file_path_str.bright_red().bold()));
                 continue;
             },
         }
@@ -54,7 +69,7 @@ pub fn read_files() -> HashMap<String, Vec<String>>{
             },
             Err(_) => {
                 file_errors=true;
-                println!("لا يمكن قراءة الملف {} أو أنه غير موجود.", file_path_str);
+                print_err(format!("{} {} {}", "لا يمكن قراءة الملف".bold() ,file_path_str.bright_red().bold(), "أو أنه غير موجود".bold()));
                 continue;
             },
         }
@@ -67,7 +82,6 @@ pub fn read_files() -> HashMap<String, Vec<String>>{
 
     return files;
 }
-
 
 fn main() {
     let files = read_files();
