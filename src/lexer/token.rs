@@ -1,8 +1,10 @@
+#[derive(Clone, Copy, PartialEq)]
 pub struct Token<'a>{
     pub val: &'a str,
     pub typ: TokenType,
 }
 
+#[derive(Clone, Copy, PartialEq)]
 pub enum TokenType {
     Bad,
     EOL,
@@ -15,6 +17,7 @@ pub enum TokenType {
     Keyword,
 }
 
+#[derive(Clone, Copy, PartialEq)]
 pub enum LiteralTokenType{
     String,
     Char,
@@ -22,6 +25,7 @@ pub enum LiteralTokenType{
     Num(NumTokenType),
 }
 
+#[derive(Clone, Copy, PartialEq)]
 pub enum NumTokenType {
     I8,
     I16,
