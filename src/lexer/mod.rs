@@ -1,6 +1,6 @@
-use token::Token;
-
 mod token;
+
+use token::Token;
 use crate::diagnostics::Diagnostics;
 
 pub struct Lexer<'a>{

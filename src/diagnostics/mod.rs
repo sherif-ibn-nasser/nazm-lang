@@ -1,5 +1,9 @@
 use std::fmt::Display;
 
+mod ticket;
+
+use ticket::DiagnosticTicket;
+
 pub struct Diagnostics{
     tickets: Vec<DiagnosticTicket>,
 }
@@ -19,15 +23,5 @@ impl Display for Diagnostics{
         }
 
         write!(f, "{}", diagnostics_str)
-    }
-}
-
-struct DiagnosticTicket{
-    
-}
-
-impl Display for DiagnosticTicket{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
     }
 }
