@@ -1,6 +1,9 @@
+use crate::span::Span;
+
 #[derive(Clone, Copy, PartialEq)]
 pub struct Token<'a>{
     pub val: &'a str,
+    pub span: Span,
     pub typ: TokenType,
 }
 

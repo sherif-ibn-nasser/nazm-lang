@@ -1,16 +1,17 @@
 mod token;
+mod cursor;
 
 use std::cell::{Cell, RefCell};
-
 use token::*;
-use crate::diagnostics::Diagnostics;
+use cursor::Cursor;
+use crate::{diagnostics::Diagnostics, span::Span};
 
 pub struct Lexer<'a>{
     file_path: &'a str,
     file_lines: &'a Vec<String>,
     diagnostics: &'a RefCell<Diagnostics>,
-    current_line_idx: Cell<usize>,
-    current_col_idx: Cell<usize>,
+    current_line_idx: usize,
+    cursor: Cursor<'a>,
 }
 
 impl<'a> Lexer<'a> {
@@ -20,51 +21,91 @@ impl<'a> Lexer<'a> {
             file_path: file_path,
             file_lines: file_lines,
             diagnostics: diagnostics,
-            current_line_idx: Cell::new(0),
-            current_col_idx: Cell::new(0),
+            current_line_idx: 0,
+            cursor: Cursor::new(""),
         }
     }
     
-    pub fn lex(&self) -> Vec<Token> {
+    pub fn lex(&mut self) -> Vec<Token>{
+
+        self.current_line_idx = 0;
 
         let mut tokens = vec![];
 
-        while self.current_line_idx.get() < self.file_lines.len() {
-            let token = self.next_token();
-            tokens.push(token);
-            if token.typ == TokenType::EOL {
-                self.current_line_idx.set(self.current_line_idx.get()+1);
+        for (i, line) in self.file_lines.iter().enumerate() {
+            
+            self.cursor = Cursor::new(&line);
+
+            while self.cursor.has_remaining() {
+                
+                let typ = self.next_token_type();
+                
+                let (val ,start, end) = self.cursor.cut();
+                
+                let token = Token {
+                    val: val,
+                    span: Span {
+                        line: i,
+                        start: start,
+                        end: end,
+                    },
+                    typ: typ
+                };
+
+                tokens.push(token);
+    
             }
+
         }
 
-        tokens.push(Token{val:"", typ: TokenType::EOF});
+        tokens.push(
+            Token {
+                val:"\0",
+                span: Span {
+                    line: self.current_line_idx+1,
+                    start: 0,
+                    end: 0,
+                },
+                typ: TokenType::EOF
+            }
+        );
 
         return tokens;
     }
 
-    fn next_token(&self) -> Token {
-
-        if let Some(token) = self.find_string_or_char_token() {
-            return token;
-        }
-
-        if let Some(token) = self.find_comment_token() {
-            return token;
-        }
-
-        Token { val: "", typ: TokenType::Bad }
-    }
-    
-    fn find_string_or_char_token(&self) -> Option<Token> {
-        todo!()
-    }
-    
-    fn find_comment_token(&self) -> Option<Token> {
-        todo!()
-    }
-
-    fn diagnostics_mut(&self) -> std::cell::RefMut<Diagnostics> {
+    fn get_diagnostics(&self) -> std::cell::RefMut<Diagnostics> {
         self.diagnostics.borrow_mut()
+    }
+
+    fn next_token_type(&mut self) -> TokenType{
+
+        match self.cursor.select_next() {
+            '\'' | '\"' => self.next_string_or_char_token(),
+            _ => TokenType::Bad,
+        }
+        
+    }
+
+    fn next_string_or_char_token(&mut self) -> TokenType {
+
+        let quote = self.cursor.last_selected();
+
+        let is_char = quote == '\'';
+
+        let mut rust_lit = String::new(); // The literal as rust literal
+
+        TokenType::Literal(
+            if is_char {
+                LiteralTokenType::Char
+            }
+            else {
+                LiteralTokenType::String
+            }
+        )
+    }
+    
+    fn find_comment_token(&mut self) -> TokenType {
+        todo!()
     }
 
 }

@@ -1,6 +1,7 @@
 mod diagnostics;
 mod cli;
 mod lexer;
+mod span;
 
 use std::{cell::RefCell, collections::HashMap};
 use diagnostics::Diagnostics;
