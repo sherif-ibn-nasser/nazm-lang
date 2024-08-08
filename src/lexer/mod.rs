@@ -1,7 +1,8 @@
 mod token;
 mod cursor;
+mod lexing_methods;
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use token::*;
 use cursor::Cursor;
 use crate::{diagnostics::Diagnostics, span::Span};
@@ -78,33 +79,19 @@ impl<'a> Lexer<'a> {
     }
 
     fn next_token_type(&mut self) -> TokenType{
-
-        match self.cursor.select_next() {
-            '\'' | '\"' => self.next_string_or_char_token(),
-            _ => TokenType::Bad,
+        if let Some(typ) = self.find_string_or_char_token() {
+            typ
+        }
+        else if let Some(typ) = self.find_comment_token()  {
+            typ
+        }
+        else {
+            TokenType::Bad
         }
         
     }
-
-    fn next_string_or_char_token(&mut self) -> TokenType {
-
-        let quote = self.cursor.last_selected();
-
-        let is_char = quote == '\'';
-
-        let mut rust_lit = String::new(); // The literal as rust literal
-
-        TokenType::Literal(
-            if is_char {
-                LiteralTokenType::Char
-            }
-            else {
-                LiteralTokenType::String
-            }
-        )
-    }
     
-    fn find_comment_token(&mut self) -> TokenType {
+    fn find_comment_token(&mut self) -> Option<TokenType> {
         todo!()
     }
 
