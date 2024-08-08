@@ -1,71 +1,91 @@
 
 pub(crate) struct Cursor<'a>{
     line: &'a str,
-    start: usize,
-    end: usize,
+    selected: usize,
+    remainder: usize,
 }
 
 impl <'a> Cursor<'a> {
 
     /// New cursor
     pub(crate) fn new(line: &'a str) -> Self {
-        Cursor { line: line, start: 0, end: 0 }
+        Cursor { line: line, selected: 0, remainder: 0 }
     }
 
     /// Returns the current selected text
     pub(crate) fn get_selceted(&self) -> &'a str {
-        &self.line[self.start..=self.end]
+        if self.selected == self.remainder {
+            return "";
+        }
+        &self.line[self.selected..self.remainder]
     }
 
     /// Returns the remaining unselected text
-    pub(crate) fn get_remaining(&self) -> &'a str {
-        &self.line[self.end..]
+    pub(crate) fn get_remainder(&self) -> &'a str {
+        if !self.has_remaining() {
+            return "";
+        }
+        &self.line[self.remainder..]
     }
 
     /// Returns the start index of current selected text
     pub(crate) fn get_start(&self) -> usize {
-        self.start
+        self.selected
     }
 
     /// Returns the end index of current selected text
     pub(crate) fn get_end(&self) -> usize {
-        self.end
+        self.remainder - 1
+    }
+
+    /// Returns the start index of the remainder text
+    pub(crate) fn get_start_remainder(&self) -> usize {
+        self.remainder
     }
 
     pub(crate) fn has_remaining(&self) -> bool {
-        !self.get_remaining().is_empty()
+        self.remainder < self.line.len()
     }
 
     /// Select the remaining part and return it (or empty str if end is reached))
-    pub(crate) fn select_remaining(&mut self) -> &str {
-        let remaining = self.get_remaining();
-        self.end += remaining.len();
-        remaining
+    pub(crate) fn select_remainder(&mut self) -> &str {
+        let remainder_str = self.get_remainder();
+        self.remainder += remainder_str.len();
+        remainder_str
     }
 
     /// Select the next character and return it (or `\0` if end is reached)
     pub(crate) fn select_next(&mut self) -> char {
-        if !self.has_remaining() {
-            return char::default();
+        match self.get_remainder().chars().next() {
+            Some(c) => {
+                self.remainder += c.len_utf8();
+                c
+            }
+            None => '\0',
         }
-        self.end += 1;
-        self.last_selected()
     }
 
     /// Select the next `n` characters  and return it (or empty str if end is reached)
     pub(crate) fn select_next_n(&mut self, n: usize) -> &str {
-        let new_start = self.end+1;
-        if n > self.get_remaining().len() { 
-            return self.select_remaining();
+        
+        let n_bytes=self.get_remainder().chars().take(n).fold(
+            0,
+            |acc, c|{ acc+c.len_utf8() }
+        );
+
+        if n_bytes > self.get_remainder().len() {
+            return self.select_remainder();
         }
-        self.end += n;
-        &self.get_selceted()[new_start..]
+
+        let new_start = self.remainder;
+        self.remainder += n_bytes;
+        &self.line[new_start..self.remainder]
     }
 
     /// Select if it starts with a certain string and return true if it is selected
     pub(crate) fn select_if_starts_with(&mut self, s: &str) -> bool {
-        if self.get_remaining().starts_with(s) {
-            self.end += s.len();
+        if self.get_remainder().starts_with(s) {
+            self.remainder += s.len();
             return true;
         }
         false
@@ -75,11 +95,10 @@ impl <'a> Cursor<'a> {
     /// 
     /// The `predicate` is on the character to select and its start index
     pub(crate) fn select_next_while<F>(&mut self, mut predicate: F) where F: FnMut(char, usize) -> bool{
-        while 
-            self.has_remaining()
-            &&
-            predicate(self.get_remaining().chars().next().unwrap_or_default(), self.end + 1)
-        {
+
+        let mut chars = self.get_remainder().chars();
+
+        while chars.next().is_some_and(|c|{ predicate(c, self.remainder) }){
             self.select_next();
         }
     }
@@ -88,9 +107,10 @@ impl <'a> Cursor<'a> {
     /// 
     /// The `predicate` is on the remaining and its start index
     pub(crate) fn select_while<F>(&mut self, mut predicate: F) where F: FnMut(&str, usize) -> isize{
+
         while self.has_remaining(){
             
-            let n = predicate(self.get_remaining(), self.end + 1);
+            let n = predicate(self.get_remainder(), self.remainder);
 
             if n < 1 {
                 break;
@@ -107,11 +127,32 @@ impl <'a> Cursor<'a> {
 
     /// Cut the current selection and return it (to paste it elsewhere) with its range
     pub(crate) fn cut(&mut self) -> (&'a str, usize, usize) {
-        let start = self.start;
-        let end = self.end;
+        let start = self.selected;
+        let end = self.remainder - 1;
         let selected = self.get_selceted();
-        self.end += 1;
-        self.start = self.end;
+        self.selected = self.remainder;
         (selected, start, end)
+    }
+}
+
+#[cfg(test)]
+mod tests{
+    use super::Cursor;
+    
+    #[test]
+    fn test_cursor(){
+        let mut cursor = Cursor::new("لغة نظم");
+
+        assert_eq!(cursor.select_next_n(3), "لغة");
+        assert_eq!(cursor.select_next(), ' ');
+        assert_eq!(cursor.get_remainder(), "نظم");
+        let (cut, start, end) = cursor.cut();
+        assert_eq!(cut, "لغة ");
+        assert_eq!(0, start);
+        assert_eq!("لغة ".len() - 1, end);
+        assert_eq!(cursor.get_remainder(), "نظم");
+        assert_eq!(cursor.select_next_n(3), "نظم");
+        assert_eq!(cursor.get_selceted(), "نظم");
+        assert!(!cursor.has_remaining())
     }
 }

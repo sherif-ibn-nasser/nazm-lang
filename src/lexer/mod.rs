@@ -23,7 +23,7 @@ impl<'a> Lexer<'a> {
             file_lines: file_lines,
             diagnostics: diagnostics,
             current_line_idx: 0,
-            cursor: Cursor::new(""),
+            cursor: Cursor::new(&file_lines[0]),
         }
     }
     

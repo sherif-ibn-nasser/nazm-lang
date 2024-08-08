@@ -1,13 +1,13 @@
 use crate::span::Span;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Token<'a>{
     pub val: &'a str,
     pub span: Span,
     pub typ: TokenType,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum TokenType {
     Bad,
     EOL,
@@ -20,7 +20,7 @@ pub enum TokenType {
     Keyword,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum LiteralTokenType{
     String(String),
     Char(char),
@@ -28,7 +28,7 @@ pub enum LiteralTokenType{
     Num(NumTokenType),
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum NumTokenType {
     I(isize),
     I1(i8),

@@ -49,13 +49,17 @@ impl<'a> Lexer<'a> {
             // A unicode char
             if c == 'ي' {
 
+                let mut code_point_str = String::new();
+
                 for _ in 0..4 {
-                    if !chars.next().is_some_and(|c|{c.is_ascii_hexdigit()}){
+                    let c = chars.next().unwrap_or_default();
+                    if !c.is_ascii_hexdigit(){
                         panic!(); // TODO
                     }
+                    code_point_str.push(c);
                 }
 
-                let code_point=u32::from_str_radix(&remaining[2..6],16).unwrap();
+                let code_point=u32::from_str_radix(&code_point_str,16).unwrap();
 
                 match char::from_u32(code_point){
                     Some(c) => {
@@ -84,7 +88,7 @@ impl<'a> Lexer<'a> {
             panic!() // TODO
         }
 
-        if is_char && rust_lit.len() != 1{
+        if is_char && rust_lit.chars().count() != 1{
             panic!() // TODO
         }
 
@@ -157,5 +161,110 @@ fn to_escape_sequence(c:char) -> Option<char>{
         '\''=> Some('\'')  ,
         '\"'=> Some('\"')  ,
         _   => None
+    }
+}
+
+
+#[cfg(test)]
+mod tests{
+
+    use std::cell::RefCell;
+
+    use crate::diagnostics::Diagnostics;
+
+    use super::*;
+
+    #[test]
+    fn test_lexing_chars_pass(){
+        let lines = vec![
+            "'ن'".to_owned(),
+            "'ظ'".to_owned(),
+            "'م'".to_owned(),
+            "' '".to_owned(),
+            "'N'".to_owned(),
+            "'\\ي0041'".to_owned(), // A
+            "'\\خ'".to_owned(),
+            "'\\ر'".to_owned(),
+            "'\\ص'".to_owned(),
+            "'\\ف'".to_owned(),
+            "'\\س'".to_owned(),
+            "'\\ج'".to_owned(),
+            "'\\\\'".to_owned(),
+            "'\\\''".to_owned(),
+            "'\\\"'".to_owned(),
+        ];
+
+        let expected_chars = vec![
+            'ن',
+            'ظ',
+            'م',
+            ' ',
+            'N',
+            '\u{0041}', // A
+            '\x08',
+            '\x0b',
+            '\x0c',
+            '\t',
+            '\n',
+            '\r',
+            '\\',
+            '\'',
+            '\"',
+        ];
+
+        let diagnostics = RefCell::new(Diagnostics::new());
+
+        let mut lexer = Lexer::new(
+            "test.نظم",
+            &lines,
+            &diagnostics
+        );
+
+        let tokens = lexer.lex();
+
+        for (i, line) in lines.iter().enumerate() {
+            assert_eq!(line, &tokens[i].val);
+            assert_eq!(
+                tokens[i].typ,
+                TokenType::Literal(
+                    LiteralTokenType::Char(expected_chars[i])
+                )
+            );
+        }
+
+        assert_eq!(tokens.last().unwrap().typ, TokenType::EOF);
+
+    }
+
+    #[test]
+    fn test_lexing_strings_pass(){
+        let lines = vec![
+            "\"string \\خ\\ر\\ص\\ف\\س\\ج\\\\ نص literal with\\\'\\\' \\\"QUOTES\\\" \\س and \\ي0041\\ي0042\"".to_owned(),
+        ];
+
+        let expected = "string \x08\x0b\x0c\t\n\r\\ نص literal with\'\' \"QUOTES\" \n and \u{0041}\u{0042}".to_owned();
+
+        let diagnostics = RefCell::new(Diagnostics::new());
+
+        
+
+        let mut lexer = Lexer::new(
+            "test.نظم",
+            &lines,
+            &diagnostics
+        );
+
+        let tokens = lexer.lex();
+        assert_eq!(lines[0], tokens[0].val);
+
+        assert_eq!(
+            tokens[0].typ,
+            TokenType::Literal(
+                LiteralTokenType::String(expected)
+            )
+        );
+
+        assert_eq!(tokens.last().unwrap().typ, TokenType::EOF);
+
     }
 }
