@@ -133,7 +133,7 @@ impl <'a> Cursor<'a> {
         self.selected = self.remainder;
         (selected, start, end)
     }
-    
+
 }
 
 #[cfg(test)]
