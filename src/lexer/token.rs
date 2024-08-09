@@ -1,5 +1,7 @@
 use crate::span::Span;
 
+use super::error::LexerError;
+
 #[derive(Clone, PartialEq, Debug)]
 pub struct Token<'a>{
     pub val: &'a str,
@@ -9,7 +11,7 @@ pub struct Token<'a>{
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum TokenType {
-    Bad,
+    Bad(Vec<LexerError>),
     EOL,
     EOF,
     Space,

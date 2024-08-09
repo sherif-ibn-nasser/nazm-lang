@@ -1,4 +1,6 @@
-use crate::lexer::{Lexer, LiteralTokenType, TokenType};
+use error::*;
+
+use crate::lexer::*;
 
 impl<'a> Lexer<'a> {
     
@@ -14,11 +16,8 @@ impl<'a> Lexer<'a> {
 
         let is_char = quote == '\'';
 
-        let check_is_kufr_or_unsupported_char = |c: char|{
-            if is_kufr_or_unsupported_character(c) {
-                panic!(); // TODO
-            }
-        };
+        // The error in chars and their starts and their lengths (To error them only instead of the whole token)
+        let mut lit_errors: Vec<LexerError> = vec![];
 
         let mut closed = false;
 
@@ -39,7 +38,16 @@ impl<'a> Lexer<'a> {
 
             // A normal char
             if c != '\\'{
-                check_is_kufr_or_unsupported_char(c);
+                if is_kufr_or_unsupported_character(c) {
+                    lit_errors.push(
+                        LexerError{
+                            col: remaining_start,
+                            len: c.len_utf8(),
+                            typ: LexerErrorType::KufrOrInvalidChar,
+                        }
+                    );
+                    return 1;
+                }
                 rust_lit.push(c);
                 return 1; // Select this only char
             }
@@ -49,24 +57,45 @@ impl<'a> Lexer<'a> {
             // A unicode char
             if c == 'ي' {
 
-                let mut code_point_str = String::new();
+                let mut next_4_chars=chars.take(4);
 
-                for _ in 0..4 {
-                    let c = chars.next().unwrap_or_default();
-                    if !c.is_ascii_hexdigit(){
-                        panic!(); // TODO
-                    }
-                    code_point_str.push(c);
+                if !next_4_chars.clone().all(|c|{ c.is_ascii_hexdigit() }){
+                    let next_4_chars_size=next_4_chars.fold(0, |acc, c|{ acc+c.len_utf8() });
+                    lit_errors.push(
+                        LexerError{
+                            col: remaining_start,
+                            len: next_4_chars_size,
+                            typ: LexerErrorType::UnicodeCodePointHexDigitOnly,
+                        }
+                    );
+                    return 6;
                 }
+
+                let code_point_str = next_4_chars.collect::<String>();
 
                 let code_point=u32::from_str_radix(&code_point_str,16).unwrap();
 
                 match char::from_u32(code_point){
                     Some(c) => {
-                        check_is_kufr_or_unsupported_char(c);
+                        if is_kufr_or_unsupported_character(c) {
+                            lit_errors.push(
+                                LexerError{
+                                    col: remaining_start,
+                                    len: 7, // The length is 7 bytes as for (`\`, `ي` and the four digits
+                                    typ: LexerErrorType::KufrOrInvalidChar,
+                                }
+                            );
+                        }
                         rust_lit.push(c);
                     }
-                    None => panic!(), // TODO
+                    None =>
+                        lit_errors.push(
+                            LexerError{
+                                col: remaining_start,
+                                len: 7, // The length is 7 bytes as for (`\`, `ي` and the four digits
+                                typ: LexerErrorType::InvalidUnicodeCodePoint,
+                            }
+                        )
                 }
 
                 return 6; // Select the `\` and `ي` and the 4 digits of the code-point
@@ -74,22 +103,43 @@ impl<'a> Lexer<'a> {
 
             // An escape sequence
             match to_escape_sequence(c) {
-                Some(c) => {
-                    rust_lit.push(c);
-                    return 2; // Select the `\` and the escape char
-                },
-                None => panic!() // TODO,
+                Some(c) => rust_lit.push(c),
+                None => 
+                    lit_errors.push(
+                        LexerError{
+                            col: remaining_start,
+                            len: c.len_utf8() + 1, // The length is 1 byte for `\` and the char's size
+                            typ: LexerErrorType::UnknownEscapeSequence,
+                        }
+                    )
             }
 
-            return 0;
+            return 2; // Select the `\` and the next char
         });
 
         if !closed {
-            panic!() // TODO
+            lit_errors.push(
+                LexerError{
+                    col: self.cursor.get_start_remainder(),
+                    len: 1,
+                    typ: if is_char { LexerErrorType::UnclosedChar } else { LexerErrorType::UnclosedString },
+                }
+            );
         }
 
-        if is_char && rust_lit.chars().count() != 1{
-            panic!() // TODO
+
+        if is_char && rust_lit.chars().count() != 1 {
+            lit_errors.push(
+                LexerError{
+                    col: self.cursor.get_start(),
+                    len: self.cursor.get_selceted().len(),
+                    typ: LexerErrorType::OneCharOnly,
+                }
+            );
+        }
+
+        if !lit_errors.is_empty() {
+            return Some(TokenType::Bad(lit_errors));
         }
 
         Some(
@@ -245,8 +295,6 @@ mod tests{
         let expected = "string \x08\x0b\x0c\t\n\r\\ نص literal with\'\' \"QUOTES\" \n and \u{0041}\u{0042}".to_owned();
 
         let diagnostics = RefCell::new(Diagnostics::new());
-
-        
 
         let mut lexer = Lexer::new(
             "test.نظم",

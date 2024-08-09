@@ -1,11 +1,12 @@
 mod token;
 mod cursor;
 mod lexing_methods;
+mod error;
 
 use std::cell::RefCell;
 use token::*;
 use cursor::Cursor;
-use crate::{diagnostics::Diagnostics, span::Span};
+use crate::{diagnostics::Diagnostics, span::{Span, SpanCursor}};
 
 pub struct Lexer<'a>{
     file_path: &'a str,
@@ -33,9 +34,9 @@ impl<'a> Lexer<'a> {
 
         let mut tokens = vec![];
 
-        for (i, line) in self.file_lines.iter().enumerate() {
+        while self.current_line_idx < self.file_lines.len() {
             
-            self.cursor = Cursor::new(&line);
+            self.cursor = Cursor::new(&self.file_lines[self.current_line_idx]);
 
             while self.cursor.has_remaining() {
                 
@@ -46,9 +47,8 @@ impl<'a> Lexer<'a> {
                 let token = Token {
                     val: val,
                     span: Span {
-                        line: i,
-                        start: start,
-                        end: end,
+                        start: SpanCursor{ line: self.current_line_idx, col: start },
+                        end  : SpanCursor{ line: self.current_line_idx, col: end   },
                     },
                     typ: typ
                 };
@@ -57,15 +57,16 @@ impl<'a> Lexer<'a> {
     
             }
 
+            self.current_line_idx += 1;
+
         }
 
         tokens.push(
             Token {
                 val:"\0",
                 span: Span {
-                    line: self.current_line_idx+1,
-                    start: 0,
-                    end: 0,
+                    start: SpanCursor{ line: self.current_line_idx, col: self.cursor.get_start_remainder() },
+                    end  : SpanCursor{ line: self.current_line_idx, col: self.cursor.get_start_remainder() },
                 },
                 typ: TokenType::EOF
             }
@@ -86,7 +87,7 @@ impl<'a> Lexer<'a> {
             typ
         }
         else {
-            TokenType::Bad
+            TokenType::Bad(vec![])
         }
         
     }

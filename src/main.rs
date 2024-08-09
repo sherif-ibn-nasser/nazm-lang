@@ -21,25 +21,3 @@ fn main() {
     }
     println!("Hello, world!");
 }
-
-struct LL<'a>{
-    t: u16,
-    u: u16,
-    v: &'a str
-}
-
-impl<'a> LL <'a>{
-    fn lex(&mut self) {
-        while self.t < self.u {
-            self.next_token();
-            self.t += 1;
-        }
-
-        self.t=8;
-        self.u=5;
-    }
-
-    fn next_token(&mut self){
-        self.t=5;
-    }
-}
