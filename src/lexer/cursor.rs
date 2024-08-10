@@ -94,7 +94,7 @@ impl <'a> Cursor<'a> {
     /// Select while `predicate` on the next character to select is matched
     /// 
     /// The `predicate` is on the character to select and its start index
-    pub(crate) fn select_next_while<F>(&mut self, mut predicate: F) where F: FnMut(char, usize) -> bool{
+    pub(crate) fn select_next_while<F>(&mut self, mut predicate: F) where F: FnMut(char, usize) -> bool {
 
         let mut chars = self.get_remainder().chars();
 
