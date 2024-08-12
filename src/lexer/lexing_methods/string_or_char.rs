@@ -57,7 +57,7 @@ impl<'a> Lexer<'a> {
             // A unicode char
             if c == 'ي' {
 
-                let mut next_4_chars=chars.take(4);
+                let next_4_chars=chars.take(4);
 
                 if !next_4_chars.clone().all(|c|{ c.is_ascii_hexdigit() }){
                     let next_4_chars_size=next_4_chars.fold(0, |acc, c|{ acc+c.len_utf8() });
@@ -122,7 +122,7 @@ impl<'a> Lexer<'a> {
                 LexerError{
                     col: self.cursor.get_start_remainder(),
                     len: 1,
-                    typ: if is_char { LexerErrorType::UnclosedChar } else { LexerErrorType::UnclosedString },
+                    typ: if is_char { LexerErrorType::UnclosedChar } else { LexerErrorType::UnclosedStr },
                 }
             );
         }
@@ -133,7 +133,7 @@ impl<'a> Lexer<'a> {
                 LexerError{
                     col: self.cursor.get_start(),
                     len: self.cursor.get_selceted().len(),
-                    typ: LexerErrorType::OneCharOnly,
+                    typ: LexerErrorType::ManyChars,
                 }
             );
         }
@@ -148,11 +148,196 @@ impl<'a> Lexer<'a> {
                     LiteralTokenType::Char(rust_lit.chars().next().unwrap())
                 }
                 else {
-                    LiteralTokenType::String(rust_lit)
+                    LiteralTokenType::Str(rust_lit)
                 }
             )
         )
     }
+}
+
+impl<'a> LexerIter<'a> {
+
+    pub(crate) fn next_str_or_char_token(&mut self) -> TokenType {
+
+        let (start, quote) = self.cursor.stopped_at;
+
+        let is_char = quote == '\'';
+
+        let mut rust_str_lit = String::new();
+
+        let mut errs = vec![];
+
+        loop {
+
+            match self.next_valid_nazm_rust_char_in_str() {
+                Err(mut err) => {
+                    if err.typ == LexerErrorType::UnclosedStr {
+                        if is_char {
+                            err.typ = LexerErrorType::UnclosedChar;
+                        }
+                        return TokenType::Bad(vec![err]); // Return unclosed delimiter errors early before validation of typed chars
+                    }
+    
+                    errs.push(err);
+                }
+                Ok(option) => match option {
+                    Some(ch) => rust_str_lit.push(ch),
+                    None => break, // The string is closed
+                }
+            }
+
+        }
+
+        if !is_char {
+            if !errs.is_empty() {
+                return TokenType::Bad(errs);
+            }
+
+            return TokenType::Literal(LiteralTokenType::Str(rust_str_lit));
+        }
+
+        let mut iter = rust_str_lit.chars();
+
+        let ch = match iter.next() {
+            None => return TokenType::Bad(vec![LexerError{
+                col: start.col,
+                len: 1,
+                typ: LexerErrorType::ZeroChars
+            }]),
+            Some(ch) => ch
+        };
+
+        if iter.next().is_some() {
+            return TokenType::Bad(vec![LexerError{
+                col: start.col,
+                len: 1,
+                typ: LexerErrorType::ManyChars
+            }])
+        }
+
+        if !errs.is_empty() {
+            return TokenType::Bad(errs);
+        }
+
+        return TokenType::Literal(LiteralTokenType::Char(ch));
+
+    }
+
+    fn next_valid_nazm_rust_char_in_str(&mut self) -> Result<Option<char>, LexerError> {
+
+        let ch = match self.next_cursor_non_eol() {
+            Some((_, '\"')) => return Ok(None),
+            Some((_, ch)) => ch,
+            None => return self.unclosed_delimiter_err(),
+        };
+
+        if ch != '\\' {
+            return self.check_is_kufr_or_unsupported_char()
+        }
+
+        let ch = match self.next_cursor_non_eol() {
+            Some((_, ch)) => ch,
+            None => return self.unclosed_delimiter_err(),
+        };
+
+        if ch != 'ي' {
+            return self.check_is_escape_sequence();
+        }
+
+        let start = self.cursor.stopped_at.0;
+
+        let mut code_point_str = String::new();
+
+        for _ in 0..4 {
+            match self.next_cursor_non_eol() {
+                Some((_, ch)) => code_point_str.push(ch),
+                None => return self.unclosed_delimiter_err(),
+            }
+        }
+
+        if code_point_str.len() != 4 || !code_point_str.chars().all(|ch| { ch.is_ascii_hexdigit() } ){
+            return Err(
+                LexerError {
+                    col: start.col + 1, // To start marking after `ي` 
+                    len: code_point_str.len(),
+                    typ: LexerErrorType::UnicodeCodePointHexDigitOnly,
+                }
+            );
+        }
+
+        let code_point = u32::from_str_radix(&code_point_str,16).unwrap();
+
+        match char::from_u32(code_point){
+            Some(ch) => self.check_is_kufr_or_unsupported_char_unicode(ch, start),
+            None => Err(
+                LexerError{
+                    col: start.col + 1, // To start marking after `ي` 
+                    len: 4, // The 4 digits
+                    typ: LexerErrorType::InvalidUnicodeCodePoint,
+                }
+            )
+        }
+    }
+
+    #[inline]
+    fn unclosed_delimiter_err(&self) -> Result<Option<char>, LexerError> {
+        Err(
+            LexerError {
+                col: self.cursor.stopped_at.0.col,
+                len: 1,
+                typ: LexerErrorType::UnclosedStr,
+            }
+        )
+    }
+
+    #[inline]
+    fn check_is_kufr_or_unsupported_char_unicode(&self, ch: char, start: SpanCursor) -> Result<Option<char>, LexerError> {
+        if is_kufr_or_unsupported_character(ch) {
+            Err(
+                LexerError {
+                    col: start.col + 1, // To start marking after `ي`
+                    len: 4, // The 4 digits
+                    typ: LexerErrorType::KufrOrInvalidChar,
+                }
+            )
+        }
+        else { Ok(Some(ch)) }
+    }
+
+    #[inline]
+    fn check_is_kufr_or_unsupported_char(&self) -> Result<Option<char>, LexerError> {
+        let (start, ch) = self.cursor.stopped_at;
+
+        if is_kufr_or_unsupported_character(ch) {
+            Err(
+                LexerError {
+                    col: start.col,
+                    len: 1,
+                    typ: LexerErrorType::KufrOrInvalidChar,
+                }
+            )
+        }
+        else { Ok(Some(ch)) }
+    }
+
+    #[inline]
+    fn check_is_escape_sequence(&self) -> Result<Option<char>, LexerError> {
+
+        let (start, ch) = self.cursor.stopped_at;
+
+        match to_escape_sequence(ch) {
+            None => Err(
+                LexerError {
+                    col: start.col,
+                    len: 1,
+                    typ: LexerErrorType::UnknownEscapeSequence,
+                }
+            ),
+            some => Ok(some)
+        }
+
+    }
+
 }
 
 fn is_kufr_or_unsupported_character(c:char) -> bool{
@@ -210,6 +395,7 @@ fn to_escape_sequence(c:char) -> Option<char>{
         '\\'=> Some('\\')  ,
         '\''=> Some('\'')  ,
         '\"'=> Some('\"')  ,
+        '0' => Some('\0')  ,
         _   => None
     }
 }
@@ -308,7 +494,7 @@ mod tests{
         assert_eq!(
             tokens[0].typ,
             TokenType::Literal(
-                LiteralTokenType::String(expected)
+                LiteralTokenType::Str(expected)
             )
         );
 

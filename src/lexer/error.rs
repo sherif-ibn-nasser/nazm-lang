@@ -1,9 +1,9 @@
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct LexerError {
-    /// The start index to mark from
+    /// The index of character to start marking from
     pub col: usize,
-    /// The length for marking (in bytes)
+    /// The length for marking (in characters)
     pub len: usize,
     /// The type of error
     pub typ: LexerErrorType,
@@ -11,9 +11,11 @@ pub struct LexerError {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LexerErrorType {
-    UnclosedString,
+    UnclosedStr,
     UnclosedChar,
-    OneCharOnly,
+    UnclosedDelimitedComment,
+    ZeroChars,
+    ManyChars,
     KufrOrInvalidChar,
     UnicodeCodePointHexDigitOnly,
     InvalidUnicodeCodePoint,

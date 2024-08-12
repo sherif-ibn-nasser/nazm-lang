@@ -15,7 +15,8 @@ pub enum TokenType {
     EOL,
     EOF,
     Space,
-    Comment,
+    LineComment,
+    DelimitedComment,
     Literal(LiteralTokenType),
     Id,
     Symbol(SymbolType),
@@ -24,7 +25,7 @@ pub enum TokenType {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LiteralTokenType{
-    String(String),
+    Str(String),
     Char(char),
     Bool(bool),
     F4(f32),
@@ -52,64 +53,14 @@ pub enum Radix {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum SymbolType {
-    /// `<<=`
-    ShrEqual,
-    /// `>>=`
-    ShlEqual,
-    /// `**=`
-    PowerEqual,
-    /// `<<`
-    SHR,
-    /// `>>`
-    SHL,
-    /// `**`
-    Power,
-    /// `++`
-    PlusPlus,
-    /// `--`
-    MinusMinus,
-    /// `>=`
-    GreaterEqual,
-    /// `<=`
-    LessEqual,
-    /// `==`
-    EqualEqual,
-    /// `!=`
-    NotEqual,
-    /// `&&`
-    LogicalAnd,
-    /// `||`
-    LogicalOr,
-    /// `+=`
-    PLusEqual,
-    /// `-=`
-    MinusEqual,
-    /// `*=`
-    StarEqual,
-    /// `/=`
-    SlashEqual,
-    /// `%=`
-    ModuloEqual,
-    /// `~=`
-    BitNotEqual,
-    /// `&=`
-    BitAndEqual,
-    /// `^=`
-    XorEqual,
-    /// `|=`
-    BitOrEqual,
-    /// `::`
-    DoubleColons,
     /// `،`
     Comma,
     /// `؛`
     Semicolon,
     /// `؟`
     QuestionMark,
-    /// `<`
-    OpenAngleBracket,
-    /// `>`
-    CloseAngleBracket,
+    /// `.`
+    DOT,
     /// `(`
     OpenParenthesis,
     /// `)`
@@ -122,36 +73,95 @@ pub enum SymbolType {
     OpenSquareBracket,
     /// `]`
     CloseSquareBracket,
-    /// `:`
-    COLON,
-    /// `!`
-    ExclamationMark,
-    /// `~`
-    BitNot,
-    /// `&`
-    AMPERSAND,
-    /// `^`
-    XOR,
-    /// `|`
-    BAR,
-    /// `.`
-    DOT,
-    /// `\"`
-    DoubleQuote,
-    /// `\'`
-    SingleQuote,
-    /// `\\`
-    BackSlash,
-    /// `+`
-    Plus,
-    /// `-`
-    Minus,
+
+    /// `<`
+    OpenAngleBracketOrLess,
+    /// `<=`
+    LessEqual,
+    /// `<<`
+    Shr,
+    /// `<<=`
+    ShrEqual,
+
+    /// `>`
+    CloseAngleBracketOrGreater,
+    /// `>=`
+    GreaterEqual,
+    /// `>>`
+    Shl,
+    /// `>>=`
+    ShlEqual,
+
     /// `*`
     Star,
+    /// `*=`
+    StarEqual,
+    /// `**`
+    Power,
+    /// `**=`
+    PowerEqual,
+
     /// `/`
     Slash,
-    /// `=`
-    Equal,
+    /// `/=`
+    SlashEqual,
+
+    /// `+`
+    Plus,
+    /// `+=`
+    PLusEqual,
+    /// `++`
+    PlusPlus,
+
+    /// `-`
+    Minus,
+    /// `-=`
+    MinusEqual,
+    /// `--`
+    MinusMinus,
+
+    /// `|`
+    BitOr,
+    /// `|=`
+    BitOrEqual,
+    /// `||`
+    LogicalOr,
+
+    /// `&`
+    BitAnd,
+    /// `&=`
+    BitAndEqual,
+    /// `&&`
+    LogicalAnd,
+
     /// `%`
     Modulo,
+    /// `%=`
+    ModuloEqual,
+
+    /// `~`
+    BitNot,
+    /// `~=`
+    BitNotEqual,
+
+    /// `^`
+    Xor,
+    /// `^=`
+    XorEqual,
+
+    /// `=`
+    Equal,
+    /// `==`
+    EqualEqual,
+
+    /// `!`
+    ExclamationMark,
+    /// `!=`
+    NotEqual,
+
+    /// `:`
+    Colon,
+    /// `::`
+    DoubleColons,
+    
 }
