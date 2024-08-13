@@ -3,10 +3,10 @@ mod cli;
 mod lexer;
 mod span;
 
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, io::{self, Write}, process::Command};
 use diagnostics::Diagnostics;
 use lexer::*;
-use owo_colors::{AnsiColors, OwoColorize};
+use owo_colors::{OwoColorize, XtermColors};
 
 fn main() {
 
@@ -18,20 +18,26 @@ fn main() {
 
     let lexer = LexerIter::new(&file_content);
 
+
+    // RTL printing
+    let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
+    io::stdout().write_all(&output.stdout[1..output.stdout.len()-1]).unwrap();
+
     let mut bad_tokens = vec![];
 
     for (span, token_typ, val) in lexer {
+
         let color = match token_typ {
-            TokenType::LineComment | TokenType::DelimitedComment => AnsiColors::BrightGreen,
-            TokenType::Symbol(_) => AnsiColors::BrightYellow,
-            TokenType::Id => AnsiColors::BrightWhite,
+            TokenType::LineComment | TokenType::DelimitedComment =>XtermColors::UserGreen,
+            TokenType::Symbol(_) => XtermColors::UserBrightYellow,
+            TokenType::Id => XtermColors::LightAnakiwaBlue,
             TokenType::Keyword(_) | TokenType::Literal(LiteralTokenType::Bool(_))
-            => AnsiColors::BrightBlue,
+            => XtermColors::FlushOrange,
             TokenType::Literal(
                 LiteralTokenType::Str(_) | LiteralTokenType::Char(_)
-            ) => AnsiColors::BrightMagenta,
-            TokenType::Literal(_) => AnsiColors::BrightCyan,
-            _ => AnsiColors::White,
+            ) => XtermColors::PinkSalmon,
+            TokenType::Literal(_) => XtermColors::UserBrightCyan,
+            _ => XtermColors::UserWhite,
         };
 
         let mut val = format!("{}", val.color(color));
