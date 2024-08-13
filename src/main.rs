@@ -5,7 +5,8 @@ mod span;
 
 use std::{cell::RefCell, collections::HashMap};
 use diagnostics::Diagnostics;
-use lexer::Lexer;
+use lexer::*;
+use owo_colors::{AnsiColors, OwoColorize};
 
 fn main() {
 
@@ -13,11 +14,46 @@ fn main() {
 
     let diagnostics = RefCell::new(Diagnostics::new());
 
-    cli::read_files(&mut files);
+    let file_content = cli::read_file();
 
-    for (file_path,file_lines) in files.iter(){
-        let mut lexer = Lexer::new(file_path, file_lines, &diagnostics);
-        let tokens = lexer.lex();
+    let lexer = LexerIter::new(&file_content);
+
+    let mut bad_tokens = vec![];
+
+    for (span, token_typ, val) in lexer {
+        let color = match token_typ {
+            TokenType::LineComment | TokenType::DelimitedComment => AnsiColors::BrightGreen,
+            TokenType::Symbol(_) => AnsiColors::BrightYellow,
+            TokenType::Id => AnsiColors::BrightWhite,
+            TokenType::Keyword(_) | TokenType::Literal(LiteralTokenType::Bool(_))
+            => AnsiColors::BrightBlue,
+            TokenType::Literal(
+                LiteralTokenType::Str(_) | LiteralTokenType::Char(_)
+            ) => AnsiColors::BrightMagenta,
+            TokenType::Literal(_) => AnsiColors::BrightCyan,
+            _ => AnsiColors::White,
+        };
+
+        let mut val = format!("{}", val.color(color));
+
+        if matches!(token_typ, TokenType::Keyword(_) | TokenType::Symbol(_)) {
+            val = format!("{}", val.bold());
+        }
+        
+        print!("{}", val);
+
+        if let TokenType::Bad(errs) = token_typ {
+            bad_tokens.push((val, span, errs));
+        }
     }
-    println!("Hello, world!");
+
+    if bad_tokens.is_empty() {
+        return;
+    }
+
+    println!("-----------------------------");
+
+    for (_0, _1, _2) in bad_tokens {
+        println!("{}, {:?}, {:?}", _0, _1, _2)
+    }
 }

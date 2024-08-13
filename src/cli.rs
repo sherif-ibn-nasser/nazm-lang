@@ -9,8 +9,8 @@ use owo_colors::OwoColorize;
 /// The official compiler of Nazm programming language 
 struct CLI{
     #[bpaf(positional("FILE"))]
-    /// Nazm files to compile (with *.نظم extension)
-    files: Vec<PathBuf>,
+    /// Nazm file to compile (with *.نظم extension)
+    file: PathBuf,
 }
 
 fn print_err(msg: String){
@@ -22,11 +22,9 @@ fn print_err(msg: String){
     println!("{}{} {}{}",err.bright_red(),err_col,msg,err_dot)
 }
 
-pub fn read_files(files: &mut HashMap<String, Vec<String>>){
+pub fn read_file() -> String{
 
-    let files_paths=c_l_i().fallback_to_usage().run().files;
-
-    let mut file_errors = false;
+    let file_path=c_l_i().fallback_to_usage().run().file;
     
     let err_msg_str=format!(
         "{} {}{}",
@@ -35,50 +33,33 @@ pub fn read_files(files: &mut HashMap<String, Vec<String>>){
         "، ولكن تم العثور على".bold()
     );
 
-    for file_path in files_paths {
-
-        let file_path_str = file_path.to_str().unwrap().to_string();
+    let file_path_str = file_path.to_str().unwrap().to_string();
 
 
-        match file_path.extension() {
-            Some(ext) => {
+    match file_path.extension() {
+        Some(ext) => {
 
-                if ext != "نظم"{
-                    file_errors=true;
-                    print_err(format!("{} {}", err_msg_str ,file_path_str.bright_red().bold()));
-                    continue;
-                }
-
-            },
-
-            None => {
-                file_errors=true;
+            if ext != "نظم"{
                 print_err(format!("{} {}", err_msg_str ,file_path_str.bright_red().bold()));
-                continue;
-            },
-        }
-        
-        match fs::read_to_string(&file_path) {
-            Ok(content) => {
-                let file_lines = content
-                    .lines()
-                    .map(String::from)
-                    .collect();
+                exit(1);
+            }
 
+        },
 
-                files.insert(file_path_str, file_lines);
-            },
-            Err(_) => {
-                file_errors=true;
-                print_err(format!("{} {} {}", "لا يمكن قراءة الملف".bold() ,file_path_str.bright_red().bold(), "أو أنه غير موجود".bold()));
-                continue;
-            },
-        }
-
+        None => {
+            print_err(format!("{} {}", err_msg_str ,file_path_str.bright_red().bold()));
+            exit(1);
+        },
     }
-
-    if file_errors {
-        exit(1)
+    
+    match fs::read_to_string(&file_path) {
+        Ok(content) => {
+            return content;
+        },
+        Err(_) => {
+            print_err(format!("{} {} {}", "لا يمكن قراءة الملف".bold() ,file_path_str.bright_red().bold(), "أو أنه غير موجود".bold()));
+            exit(1);
+        },
     }
 
 }
