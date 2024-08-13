@@ -1,3 +1,6 @@
+use documented::{DocumentedFields, DocumentedVariants};
+use strum::EnumIter;
+
 use crate::span::Span;
 
 use super::error::LexerError;
@@ -20,7 +23,7 @@ pub enum TokenType {
     Literal(LiteralTokenType),
     Id,
     Symbol(SymbolType),
-    Keyword,
+    Keyword(KeywordType),
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -51,117 +54,126 @@ pub enum Radix {
     Hex = 16,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, DocumentedVariants, DocumentedFields, EnumIter)]
 pub enum SymbolType {
-    /// `،`
-    Comma,
-    /// `؛`
-    Semicolon,
-    /// `؟`
-    QuestionMark,
-    /// `.`
-    DOT,
-    /// `(`
-    OpenParenthesis,
-    /// `)`
-    CloseParenthesis,
-    /// `{`
-    OpenCurlyBraces,
-    /// `}`
-    CloseCurlyBraces,
-    /// `[`
-    OpenSquareBracket,
-    /// `]`
-    CloseSquareBracket,
 
-    /// `<`
-    OpenAngleBracketOrLess,
-    /// `<=`
-    LessEqual,
-    /// `<<`
-    Shr,
-    /// `<<=`
+    /// <..<
+    LessDotDotLess,
+    /// <..
+    LessDotDot,
+    /// ..<
+    DotDotLess,
+    /// <<=
     ShrEqual,
-
-    /// `>`
-    CloseAngleBracketOrGreater,
-    /// `>=`
-    GreaterEqual,
-    /// `>>`
-    Shl,
-    /// `>>=`
+    /// >>=
     ShlEqual,
-
-    /// `*`
-    Star,
-    /// `*=`
-    StarEqual,
-    /// `**`
-    Power,
-    /// `**=`
+    /// **=
     PowerEqual,
 
-    /// `/`
-    Slash,
-    /// `/=`
+    /// <=
+    LessEqual,
+    /// <<
+    Shr,
+    /// >=
+    GreaterEqual,
+    /// >>
+    Shl,
+    /// *=
+    StarEqual,
+    /// **
+    Power,
+    /// /=
     SlashEqual,
-
-    /// `+`
-    Plus,
-    /// `+=`
+    /// +=
     PLusEqual,
-    /// `++`
+    /// ++
     PlusPlus,
-
-    /// `-`
-    Minus,
-    /// `-=`
+    /// -=
     MinusEqual,
-    /// `--`
+    /// --
     MinusMinus,
-
-    /// `|`
-    BitOr,
-    /// `|=`
+    /// |=
     BitOrEqual,
-    /// `||`
+    /// ||
     LogicalOr,
-
-    /// `&`
-    BitAnd,
-    /// `&=`
+    /// &=
     BitAndEqual,
-    /// `&&`
+    /// &&
     LogicalAnd,
-
-    /// `%`
-    Modulo,
-    /// `%=`
+    /// %=
     ModuloEqual,
-
-    /// `~`
-    BitNot,
-    /// `~=`
+    /// ~=
     BitNotEqual,
-
-    /// `^`
-    Xor,
-    /// `^=`
+    /// ^=
     XorEqual,
-
-    /// `=`
-    Equal,
-    /// `==`
+    /// ==
     EqualEqual,
-
-    /// `!`
-    ExclamationMark,
-    /// `!=`
+    /// !=
     NotEqual,
-
-    /// `:`
-    Colon,
-    /// `::`
+    /// ::
     DoubleColons,
+    /// ..
+    DotDot,
+
+    /// ،
+    Comma,
+    /// ؛
+    Semicolon,
+    /// ؟
+    QuestionMark,
+    /// (
+    OpenParenthesis,
+    /// )
+    CloseParenthesis,
+    /// {
+    OpenCurlyBraces,
+    /// }
+    CloseCurlyBraces,
+    /// [
+    OpenSquareBracket,
+    /// ]
+    CloseSquareBracket,
+    /// .
+    Dot,
+    /// <
+    OpenAngleBracketOrLess,
+    /// >
+    CloseAngleBracketOrGreater,
+    /// *
+    Star,
+    /// /
+    Slash,
+    /// +
+    Plus,
+    /// -
+    Minus,
+    /// |
+    BitOr,
+    /// &
+    BitAnd,
+    /// %
+    Modulo,
+    /// ~
+    BitNot,
+    /// ^
+    Xor,
+    /// !
+    ExclamationMark,
+    /// :
+    Colon,
+    /// =
+    Equal,
     
+}
+
+#[derive(DocumentedVariants, Debug, Clone, PartialEq, EnumIter)]
+pub enum KeywordType {
+    /// دالة
+    Fn,
+    /// احجز
+    Let,
+    /// متغير
+    Mut,
+    /// ثابت
+    Const,
 }

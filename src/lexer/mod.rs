@@ -3,8 +3,10 @@ mod cursor;
 mod lexing_methods;
 mod error;
 
-use std::{cell::RefCell, char, slice::Iter, str::Chars, usize};
+use std::{cell::RefCell, str::Chars};
+use documented::DocumentedVariants;
 use error::{LexerError, LexerErrorType};
+use strum::IntoEnumIterator;
 use token::*;
 use cursor::Cursor;
 use crate::{diagnostics::Diagnostics, span::{Span, SpanCursor}};
@@ -235,7 +237,7 @@ impl<'a> Lexer<'a> {
             return Some(TokenType::Symbol(SymbolType::BitOr));
         }
         if self.cursor.select_if_starts_with("."){
-            return Some(TokenType::Symbol(SymbolType::DOT));
+            return Some(TokenType::Symbol(SymbolType::Dot));
         }
         if self.cursor.select_if_starts_with("+"){
             return Some(TokenType::Symbol(SymbolType::Plus));
@@ -280,7 +282,7 @@ impl<'a> Iterator for LexerIter<'a> {
         let end = self.cursor.stopped_at.0;
         let end_byte = self.stopped_at_bidx;
         let val = &self.text[start_byte..end_byte];
-        Some((Span { start: start, end: end}, typ, val))
+        Some((Span { start: start, end: end }, typ, val))
     }
 }
 
@@ -292,96 +294,53 @@ impl<'a> LexerIter<'a> {
         _self
     }
 
-    fn next_token_type(&mut self) -> TokenType{
+    fn next_token_type(&mut self) -> TokenType {
 
         match self.cursor.stopped_at.1 {
-            '\'' | '\"' => self.next_str_or_char_token(),
             '/' => self.next_token_with_slash(),
             '،' => { self.next_cursor(); TokenType::Symbol(SymbolType::Comma) }
             '؛' => { self.next_cursor(); TokenType::Symbol(SymbolType::Semicolon) }
             '؟' => { self.next_cursor(); TokenType::Symbol(SymbolType::QuestionMark) }
-            '.' => { self.next_cursor(); TokenType::Symbol(SymbolType::DOT) }
-            '(' => { self.next_cursor(); TokenType::Symbol(SymbolType::OpenParenthesis) }
-            ')' => { self.next_cursor(); TokenType::Symbol(SymbolType::CloseParenthesis) }
-            '{' => { self.next_cursor(); TokenType::Symbol(SymbolType::OpenCurlyBraces) }
-            '}' => { self.next_cursor(); TokenType::Symbol(SymbolType::CloseCurlyBraces) }
-            '[' => { self.next_cursor(); TokenType::Symbol(SymbolType::OpenSquareBracket) }
-            ']' => { self.next_cursor(); TokenType::Symbol(SymbolType::CloseSquareBracket) }
-            '<' => match self.next_cursor() {
-                Some((_, '<')) => match self.next_cursor() {
-                    Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::ShrEqual) }
-                    _ => TokenType::Symbol(SymbolType::Shr),
+            '\n' => { self.next_cursor(); TokenType::EOL }
+            '0'..='9' => self.next_num_token(),
+            '\'' | '\"' => self.next_str_or_char_token(),
+            '\t' | '\x0C' | '\r' | ' ' => {
+                while self.next_cursor().is_some_and(|(_, ch)| ch.is_ascii_whitespace() && ch != '\n') {} // Skip whitespaces
+                TokenType::Space
+            }
+            any => {
+
+                if self.stopped_at_bidx == self.text.len() {
+                    return TokenType::EOF;
                 }
-                Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::LessEqual) }
-                _ => TokenType::Symbol(SymbolType::OpenAngleBracketOrLess),
-            }
-            '>' => match self.next_cursor() {
-                Some((_, '>')) => match self.next_cursor() {
-                    Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::ShlEqual) }
-                    _ => TokenType::Symbol(SymbolType::Shl),
+
+                let text = &self.text[self.stopped_at_bidx..];
+
+                for symbol in SymbolType::iter() {
+                    if symbol.get_variant_docs().is_ok_and(|val| text.starts_with(val)){
+                        for _ in 0..symbol.get_variant_docs().unwrap().len() { // The multibyte symbols are checked above
+                            self.next_cursor();
+                        }
+                        return TokenType::Symbol(symbol);
+                    }
                 }
-                Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::GreaterEqual) }
-                _ => TokenType::Symbol(SymbolType::CloseAngleBracketOrGreater),
-            }
-            '*' => match self.next_cursor() {
-                Some((_, '*')) => match self.next_cursor() {
-                    Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::PowerEqual) }
-                    _ => TokenType::Symbol(SymbolType::Power),
+                
+                if !any.is_alphabetic() {
+                    self.next_cursor();
+                    return TokenType::Bad(vec![]);
                 }
-                Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::StarEqual) }
-                _ => TokenType::Symbol(SymbolType::Star),
-            }
-            '+' => match self.next_cursor() {
-                Some((_, '+')) => { self.next_cursor(); TokenType::Symbol(SymbolType::PlusPlus) }
-                Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::PLusEqual) }
-                _ => TokenType::Symbol(SymbolType::Plus),
-            }
-            '-' => match self.next_cursor() {
-                Some((_, '-')) => { self.next_cursor(); TokenType::Symbol(SymbolType::MinusMinus) }
-                Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::MinusEqual) }
-                _ => TokenType::Symbol(SymbolType::Minus),
-            }
-            '|' => match self.next_cursor() {
-                Some((_, '|')) => { self.next_cursor(); TokenType::Symbol(SymbolType::LogicalOr) }
-                Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::BitOrEqual) }
-                _ => TokenType::Symbol(SymbolType::BitOr),
-            }
-            '&' => match self.next_cursor() {
-                Some((_, '&')) => { self.next_cursor(); TokenType::Symbol(SymbolType::LogicalAnd) }
-                Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::BitAndEqual) }
-                _ => TokenType::Symbol(SymbolType::BitAnd),
-            }
-            '%' => match self.next_cursor() {
-                Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::ModuloEqual) }
-                _ => TokenType::Symbol(SymbolType::Modulo),
-            }
-            '~' => match self.next_cursor() {
-                Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::BitNotEqual) }
-                _ => TokenType::Symbol(SymbolType::BitNot),
-            }
-            '^' => match self.next_cursor() {
-                Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::XorEqual) }
-                _ => TokenType::Symbol(SymbolType::Xor),
-            }
-            '=' => match self.next_cursor() {
-                Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::EqualEqual) }
-                _ => TokenType::Symbol(SymbolType::Equal),
-            }
-            '!' => match self.next_cursor() {
-                Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::NotEqual) }
-                _ => TokenType::Symbol(SymbolType::ExclamationMark),
-            }
-            ':' => match self.next_cursor() {
-                Some((_, ':')) => { self.next_cursor(); TokenType::Symbol(SymbolType::DoubleColons) }
-                _ => TokenType::Symbol(SymbolType::Colon),
-            }
-            _ => TokenType::EOF,
+
+                self.next_id_or_keyword()
+            },
         }
 
     }
 
     fn next_cursor(&mut self) -> Option<(SpanCursor, char)> {
-        self.stopped_at_bidx += self.cursor.stopped_at.1.len_utf8();
+        let size = self.cursor.stopped_at.1.len_utf8();
+
+        self.stopped_at_bidx += size;
+
         self.cursor.next()
     }
 
@@ -438,7 +397,25 @@ impl<'a> LexerIter<'a> {
 
     }
 
-    
+    fn next_id_or_keyword(&mut self) -> TokenType {
+
+        let start = self.stopped_at_bidx;
+
+        while self.next_cursor_non_eol().is_some_and(|(_, ch)| ch.is_alphanumeric() || ch == '_' ) {}
+
+        let end = self.stopped_at_bidx;
+        
+        let id = &self.text[start..end];
+
+        for keyword_typ in KeywordType::iter() {
+            if keyword_typ.get_variant_docs().is_ok_and(|val| id == val) {
+                return TokenType::Keyword(keyword_typ);
+            }
+        }
+
+        return TokenType::Id;
+
+    }
 
 }
 
@@ -467,19 +444,24 @@ impl<'a> Iterator for CharsCursor<'a> {
     type Item = (SpanCursor, char);
 
     fn next(&mut self) -> Option<Self::Item> {
+
+        if self.stopped_at.1 != '\0' {  // Not the first time to call the `next` method
+            self.stopped_at.0.col += 1; // Update the column
+        }
+        if self.stopped_at.1 == '\n' { // Last was a new line character
+            self.stopped_at.0.line += 1; // Update the line
+            self.stopped_at.0.col = 0; // Reset the column
+        }
+
         match self.chars.next() {
             Some(ch) => {
-                if self.stopped_at.1 != '\0' {  // Not the first time to call the `next` method
-                    self.stopped_at.0.col += 1; // Update the column
-                }
-                if self.stopped_at.1 == '\n' { // Last was a new line character
-                    self.stopped_at.0.line += 1; // Update the line
-                    self.stopped_at.0.col = 0; // Reset the column
-                }
                 self.stopped_at.1 = ch; // Update the character
                 Some(self.stopped_at)
             }
-            None => None
+            None => {
+                self.stopped_at.1 = '\0'; // Update the character
+                None
+            }
         }
     }
     
@@ -488,12 +470,114 @@ impl<'a> Iterator for CharsCursor<'a> {
 #[cfg(test)]
 
 mod tests{
+    use documented::DocumentedVariants;
+    use strum::IntoEnumIterator;
+    use crate::{lexer::TokenType, span::{Span, SpanCursor}};
+    use super::{KeywordType, LexerIter, SymbolType};
 
     #[test]
-    fn test() {
-        let mut it="شريف".chars().enumerate();
-        for i in 0..2 {
-            println!("{}: {}", i, it.next().unwrap().1);
+    fn test_symbols_lexing() {
+        for symbol in SymbolType::iter() {
+            let symbol_val = symbol.get_variant_docs().unwrap();
+            let (span, typ, val) = LexerIter::new(&symbol_val).next().unwrap();
+            assert_eq!(
+                span,
+                Span { 
+                    start: SpanCursor { line:0, col: 0 },
+                    end:   SpanCursor { line:0, col: symbol_val.chars().count() },
+                }
+            );
+            assert_eq!(val, symbol_val);
+            assert_eq!(typ, TokenType::Symbol(symbol));
+        }
+
+        let mut symbols_line = String::new();
+        for symbol in SymbolType::iter() {
+            let symbol_val = symbol.get_variant_docs().unwrap();
+            symbols_line.push_str(symbol_val);
+        }
+
+        let mut tokens = LexerIter::new(&symbols_line);
+        let mut symbols_iter = SymbolType::iter();
+        let mut columns = 0;
+
+        while let Some((span, typ, val)) = tokens.next() {
+            let symbol = symbols_iter.next().unwrap();
+            let symbol_val = symbol.get_variant_docs().unwrap();
+
+            assert_eq!(
+                span,
+                Span { 
+                    start: SpanCursor { line:0, col: columns },
+                    end:   SpanCursor { line:0, col: columns + symbol_val.chars().count() },
+                },
+                "Maybe the tokens are overlapping for left: `{}`, right: `{}`",val, symbol_val
+            );
+
+            columns += symbol_val.chars().count();
+
+            assert_eq!(val, symbol_val);
+            assert_eq!(typ, TokenType::Symbol(symbol));
+        }
+
+        let mut symbols_line = String::new();
+        for symbol in SymbolType::iter() {
+            let symbol_val = symbol.get_variant_docs().unwrap();
+            symbols_line.push_str(symbol_val);
+            symbols_line.push('\n');
+        }
+
+        let mut tokens = LexerIter::new(&symbols_line);
+        let mut symbols_iter = SymbolType::iter();
+        let mut lines = 0;
+
+        while let Some((span, typ, val)) = tokens.next() {
+            let symbol = symbols_iter.next().unwrap();
+            let symbol_val = symbol.get_variant_docs().unwrap();
+
+            assert_eq!(
+                span,
+                Span { 
+                    start: SpanCursor { line: lines, col: 0 },
+                    end:   SpanCursor { line: lines, col: symbol_val.chars().count() },
+                },
+                "Maybe the tokens are overlapping for left: `{}`, right: `{}`",val, symbol_val
+            );
+
+            assert_eq!(val, symbol_val);
+            assert_eq!(typ, TokenType::Symbol(symbol));
+
+            let (span, typ, val) = tokens.next().unwrap();
+
+            assert_eq!(
+                span,
+                Span { 
+                    start: SpanCursor { line: lines, col: symbol_val.chars().count() },
+                    end:   SpanCursor { line: lines + 1, col: 0 },
+                },
+                "On symbol `{}`", symbol_val
+            );
+
+            assert_eq!(val, "\n");
+            assert_eq!(typ, TokenType::EOL);
+            lines += 1;
+        }
+    }
+
+    #[test]
+    fn test_keywords_lexing() {
+        for keyword in KeywordType::iter() {
+            let keyword_val = keyword.get_variant_docs().unwrap();
+            let (span, typ, val) = LexerIter::new(&keyword_val).next().unwrap();
+            assert_eq!(
+                span,
+                Span { 
+                    start: SpanCursor { line:0, col: 0 },
+                    end:   SpanCursor { line:0, col: keyword_val.chars().count() },
+                }
+            );
+            assert_eq!(val, keyword_val);
+            assert_eq!(typ, TokenType::Keyword(keyword));
         }
     }
 }

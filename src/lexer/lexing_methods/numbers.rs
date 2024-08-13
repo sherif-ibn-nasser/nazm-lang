@@ -16,4 +16,13 @@ impl<'a> Lexer<'a> {
 
         None
     }
+
+}
+
+
+impl<'a> LexerIter<'a> {
+
+    pub(crate) fn next_num_token(&mut self) -> TokenType {
+        todo!()
+    }
 }
