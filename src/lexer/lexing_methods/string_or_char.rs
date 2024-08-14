@@ -190,24 +190,3 @@ fn to_escape_sequence(c:char) -> Option<char>{
         _   => None
     }
 }
-
-
-#[cfg(test)]
-mod tests{
-
-    use std::cell::RefCell;
-
-    use crate::diagnostics::Diagnostics;
-
-    use super::*;
-
-    #[test]
-    fn test_lexing_chars_pass(){
-        todo!()
-    }
-
-    #[test]
-    fn test_lexing_strings_pass(){
-        todo!()
-    }
-}

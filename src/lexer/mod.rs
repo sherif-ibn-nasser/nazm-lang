@@ -172,6 +172,13 @@ impl<'a> LexerIter<'a> {
         
         let id = &self.text[start..end];
 
+        if id == "مؤكد" {
+            return TokenType::Literal(LiteralTokenType::Bool(true));
+        }
+        else if id == "محال" {
+            return TokenType::Literal(LiteralTokenType::Bool(false));
+        }
+
         for keyword_typ in KeywordType::iter() {
             if keyword_typ.get_variant_docs().is_ok_and(|val| id == val) {
                 return TokenType::Keyword(keyword_typ);

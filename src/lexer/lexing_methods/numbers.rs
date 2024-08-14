@@ -1,5 +1,3 @@
-use std::num::{IntErrorKind, ParseIntError};
-
 use error::*;
 
 use crate::lexer::*;
