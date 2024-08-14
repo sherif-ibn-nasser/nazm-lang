@@ -98,11 +98,19 @@ impl<'a> LexerIter<'a> {
         match self.next_cursor() {
             Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::SlashEqual) }
             Some((_, '/')) => {
-                while self.next_cursor_non_eol().is_some(){} // Skip all until first EOL
-                TokenType::LineComment
+                let mut errs = vec![];
+                while self.next_cursor_non_eol().is_some(){ // Skip all until first EOL
+                    if let Err(err) = self.check_is_kufr_or_unsupported_char() {
+                        errs.push(err);
+                    }
+                }
+
+                if errs.is_empty() { TokenType::LineComment }
+                else { TokenType::Bad(errs) }
             }
             Some((_, '*')) => {
                 let mut opened_delimted_comments = 1;
+                let mut errs = vec![];
 
                 while let Some((_, ch)) = self.next_cursor() {
 
@@ -118,10 +126,14 @@ impl<'a> LexerIter<'a> {
                         opened_delimted_comments -= 1;
                     }
 
+                    if let Err(err) = self.check_is_kufr_or_unsupported_char() {
+                        errs.push(err);
+                    }
                 }
 
                 if opened_delimted_comments == 0 {
-                    TokenType::DelimitedComment
+                    if errs.is_empty() { TokenType::DelimitedComment }
+                    else { TokenType::Bad(errs) }
                 }
                 else {
                     TokenType::Bad(vec![
@@ -168,6 +180,22 @@ impl<'a> LexerIter<'a> {
 
         return TokenType::Id;
 
+    }
+
+    #[inline]
+    fn check_is_kufr_or_unsupported_char(&self) -> Result<Option<char>, LexerError> {
+        let (start, ch) = self.cursor.stopped_at;
+
+        if is_kufr_or_unsupported_character(ch) {
+            Err(
+                LexerError {
+                    col: start.col,
+                    len: 1,
+                    typ: LexerErrorType::KufrOrInvalidChar,
+                }
+            )
+        }
+        else { Ok(Some(ch)) }
     }
 
 }
@@ -219,6 +247,51 @@ impl<'a> Iterator for CharsCursor<'a> {
     }
     
 }
+
+fn is_kufr_or_unsupported_character(c:char) -> bool{
+    let chars=[
+        '\u{03EE}','\u{03EF}','\u{058d}','\u{058e}',
+        '\u{05EF}', // yod triangle
+        '\u{07D9}','\u{093B}','\u{13D0}','\u{16BE}','\u{165C}','\u{16ED}',
+        '\u{17D2}','\u{1D7B}','\u{2020}','\u{2021}','\u{256A}','\u{256B}',
+        '\u{256C}','\u{2616}','\u{2617}','\u{269C}','\u{269E}','\u{269F}',
+        '\u{26AF}','\u{26B0}','\u{26B1}','\u{26F3}','\u{26F9}','\u{26FB}',
+        '\u{26FF}','\u{27CA}','\u{29FE}','\u{2CFE}',
+    ];
+
+    if chars.contains(&c){
+        return true
+    }
+
+    let ranges=[
+        /*  from  ,    to  */
+        ('\u{0900}','\u{109F}'),//HinduEurope
+        ('\u{1100}','\u{1C7F}'),//HinduEurope
+        ('\u{253C}','\u{254B}'),
+        ('\u{2624}','\u{2638}'),//Kufr
+        ('\u{263D}','\u{2653}'),//Kufr
+        ('\u{2654}','\u{2667}'),
+        ('\u{2669}','\u{2671}'),//Music and kufr crosses
+        ('\u{2680}','\u{268F}'),
+        ('\u{2680}','\u{268F}'),
+        ('\u{26A2}','\u{26A9}'),// Pride
+        ('\u{26B3}','\u{26BC}'),// Kufr
+        ('\u{26BF}','\u{26EC}'),
+        ('\u{2719}','\u{2725}'),// Kufr crosses
+        ('\u{2BF0}','\u{2C5F}'),// Includes astrology
+        ('\u{2D80}','\u{AB2F}'),
+        ('\u{AB70}','\u{FAFF}'),
+    ];
+
+    for (r1,r2) in ranges{
+        if c>=r1 && c<=r2{
+            return true
+        }
+    }
+
+    return false
+}
+
 
 #[cfg(test)]
 

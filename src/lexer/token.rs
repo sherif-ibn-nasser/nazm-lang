@@ -49,6 +49,7 @@ pub enum NumType {
     U4(u32),
     U8(u64),
     UnspecifiedInt(u64),
+    UnspecifiedFloat(f64),
 }
 
 #[derive(Clone, PartialEq, Debug)]

@@ -28,7 +28,7 @@ fn main() {
     for (span, token_typ, val) in lexer {
 
         let color = match token_typ {
-            TokenType::LineComment | TokenType::DelimitedComment =>XtermColors::UserGreen,
+            TokenType::LineComment | TokenType::DelimitedComment =>XtermColors::BrightTurquoise,
             TokenType::Symbol(_) => XtermColors::UserBrightYellow,
             TokenType::Id => XtermColors::LightAnakiwaBlue,
             TokenType::Keyword(_) | TokenType::Literal(LiteralTokenType::Bool(_))
@@ -36,7 +36,7 @@ fn main() {
             TokenType::Literal(
                 LiteralTokenType::Str(_) | LiteralTokenType::Char(_)
             ) => XtermColors::PinkSalmon,
-            TokenType::Literal(_) => XtermColors::UserBrightCyan,
+            TokenType::Literal(_) => XtermColors::ChelseaCucumber,
             _ => XtermColors::UserWhite,
         };
 
