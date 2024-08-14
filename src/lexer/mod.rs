@@ -55,7 +55,7 @@ impl<'a> LexerIter<'a> {
                 while self.next_cursor().is_some_and(|(_, ch)| ch.is_ascii_whitespace() && ch != '\n') {} // Skip whitespaces
                 TokenType::Space
             }
-            any => {
+            _ => {
 
                 if self.stopped_at_bidx == self.text.len() {
                     return TokenType::EOF;
@@ -70,11 +70,6 @@ impl<'a> LexerIter<'a> {
                         }
                         return TokenType::Symbol(symbol);
                     }
-                }
-                
-                if !any.is_alphabetic() {
-                    self.next_cursor();
-                    return TokenType::Bad(vec![]);
                 }
 
                 self.next_id_or_keyword()
@@ -145,6 +140,17 @@ impl<'a> LexerIter<'a> {
     }
 
     fn next_id_or_keyword(&mut self) -> TokenType {
+
+        if !self.cursor.stopped_at.1.is_alphabetic() {
+            self.next_cursor();
+            return TokenType::Bad(vec![
+                LexerError {
+                    col: self.cursor.stopped_at.0.col,
+                    len: 1,
+                    typ: LexerErrorType::UnknownToken,
+                }
+            ]);
+        }
 
         let start = self.stopped_at_bidx;
 

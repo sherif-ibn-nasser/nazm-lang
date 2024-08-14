@@ -31,23 +31,28 @@ pub enum LiteralTokenType{
     Str(String),
     Char(char),
     Bool(bool),
-    F4(f32),
-    F8(f64),
-    I(isize, Radix),
-    I1(i8, Radix),
-    I2(i16, Radix),
-    I4(i32, Radix),
-    I8(i64, Radix),
-    U(usize, Radix),
-    U1(u8, Radix),
-    U2(u16, Radix),
-    U4(u32, Radix),
-    U8(u64, Radix),
-    UnspecifiedInt(u64, Radix),
+    Num(NumType),
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum Radix {
+pub enum NumType {
+    F4(f32),
+    F8(f64),
+    I(isize),
+    I1(i8),
+    I2(i16),
+    I4(i32),
+    I8(i64),
+    U(usize),
+    U1(u8),
+    U2(u16),
+    U4(u32),
+    U8(u64),
+    UnspecifiedInt(u64),
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum Base {
     Bin = 2,
     Oct = 8,
     Dec = 10,

@@ -1,3 +1,4 @@
+use super::{Base, NumType};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct LexerError {
@@ -11,6 +12,7 @@ pub struct LexerError {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LexerErrorType {
+    UnknownToken,
     UnclosedStr,
     UnclosedChar,
     UnclosedDelimitedComment,
@@ -20,4 +22,10 @@ pub enum LexerErrorType {
     UnicodeCodePointHexDigitOnly,
     InvalidUnicodeCodePoint,
     UnknownEscapeSequence,
+    MissingDigitsAfterBasePrefix,
+    InvalidDigitForBase(Base),
+    InvalidNumSuffix,
+    InvalidFloatSuffix,
+    InvalidIntSuffixForBase(Base),
+    NumIsOutOfRange(NumType),
 }
