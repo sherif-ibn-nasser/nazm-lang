@@ -2,6 +2,7 @@ mod diagnostics;
 mod cli;
 mod lexer;
 mod span;
+mod code_reporter;
 
 use std::{cell::RefCell, collections::HashMap, io::{self, Write}, process::Command};
 use diagnostics::Diagnostics;
