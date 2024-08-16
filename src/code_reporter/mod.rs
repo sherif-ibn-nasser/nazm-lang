@@ -109,7 +109,7 @@ impl<'a> HorizontalMarkerLine<'a, MainDepth> {
 
     fn mark_as_multi_line_start(&mut self, col: usize, sign: char, style: Style) {
 
-        self.check_col_or_resize(col); // To expand until that column
+        self.check_col_or_resize(col + 1); // To expand until the column after it
 
         let marker = Marker {
             sign: sign,
@@ -123,7 +123,7 @@ impl<'a> HorizontalMarkerLine<'a, MainDepth> {
 
     fn mark_as_multi_line_end(&mut self, col: usize, sign: char, style: Style, labels: &'a [&'a str]) {
 
-        self.check_col_or_resize(col); // To expand until that column
+        self.check_col_or_resize(col); // To expand until the column
 
         let marker = Marker {
             sign: sign,
@@ -131,7 +131,7 @@ impl<'a> HorizontalMarkerLine<'a, MainDepth> {
             typ: MarkerType::MultiLine(MultiLineMarkerType::End { labels: labels }),
         };
 
-        self.markers[col] = marker;
+        self.markers[col - 1] = marker; // The column before
 
     }
 
@@ -147,14 +147,14 @@ struct Marker<'a> {
 #[derive(Clone)]
 enum MarkerType<'a> {
     Reapeted,
-    OneLineStart{ labels: &'a [&'a str] },
+    OneLineStart { labels: &'a [&'a str] },
     MultiLine(MultiLineMarkerType<'a>),
 }
 
 #[derive(Clone)]
 enum MultiLineMarkerType<'a> {
     Start,
-    End{ labels: &'a [&'a str] },
+    End { labels: &'a [&'a str] },
 }
 
 #[cfg(test)]
@@ -162,6 +162,7 @@ mod tests {
 
     use std::{io::{self, Write}, process::Command};
 
+    use itertools::Itertools;
     use owo_colors::{OwoColorize, Style};
 
     use crate::span::Span;
@@ -194,10 +195,19 @@ mod tests {
             '^',
             Style::new().yellow().bold(),
             &["القيمة ليست متغيرة"],
+        )
+        .report(
+            Span::new((1,5), (2,4)),
+            '^',
+            Style::new().yellow().bold(),
+            &["علامة طويلة"],
         );
 
+
         println!("  {} ", "|".bright_blue()); // Add empty line above
-        for (k, v) in reporter.lines_to_report.iter() {
+
+        for k in reporter.lines_to_report.keys().sorted() {
+            let v = &reporter.lines_to_report[k];
             println!("{} {} {}", k.bright_blue(), "|".bright_blue(), reporter.files_lines[*k]);
             print!("  {} ", "|".bright_blue());
             for marker in v.markers.iter() {
