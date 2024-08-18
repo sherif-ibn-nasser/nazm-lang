@@ -107,8 +107,11 @@ impl<'a> Display for CodeLine<'a> {
             Marker {sign: MarkerSign::Char(' '), style: Style::new()} // Default is space
         );
 
-        let mut max_labels_depth = 0;
-        let mut max_multline_depth = 0;
+        // The number of bars (`|`) between the code and the next label (of one-line markers and multiline end markers)
+        let mut next_labels_margin = 0;
+
+        // The number of bars (`|`) between the code and the repeated underscores (`_`) of multiline marker
+        let mut next_multline_margin = 0;
 
         for col in self.markers.keys().sorted().rev() {
 
@@ -125,31 +128,52 @@ impl<'a> Display for CodeLine<'a> {
                         painter.move_left().paint(marker.clone());
                     }
                     if !labels.is_empty(){
-                        if max_labels_depth < max_multline_depth {
-                            max_labels_depth = max_multline_depth; // Labels of one-line markers and multilines may have the same depth
+                        // Check if this label margin will be less than the next multiline marker margin
+                        // This will prevent labels to be above the next multiline margin
+                        // But they may have the same margins
+                        /*
+                         * Code Code Code
+                         *      ^    ^^^^
+                         * _____|    |
+                         *           Label
+                         */
+                        if next_labels_margin < next_multline_margin {
+                            // The margin of this label should equal the next multiline margin
+                            next_labels_margin = next_multline_margin;
                         }
-                        if max_labels_depth == 0 {
+                        if next_labels_margin == 0 {
                             painter.move_to(brush_pos);
                         }
                         else {
-                            
-                            for _depth in 0..max_labels_depth {
+                            for _depth in 0..next_labels_margin {
                                 painter.move_down().paint(marker.clone_with_char('|'));
                             }
                             painter.move_down();
                         }
-                        
-                        painter.paint(
-                            marker.clone_with_str(labels[0])
-                        );
-                        max_labels_depth += 1;
-                        
-                        for i in 1..labels.len() {
-                            painter.move_down().paint(
-                                marker.clone_with_str(labels[i])
-                            );
-                            max_labels_depth += 1;
+
+                        // Increase the labels margin by number of labels and if it's greater than one subtract one
+                        /*
+                         *
+                         * احجز متغير س = 555؛
+                            ^^^^_^^^^^___~ ---من الممكن عدم جعل القيمة متغيرة
+                            |    |       |    من الممكن عدم جعل القيمة متغيرة  (remove extra one margin if they're more than one and we are on the first label in reverse)
+                            |    |       من الممكن عدم جعل القيمة متغيرة
+                            |    من الممكن عدم جعل القيمة متغيرة
+                            من الممكن عدم جعل القيمة متغيرة
+ 
+                         */
+                        next_labels_margin += labels.len() - (labels.len() > 1 && next_labels_margin == 0) as usize;
+
+                        for (i, label) in labels.iter().enumerate() {
+                            if i != 0 {
+                                painter.move_down();
+                            }
+                            painter.paint(marker.clone_with_str(label));
                         }
+                    }
+                    else if next_labels_margin == 0{
+                        // Increase the labels margin if we are on the first marker from reverse and there is no labels found
+                        next_labels_margin += 1;
                     }
                 },
                 MarkerType::MultiLine(MultiLineMarkerType::End { labels }) => {
@@ -162,39 +186,48 @@ impl<'a> Display for CodeLine<'a> {
                     if !labels.is_empty(){
                         // Note it increase the labels depth if they're equal
                         // as labels of multiline end markers have at least one depth greater than it's depth
-                        if max_labels_depth <= max_multline_depth && max_multline_depth != 0 { // This happen if it is not the first multiline
-                            max_labels_depth = max_multline_depth + 1; // Labels should be below
+                        if next_labels_margin <= next_multline_margin && next_multline_margin != 0 { // This happen if it is not the first multiline
+                            next_labels_margin = next_multline_margin + 1; // Labels should be below
                         }
-                        if max_labels_depth == 0 {
+                        if next_labels_margin == 0 {
                             painter.move_to(brush_pos);
                         }
                         else {
                             
-                            for _depth in 0..max_labels_depth {
+                            for _depth in 0..next_labels_margin {
                                 painter.move_down().paint(marker.clone_with_char('|'));
                             }
                             painter.move_down();
                         }
                         
-                        painter.paint(
-                            marker.clone_with_str(labels[0])
-                        );
-                        max_labels_depth += 1;
-                        for i in 1..labels.len() {
-                            painter.move_down().paint(
-                                marker.clone_with_str(labels[i])
-                            );
-                            max_labels_depth += 1;
+                        // Increase the labels margin by number of labels and if it's greater than one subtract one
+                        /*
+                         *
+                         * احجز متغير س = 555؛
+                            ^^^^_^^^^^___~ ---من الممكن عدم جعل القيمة متغيرة
+                            |    |       |    من الممكن عدم جعل القيمة متغيرة  (remove extra one margin if they're more than one and we are on the first label in reverse)
+                            |    |       من الممكن عدم جعل القيمة متغيرة
+                            |    من الممكن عدم جعل القيمة متغيرة
+                            من الممكن عدم جعل القيمة متغيرة
+ 
+                         */
+                        next_labels_margin += labels.len() - (labels.len() > 1 && next_labels_margin == 0) as usize;
+
+                        for (i, label) in labels.iter().enumerate() {
+                            if i != 0 {
+                                painter.move_down();
+                            }
+                            painter.paint(marker.clone_with_str(label));
                         }
                     }
 
-                    painter.move_to(brush_pos).move_down_by(max_multline_depth).move_left();
+                    painter.move_to(brush_pos).move_down_by(next_multline_margin).move_left();
 
                     for _ in 0 .. *col {
                         painter.move_left().paint(marker.clone_with_char('_'));
                     }
 
-                    max_multline_depth += 1;
+                    next_multline_margin += 1;
 
                 },
                 MarkerType::MultiLine(MultiLineMarkerType::Start) => {
@@ -202,7 +235,7 @@ impl<'a> Display for CodeLine<'a> {
                         marker.clone()
                     );
 
-                    for _depth in 0..max_multline_depth {
+                    for _depth in 0..next_multline_margin {
                         painter.move_down().paint(marker.clone_with_char('|'));
                     }
 
@@ -210,7 +243,7 @@ impl<'a> Display for CodeLine<'a> {
                         painter.move_left().paint(marker.clone_with_char('_'));
                     }
 
-                    max_multline_depth += 1;
+                    next_multline_margin += 1;
                 },
             }
 
@@ -295,18 +328,15 @@ mod test_code_line{
             18,
             '-', 
             Style::new().bold().blue(),
-            &["من الممكن عدم جعل القيمة متغيرة"]
+            &[
+                "من الممكن عدم جعل القيمة متغيرة",
+                "من الممكن عدم جعل القيمة متغيرة",
+            ]
         );
         code_line.mark_as_multi_line_end(
             14,
             '~', 
             Style::new().bold().green(),
-            &["من الممكن عدم جعل القيمة متغيرة"]
-        );
-        code_line.mark_as_multi_line_end(
-            19,
-            '~', 
-            Style::new().bold().magenta(),
             &["من الممكن عدم جعل القيمة متغيرة"]
         );
         println!("{}\n{}", line, code_line)
@@ -369,7 +399,10 @@ mod test_code_line{
             19, 
             '^', 
             Style::new().bold().purple(),
-            &["من الممكن عدم جعل القيمة متغيرة"]
+            &[
+                "من الممكن عدم جعل القيمة متغيرة",
+                "من الممكن عدم جعل القيمة متغيرة",
+            ]
         );
         code_line.mark_as_one_line(
             15,
@@ -390,13 +423,20 @@ mod test_code_line{
             8,
             '-', 
             Style::new().bold().bright_cyan(),
-            &["من الممكن عدم جعل القيمة متغيرة"]
+            &[
+                "من الممكن عدم جعل القيمة متغيرة",
+                "من الممكن عدم جعل القيمة متغيرة",
+                "من الممكن عدم جعل القيمة متغيرة",
+            ]
         );
         code_line.mark_as_multi_line_end(
             14, 
             '~', 
             Style::new().bold().yellow(),
-            &["من الممكن عدم جعل القيمة متغيرة"]
+            &[
+                "من الممكن عدم جعل القيمة متغيرة",
+                "من الممكن عدم جعل القيمة متغيرة",
+            ]
         );
         code_line.mark_as_multi_line_start(
             11, 
