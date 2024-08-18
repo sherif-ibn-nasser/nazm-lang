@@ -29,10 +29,14 @@ impl<P: Clone + Display> Painter<P> {
         }
     }
 
-    pub fn move_to(&mut self, row_idx: usize, col_idx: usize) -> &mut Self {
-        self.check_or_insert(row_idx, col_idx);
-        self.brush_pos.0 = row_idx;
-        self.brush_pos.1 = col_idx;
+    pub fn move_to(&mut self, brush_pos: (usize, usize)) -> &mut Self {
+        self.check_or_insert(brush_pos.0, brush_pos.1);
+        self.brush_pos = brush_pos;
+        self
+    }
+
+    pub fn move_to_zero(&mut self) -> &mut Self {
+        self.brush_pos = (0, 0);
         self
     }
 

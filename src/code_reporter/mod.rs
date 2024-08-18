@@ -96,7 +96,9 @@ impl<'a> CodeLine<'a> {
             (marker, MarkerType::MultiLine(MultiLineMarkerType::End { labels: labels }) )
         );
     }
+
 }
+
 
 impl<'a> Display for CodeLine<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -105,38 +107,114 @@ impl<'a> Display for CodeLine<'a> {
             Marker {sign: MarkerSign::Char(' '), style: Style::new()} // Default is space
         );
 
-        let mut cols_rev = self.markers.keys().sorted().rev();
+        let mut max_labels_depth = 0;
+        let mut max_multline_depth = 0;
 
-        let col = cols_rev.next().unwrap();
+        for col in self.markers.keys().sorted().rev() {
 
-        let (marker, marker_typ) = &self.markers[col];
-        match marker_typ {
-            MarkerType::Reapeted => todo!(),
-            MarkerType::OneLineStart { end_col, labels } => {
-                painter.move_right_by(*end_col).paint(
-                    marker.clone_with_str(labels[0])
-                );
-                for _ in 0 .. end_col - col {
+            painter.move_to_zero();
+
+            let (marker, marker_typ) = &self.markers[col];
+
+
+            match marker_typ {
+                MarkerType::OneLineStart { end_col, labels } => {
+                    painter.move_right_by(*end_col);
+                    let brush_pos = painter.current_brush_pos();
+                    for _ in 0 .. end_col - col {
+                        painter.move_left().paint(marker.clone());
+                    }
+                    if !labels.is_empty(){
+                        if max_labels_depth < max_multline_depth {
+                            max_labels_depth = max_multline_depth; // Labels of one-line markers and multilines may have the same depth
+                        }
+                        if max_labels_depth == 0 {
+                            painter.move_to(brush_pos);
+                        }
+                        else {
+                            
+                            for _depth in 0..max_labels_depth {
+                                painter.move_down().paint(marker.clone_with_char('|'));
+                            }
+                            painter.move_down();
+                        }
+                        
+                        painter.paint(
+                            marker.clone_with_str(labels[0])
+                        );
+                        max_labels_depth += 1;
+                        
+                        for i in 1..labels.len() {
+                            painter.move_down().paint(
+                                marker.clone_with_str(labels[i])
+                            );
+                            max_labels_depth += 1;
+                        }
+                    }
+                },
+                MarkerType::MultiLine(MultiLineMarkerType::End { labels }) => {
+                    painter.move_right_by(*col);
+                    
+                    let brush_pos = painter.current_brush_pos();
+
                     painter.move_left().paint(marker.clone());
-                }
-            },
-            MarkerType::MultiLine(MultiLineMarkerType::End { labels }) => {
-                painter.move_right_by(*col).paint(
-                    marker.clone_with_str(labels[0])
-                );
-                painter.move_left().paint(marker.clone());
-                for _ in 0 .. *col {
-                    painter.move_left().paint(marker.clone_with_char('_'));
-                }
-            },
-            MarkerType::MultiLine(MultiLineMarkerType::Start) => {
-                painter.move_right_by(*col).paint(
-                    marker.clone()
-                );
-            },
-        }
 
-        let mut current_max_depth = 0;
+                    if !labels.is_empty(){
+                        // Note it increase the labels depth if they're equal
+                        // as labels of multiline end markers have at least one depth greater than it's depth
+                        if max_labels_depth <= max_multline_depth && max_multline_depth != 0 { // This happen if it is not the first multiline
+                            max_labels_depth = max_multline_depth + 1; // Labels should be below
+                        }
+                        if max_labels_depth == 0 {
+                            painter.move_to(brush_pos);
+                        }
+                        else {
+                            
+                            for _depth in 0..max_labels_depth {
+                                painter.move_down().paint(marker.clone_with_char('|'));
+                            }
+                            painter.move_down();
+                        }
+                        
+                        painter.paint(
+                            marker.clone_with_str(labels[0])
+                        );
+                        max_labels_depth += 1;
+                        for i in 1..labels.len() {
+                            painter.move_down().paint(
+                                marker.clone_with_str(labels[i])
+                            );
+                            max_labels_depth += 1;
+                        }
+                    }
+
+                    painter.move_to(brush_pos).move_down_by(max_multline_depth).move_left();
+
+                    for _ in 0 .. *col {
+                        painter.move_left().paint(marker.clone_with_char('_'));
+                    }
+
+                    max_multline_depth += 1;
+
+                },
+                MarkerType::MultiLine(MultiLineMarkerType::Start) => {
+                    painter.move_right_by(*col).paint(
+                        marker.clone()
+                    );
+
+                    for _depth in 0..max_multline_depth {
+                        painter.move_down().paint(marker.clone_with_char('|'));
+                    }
+
+                    for _ in 0 .. *col {
+                        painter.move_left().paint(marker.clone_with_char('_'));
+                    }
+
+                    max_multline_depth += 1;
+                },
+            }
+
+        }
 
         write!(f, "{}", painter);
 
@@ -150,11 +228,47 @@ mod test_code_line{
 
     use owo_colors::Style;
 
-    use super::CodeLine;
+    use super::{painter::Painter, CodeLine, Marker, MarkerSign};
 
     fn print_rtl(){
         let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
         io::stdout().write_all(&output.stdout[1..output.stdout.len()-1]).unwrap();
+    }
+
+    #[test]
+    fn test(){
+
+        let mut painter = Painter::new(
+            Marker {sign: MarkerSign::Char(' '), style: Style::new()} // Default is space
+        );
+        let marker = Marker { sign: MarkerSign::Char('^'), style: Style::new().bold().red()};
+        painter.move_right_by(3).paint(marker.clone())
+        .move_down().paint(marker.clone_with_char('|'))
+        .move_down().paint(marker.clone_with_char('|'))
+        .move_down().paint(marker.clone_with_char('|'))
+        .move_down().paint(marker.clone_with_char('|'))
+        .move_left().paint(marker.clone_with_char('_'))
+        .move_left().paint(marker.clone_with_char('_'))
+        .move_left().paint(marker.clone_with_char('_'))
+        .move_left().paint(marker.clone_with_char('_'))
+        .move_down().paint(marker.clone_with_char('|'))
+        .move_down().paint(marker.clone_with_char('|'))
+        .move_down().paint(marker.clone_with_char('|'))
+        .move_down().paint(marker.clone_with_char('|'))
+        .move_right().paint(marker.clone_with_char('_'))
+        .move_right().paint(marker.clone_with_char('_'))
+        .move_right().paint(marker.clone_with_char('_'))
+        .move_right().paint(marker.clone_with_char('_'))
+        .move_right_by(5).paint(marker.clone_with_char('أ'))
+        .move_right_by(5).paint(marker.clone_with_char('أ'))
+        .move_right_by(5).paint(marker.clone_with_char('أ'))
+        .move_to_zero()
+        .move_right_by(5).paint(marker.clone_with_char('أ'))
+        .move_right_by(5).paint(marker.clone_with_char('أ'))
+        .move_right_by(5).paint(marker.clone_with_char('أ'));
+
+        println!("{}", painter);
+
     }
 
     #[test]
@@ -169,6 +283,32 @@ mod test_code_line{
             Style::new().bold().yellow(),
             &["من الممكن عدم جعل القيمة متغيرة"]
         );
+        code_line.mark_as_one_line(
+            0,
+            4,
+            '^', 
+            Style::new().bold().red(),
+            &["من الممكن عدم جعل القيمة متغيرة"]
+        );
+        code_line.mark_as_one_line(
+            15,
+            18,
+            '-', 
+            Style::new().bold().blue(),
+            &["من الممكن عدم جعل القيمة متغيرة"]
+        );
+        code_line.mark_as_multi_line_end(
+            14,
+            '~', 
+            Style::new().bold().green(),
+            &["من الممكن عدم جعل القيمة متغيرة"]
+        );
+        code_line.mark_as_multi_line_end(
+            19,
+            '~', 
+            Style::new().bold().magenta(),
+            &["من الممكن عدم جعل القيمة متغيرة"]
+        );
         println!("{}\n{}", line, code_line)
     }
 
@@ -178,9 +318,26 @@ mod test_code_line{
         let line = "احجز متغير س = 555؛";
         let mut code_line = CodeLine::default();
         code_line.mark_as_multi_line_start(
+            15, 
+            '-', 
+            Style::new().bold().bright_cyan(),
+        );
+        code_line.mark_as_multi_line_start(
             5, 
             '-', 
             Style::new().bold().blue(),
+        );
+        code_line.mark_as_multi_line_start(
+            11, 
+            '-', 
+            Style::new().bold().purple(),
+        );
+        code_line.mark_as_one_line(
+            0,
+            4,
+            '^', 
+            Style::new().bold().red(),
+            &["من الممكن عدم جعل القيمة متغيرة"]
         );
         println!("{}\n{}", line, code_line)
     }
@@ -191,10 +348,60 @@ mod test_code_line{
         let line = "احجز متغير س = 555؛";
         let mut code_line = CodeLine::default();
         code_line.mark_as_multi_line_end(
+            2, 
+            '^', 
+            Style::new().bold().white(),
+            &["من الممكن عدم جعل القيمة متغيرة"]
+        );
+        code_line.mark_as_multi_line_end(
+            4, 
+            '^', 
+            Style::new().bold().blue(),
+            &["من الممكن عدم جعل القيمة متغيرة"]
+        );
+        code_line.mark_as_multi_line_end(
             10, 
             '^', 
             Style::new().bold().red(),
             &["من الممكن عدم جعل القيمة متغيرة"]
+        );
+        code_line.mark_as_multi_line_end(
+            19, 
+            '^', 
+            Style::new().bold().purple(),
+            &["من الممكن عدم جعل القيمة متغيرة"]
+        );
+        code_line.mark_as_one_line(
+            15,
+            18,
+            '-', 
+            Style::new().bold().green(),
+            &["من الممكن عدم جعل القيمة متغيرة"]
+        );
+        code_line.mark_as_one_line(
+            5,
+            6,
+            '~', 
+            Style::new().bold().green(),
+            &["من الممكن عدم جعل القيمة متغيرة"]
+        );
+        code_line.mark_as_one_line(
+            7,
+            8,
+            '-', 
+            Style::new().bold().bright_cyan(),
+            &["من الممكن عدم جعل القيمة متغيرة"]
+        );
+        code_line.mark_as_multi_line_end(
+            14, 
+            '~', 
+            Style::new().bold().yellow(),
+            &["من الممكن عدم جعل القيمة متغيرة"]
+        );
+        code_line.mark_as_multi_line_start(
+            11, 
+            '~', 
+            Style::new().bold().white(),
         );
         println!("{}\n{}", line, code_line)
     }
@@ -247,7 +454,6 @@ enum MarkerSign<'a> {
 
 #[derive(Clone)]
 enum MarkerType<'a> {
-    Reapeted,
     OneLineStart { end_col: usize, labels: &'a [&'a str] },
     MultiLine(MultiLineMarkerType<'a>),
 }

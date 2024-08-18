@@ -7,7 +7,7 @@ mod code_reporter;
 use std::{cell::RefCell, collections::HashMap, io::{self, Write}, process::Command};
 use diagnostics::Diagnostics;
 use lexer::*;
-use owo_colors::{OwoColorize, XtermColors};
+use owo_colors::{AnsiColors, OwoColorize, XtermColors};
 
 fn main() {
 
