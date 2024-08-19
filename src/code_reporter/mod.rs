@@ -64,16 +64,52 @@ impl<'a> CodeReporter<'a> {
         return self;
     }
 
-    fn build(&mut self) {
-        let mut used_connection_margins = vec![];
+    
+}
+
+impl<'a> Display for CodeReporter<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut free_connection_margins = vec![];
         let mut connections_painter = Painter::new(
             Marker {sign: MarkerSign::Char(' '), style: Style::new() } // Default is space
         );
-        for key in self.code_lines.keys().cloned().sorted(){
-            let code_line = self.code_lines.get_mut(&key).unwrap();
-            code_line.update_connection_margins(&mut used_connection_margins, &mut connections_painter);
+        let mut big_sheet = vec![];
+        for key in self.code_lines.keys().sorted() {
+            let code_line = &self.code_lines[key];
+        
+            let mut sheet = code_line
+                .update_connection_margins(
+                    &mut free_connection_margins,
+                    &mut connections_painter,
+                    self.files_lines[*key]
+            ).get_sheet();
+            //sheet.push(vec![]); // Add new line
+            big_sheet.push(sheet);
         }
 
+        let connections_sheet = connections_painter.get_sheet();
+        let mut connections = connections_sheet.iter();
+        let max_margin = free_connection_margins.len()*2;
+
+        for line_of_markers in big_sheet.iter().flatten() {
+
+            if let Some(connection_line) = connections.next() {
+                write!(f, "{}", " ".repeat(max_margin-connection_line.len()));
+                for c in connection_line.iter().rev() {
+                    write!(f, "{c}");
+                }
+            }
+            else {
+                write!(f, "{}", " ".repeat(max_margin));
+            }
+            for marker in line_of_markers {
+                write!(f, "{marker}");
+            }
+            writeln!(f);
+        
+        }
+
+        Ok(())
     }
 }
 
@@ -259,14 +295,19 @@ impl<'a> Display for CodeLine<'a> {
 
 impl<'a> CodeLine<'a> {
     fn update_connection_margins(
-        &mut self,
+        &self,
         free_connection_margins: &mut Vec<bool>,
         connections_painter: &mut Painter<Marker<'a>>,
+        file_line: &'a str,
     ) -> Painter<Marker<'a>> {
         
         let mut painter = Painter::new(
             Marker {sign: MarkerSign::Char(' '), style: Style::new() } // Default is space
         );
+
+        let painter_local_zero = painter.paint(Marker {sign: MarkerSign::Str(file_line), style: Style::new() }).move_down().current_brush_pos();
+
+        let connections_painter_local_zero = connections_painter.move_down().current_brush_pos();
 
         // The number of bars (`|`) between the code and the next label (of one-line markers and multiline end markers)
         let mut next_labels_margin = 0;
@@ -274,11 +315,10 @@ impl<'a> CodeLine<'a> {
         // The number of bars (`|`) between the code and the repeated underscores (`_`) of multiline marker
         let mut next_multline_margin = 0;
 
-        let keys_rev = self.markers.keys().sorted().rev();
+        for col in self.markers.keys().sorted().rev() {
 
-        for col in keys_rev.clone() {
-
-            painter.move_to_zero();
+            painter.move_to(painter_local_zero);
+            connections_painter.move_to(connections_painter_local_zero);
 
             let (marker, marker_typ) = &self.markers[col];
 
@@ -379,14 +419,13 @@ impl<'a> CodeLine<'a> {
                         painter.move_left().paint(marker.clone_with_char('_'));
                     }
 
-                    next_multline_margin += 1;
 
+                    connections_painter.move_down_by(next_multline_margin);
 
                     let margin = connection_margin.get().1;
                     
                     free_connection_margins[margin] = true; // free this margin
 
-                    connections_painter.move_to_y_axis();
                     let brush_pos = connections_painter.current_brush_pos();
 
                     for _ in 0..margin*2 {
@@ -400,8 +439,8 @@ impl<'a> CodeLine<'a> {
                             marker.clone_with_char('|')
                         ).move_up();
                     }
-                    connections_painter.move_to(brush_pos).move_down();
 
+                    next_multline_margin += 1;
                 },
                 MarkerType::StartOfMultiLine { connection_margin } => {
 
@@ -417,11 +456,7 @@ impl<'a> CodeLine<'a> {
                         painter.move_left().paint(marker.clone_with_char('_'));
                     }
 
-                    next_multline_margin += 1;
-
-
-
-                    connections_painter.move_to_y_axis();
+                    connections_painter.move_down_by(next_multline_margin);
 
                     let brush_pos = connections_painter.current_brush_pos();
 
@@ -449,12 +484,14 @@ impl<'a> CodeLine<'a> {
                         );
                     }
 
-                    connections_painter.move_down();
+                    next_multline_margin += 1;
 
                 },
             }
 
         }
+
+        connections_painter.move_to(connections_painter_local_zero).move_down_by(next_labels_margin+1);
 
         return painter;
 
@@ -532,10 +569,10 @@ mod test_code_line{
             margin4,
         );
 
-        let mut painter1 = code_line1.update_connection_margins(&mut unused_connection_margins, &mut connections_painter).get_sheet();
+        let mut painter1 = code_line1.update_connection_margins(&mut unused_connection_margins, &mut connections_painter, &line1).get_sheet();
         painter1.push(vec![]); // Add new line
         connections_painter.move_down(); // Add extra line for the actual code line
-        let painter2 = code_line2.update_connection_margins(&mut unused_connection_margins, &mut connections_painter).get_sheet();
+        let painter2 = code_line2.update_connection_margins(&mut unused_connection_margins, &mut connections_painter, &line2).get_sheet();
         
         let mut sheet = painter1.iter().chain(painter2.iter());
         let connections_sheet = connections_painter.get_sheet();
@@ -837,8 +874,7 @@ mod tests {
 
     use std::{io::{self, Write}, process::Command};
 
-    use itertools::Itertools;
-    use owo_colors::{OwoColorize, Style};
+    use owo_colors::{Style, XtermColors};
 
     use crate::span::Span;
 
@@ -857,34 +893,78 @@ mod tests {
                 "احجز متغير س = 555؛",
                 "احجز متغير ص = 555؛",
                 "احجز متغير ع = 555؛",
+                "احجز متغير م = 555؛",
             ]
         )
         .report(
+            Span::new((0,0), (0,4)),
+            '?',
+            Style::new().blue().cyan(),
+            &["القيمة ليست متغيرة"],
+        )
+        .report(
+            Span::new((0,15), (0,18)),
+            '~',
+            Style::new().blue().green(),
+            &["القيمة ليست متغيرة", "القيمة ليست متغيرة", "القيمة ليست متغيرة"],
+        )
+        .report(
             Span::new((0,5), (0,10)),
-            '^',
-            Style::new().red().bold(),
+            '-',
+            Style::new().blue().bold(),
             &["القيمة ليست متغيرة"],
         )
         .report(
             Span::new((2,5), (2,10)),
             '^',
             Style::new().yellow().bold(),
-            &["القيمة ليست متغيرة"],
+            &["القيمة ليست متغيرة", "القيمة ليست متغيرة"],
         )
         .report(
             Span::new((1,5), (2,4)),
             '^',
-            Style::new().yellow().bold(),
+            Style::new().red().bold(),
+            &["علامة طويلة", "علامة طويلة", "علامة طويلة", "علامة طويلة"],
+        )
+        .report(
+            Span::new((1,15), (2,19)),
+            '^',
+            Style::new().color(XtermColors::FlushOrange).bold(),
             &["علامة طويلة"],
-        );
+        )
+        .report(
+            Span::new((0,13), (2,13)),
+            '^',
+            Style::new().color(XtermColors::PinkFlamingo).bold(),
+            &["علامة طويلة"],
+        )
+        .report(
+            Span::new((1,0), (2,0)),
+            '^',
+            Style::new().color(XtermColors::Brown).bold(),
+            &["علامة طويلة"],
+        )
+        .report(
+            Span::new((0,11), (1,4)),
+            '^',
+            Style::new().magenta().bold(),
+            &["علامة طويلة","علامة طويلة","علامة طويلة"],
+        )
+        .report(
+            Span::new((1,8), (1,10)),
+            '^',
+            Style::new().color(XtermColors::Bermuda).bold(),
+            &["علامة طويلة","علامة طويلة","علامة طويلة"],
+        )
+        ;
 
+        println!("{}", reporter);
+        // println!("  {} ", "|".bright_blue()); // Add empty line above
 
-        println!("  {} ", "|".bright_blue()); // Add empty line above
-
-        for k in reporter.code_lines.keys().sorted() {
-            let marker_line = &reporter.code_lines[k];
-            println!("{} {} {}", k.bright_blue(), "|".bright_blue(), reporter.files_lines[*k]);
-            println!("  {} {}", "|".bright_blue(), marker_line);
-        }
+        // for k in reporter.code_lines.keys().sorted() {
+        //     let marker_line = &reporter.code_lines[k];
+        //     println!("{} {} {}", k.bright_blue(), "|".bright_blue(), reporter.files_lines[*k]);
+        //     println!("  {} {}", "|".bright_blue(), marker_line);
+        // }
     }
 }
