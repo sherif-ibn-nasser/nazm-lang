@@ -1,4 +1,4 @@
-use std::{cell::{Cell, RefCell}, collections::HashMap, fmt::{self, Display}, ops::Deref, rc::Rc};
+use std::{cell::Cell, collections::HashMap, fmt::{self, Display}, rc::Rc};
 
 use itertools::Itertools;
 use owo_colors::{OwoColorize, Style };
@@ -486,7 +486,7 @@ mod test_code_line{
             Rc::clone(&margin),
         );
         code_line2.mark_as_multi_line_end(
-            5, 
+            10, 
             '-', 
             Style::new().bold().bright_cyan(),
             &["عنوان"],
@@ -499,7 +499,7 @@ mod test_code_line{
             Rc::clone(&margin2),
         );
         code_line2.mark_as_multi_line_end(
-            10, 
+            5, 
             '-', 
             Style::new().bold().yellow(),
             &["عنوان"],
@@ -512,7 +512,7 @@ mod test_code_line{
             Rc::clone(&margin3),
         );
         code_line2.mark_as_multi_line_end(
-            15, 
+            20, 
             '^', 
             Style::new().bold().red(),
             &["عنوان"],
@@ -525,73 +525,45 @@ mod test_code_line{
             Rc::clone(&margin4),
         );
         code_line2.mark_as_multi_line_end(
-            20, 
+            15, 
             '^', 
             Style::new().bold().magenta(),
             &["عنوان"],
             margin4,
         );
 
-        let painter1 = code_line1.update_connection_margins(&mut unused_connection_margins, &mut connections_painter);
-        let painter2 = code_line2.update_connection_margins(&mut unused_connection_margins, &mut connections_painter);
+        let mut painter1 = code_line1.update_connection_margins(&mut unused_connection_margins, &mut connections_painter).get_sheet();
+        painter1.push(vec![]); // Add new line
+        connections_painter.move_down(); // Add extra line for the actual code line
+        let painter2 = code_line2.update_connection_margins(&mut unused_connection_margins, &mut connections_painter).get_sheet();
+        
+        let mut sheet = painter1.iter().chain(painter2.iter());
+        let connections_sheet = connections_painter.get_sheet();
+        let mut connections = connections_sheet.iter();
 
-        let painter1 = format!("{}", painter1);
-        let painter2 = format!("{}", painter2);
-        let connections = connections_painter.get_sheet();
-        let mut connections = connections.iter();
-
-        let mut lines_of_1 = painter1.lines();
-        let mut lines_of_2 = painter2.lines();
-        let mut lines_of_1_len=lines_of_1.clone().count();
-        let mut lines_of_2_len=lines_of_2.clone().count();
         let max_margin = unused_connection_margins.len()*2;
 
-        print!("{}", painter1);
-        while let Some(connection_line) = connections.next() {
-            print!("{}", " ".repeat(max_margin-connection_line.len()));
-            for c in connection_line.iter().rev() {
-                print!("{c}")
+        for markers in sheet {
+            if let Some(connection_line) = connections.next() {
+                print!("{}", " ".repeat(max_margin-connection_line.len()));
+                for c in connection_line.iter().rev() {
+                    print!("{c}")
+                }
+            }
+            else {
+                print!("{}", " ".repeat(max_margin));
+            }
+            for marker in markers {
+                print!("{marker}")
             }
             println!()
         }
 
-        print!("{}", painter2);
-        // let mut i = 0;
-        // while let Some(connection_line) = connections.next() {
-        //     for c in connection_line.iter().rev() {
-        //         print!("{c}")
-        //     }
-        //     i += 1;
-        //     if i == lines_of_1_len {
-        //         break;
-        //     }
-        //     if i == 1 {
-        //         println!("{}", line1);
-        //         continue;
-        //     }
-        //     println!("{}", lines_of_1.next().unwrap());
-        // }
-        // i = 0;
-        // while let Some(connection_line) = connections.next() {
-        //     for c in connection_line.iter().rev() {
-        //         print!("{c}")
-        //     }
-        //     i += 1;
-        //     if i == lines_of_2_len {
-        //         break;
-        //     }
-        //     if i == 1 {
-        //         println!("{}", line2);
-        //         continue;
-        //     }
-        //     println!("{}", lines_of_2.next().unwrap());
-        // }
-
     }
 
-    use std::{cell::{self, Cell}, io::{self, Write}, ops::Deref, process::Command, rc::Rc};
+    use std::{io::{self, Write}, process::Command, rc::Rc};
 
-    use owo_colors::{OwoColorize, Style};
+    use owo_colors::Style;
 
     use super::{painter::Painter, CodeLine, Marker, MarkerSign};
 
