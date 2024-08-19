@@ -1,7 +1,7 @@
-use std::{collections::HashMap, fmt::{self, write, Display}, marker::{self, PhantomData}};
+use std::{cell::{Cell, RefCell}, collections::HashMap, fmt::{self, Display}, ops::Deref, rc::Rc};
 
 use itertools::Itertools;
-use owo_colors::{AnsiColors::Black, DynColors, OwoColorize, Style, Styled };
+use owo_colors::{OwoColorize, Style };
 use painter::Painter;
 
 use crate::span::Span;
@@ -21,7 +21,7 @@ mod painter;
 
 struct CodeReporter<'a> {
     /// Map lines indecies and main depth line on them
-    lines_to_report: HashMap<usize, CodeLine<'a>>,
+    code_lines: HashMap<usize, CodeLine<'a>>,
     /// Lines to read from
     files_lines: &'a [&'a str],
 }
@@ -30,7 +30,7 @@ impl<'a> CodeReporter<'a> {
 
     fn new(files_lines: &'a [&'a str]) -> Self {
         Self {
-            lines_to_report: HashMap::new(),
+            code_lines: HashMap::new(),
             files_lines: files_lines,
         }
     }
@@ -44,24 +44,36 @@ impl<'a> CodeReporter<'a> {
 
         if start_line == end_line {
 
-            self.lines_to_report.entry(start_line)
+            self.code_lines.entry(start_line)
                 .or_insert( CodeLine::default() )
                 .mark_as_one_line(start_col, end_col, sign, style, labels);
 
             return self;
         }
 
+        let connection_margin = Rc::default(); // It will be updated later
 
-        self.lines_to_report.entry(start_line)
+        self.code_lines.entry(start_line)
             .or_insert( CodeLine::default() )
-            .mark_as_multi_line_start(start_col, sign, style);
+            .mark_as_multi_line_start(start_col, sign, style, Rc::clone(&connection_margin));
 
-        self.lines_to_report.entry(end_line)
+        self.code_lines.entry(end_line)
             .or_insert( CodeLine::default() )
-            .mark_as_multi_line_end(end_col, sign, style, labels);
-
+            .mark_as_multi_line_end(end_col, sign, style, labels, connection_margin);
 
         return self;
+    }
+
+    fn build(&mut self) {
+        let mut used_connection_margins = vec![];
+        let mut connections_painter = Painter::new(
+            Marker {sign: MarkerSign::Char(' '), style: Style::new() } // Default is space
+        );
+        for key in self.code_lines.keys().cloned().sorted(){
+            let code_line = self.code_lines.get_mut(&key).unwrap();
+            code_line.update_connection_margins(&mut used_connection_margins, &mut connections_painter);
+        }
+
     }
 }
 
@@ -81,19 +93,19 @@ impl<'a> CodeLine<'a> {
         );
     }
     
-    fn mark_as_multi_line_start(&mut self, col: usize, sign: char, style: Style) {
+    fn mark_as_multi_line_start(&mut self, col: usize, sign: char, style: Style, connection_margin: Rc<Cell<(usize, usize)>>) {
         let marker = Marker { sign: MarkerSign::Char(sign), style: style };
         self.markers.insert(
             col,
-            (marker, MarkerType::MultiLine(MultiLineMarkerType::Start) )
+            (marker, MarkerType::StartOfMultiLine { connection_margin: connection_margin } )
         );
     }
     
-    fn mark_as_multi_line_end(&mut self, col: usize, sign: char, style: Style, labels: &'a [&'a str]) {
+    fn mark_as_multi_line_end(&mut self, col: usize, sign: char, style: Style, labels: &'a [&'a str], connection_margin: Rc<Cell<(usize, usize)>>) {
         let marker = Marker { sign: MarkerSign::Char(sign), style: style };
         self.markers.insert(
             col,
-            (marker, MarkerType::MultiLine(MultiLineMarkerType::End { labels: labels }) )
+            (marker, MarkerType::EndOfMultiLine { connection_margin: connection_margin, labels: labels })
         );
     }
 
@@ -176,7 +188,7 @@ impl<'a> Display for CodeLine<'a> {
                         next_labels_margin += 1;
                     }
                 },
-                MarkerType::MultiLine(MultiLineMarkerType::End { labels }) => {
+                MarkerType::EndOfMultiLine { connection_margin, labels } => {
                     painter.move_right_by(*col);
                     
                     let brush_pos = painter.current_brush_pos();
@@ -193,7 +205,6 @@ impl<'a> Display for CodeLine<'a> {
                             painter.move_to(brush_pos);
                         }
                         else {
-                            
                             for _depth in 0..next_labels_margin {
                                 painter.move_down().paint(marker.clone_with_char('|'));
                             }
@@ -201,16 +212,6 @@ impl<'a> Display for CodeLine<'a> {
                         }
                         
                         // Increase the labels margin by number of labels and if it's greater than one subtract one
-                        /*
-                         *
-                         * احجز متغير س = 555؛
-                            ^^^^_^^^^^___~ ---من الممكن عدم جعل القيمة متغيرة
-                            |    |       |    من الممكن عدم جعل القيمة متغيرة  (remove extra one margin if they're more than one and we are on the first label in reverse)
-                            |    |       من الممكن عدم جعل القيمة متغيرة
-                            |    من الممكن عدم جعل القيمة متغيرة
-                            من الممكن عدم جعل القيمة متغيرة
- 
-                         */
                         next_labels_margin += labels.len() - (labels.len() > 1 && next_labels_margin == 0) as usize;
 
                         for (i, label) in labels.iter().enumerate() {
@@ -230,7 +231,7 @@ impl<'a> Display for CodeLine<'a> {
                     next_multline_margin += 1;
 
                 },
-                MarkerType::MultiLine(MultiLineMarkerType::Start) => {
+                MarkerType::StartOfMultiLine { connection_margin } => {
                     painter.move_right_by(*col).paint(
                         marker.clone()
                     );
@@ -255,11 +256,342 @@ impl<'a> Display for CodeLine<'a> {
     }
 }
 
+
+impl<'a> CodeLine<'a> {
+    fn update_connection_margins(
+        &mut self,
+        free_connection_margins: &mut Vec<bool>,
+        connections_painter: &mut Painter<Marker<'a>>,
+    ) -> Painter<Marker<'a>> {
+        
+        let mut painter = Painter::new(
+            Marker {sign: MarkerSign::Char(' '), style: Style::new() } // Default is space
+        );
+
+        // The number of bars (`|`) between the code and the next label (of one-line markers and multiline end markers)
+        let mut next_labels_margin = 0;
+
+        // The number of bars (`|`) between the code and the repeated underscores (`_`) of multiline marker
+        let mut next_multline_margin = 0;
+
+        let keys_rev = self.markers.keys().sorted().rev();
+
+        for col in keys_rev.clone() {
+
+            painter.move_to_zero();
+
+            let (marker, marker_typ) = &self.markers[col];
+
+            match marker_typ {
+                MarkerType::OneLineStart { end_col, labels } => {
+                    painter.move_right_by(*end_col);
+                    let brush_pos = painter.current_brush_pos();
+                    for _ in 0 .. *end_col - col {
+                        painter.move_left().paint(marker.clone());
+                    }
+                    if !labels.is_empty(){
+                        // Check if this label margin will be less than the next multiline marker margin
+                        // This will prevent labels to be above the next multiline margin
+                        // But they may have the same margins
+                        /*
+                         * Code Code Code
+                         *      ^    ^^^^
+                         * _____|    |
+                         *           Label
+                         */
+                        if next_labels_margin < next_multline_margin {
+                            // The margin of this label should equal the next multiline margin
+                            next_labels_margin = next_multline_margin;
+                        }
+                        if next_labels_margin == 0 {
+                            painter.move_to(brush_pos);
+                        }
+                        else {
+                            for _depth in 0..next_labels_margin {
+                                painter.move_down().paint(marker.clone_with_char('|'));
+                            }
+                            painter.move_down();
+                        }
+
+                        // Increase the labels margin by number of labels and if it's greater than one subtract one
+                        /*
+                         *
+                         * احجز متغير س = 555؛
+                            ^^^^_^^^^^___~ ---من الممكن عدم جعل القيمة متغيرة
+                            |    |       |    من الممكن عدم جعل القيمة متغيرة  (remove extra one margin if they're more than one and we are on the first label in reverse)
+                            |    |       من الممكن عدم جعل القيمة متغيرة
+                            |    من الممكن عدم جعل القيمة متغيرة
+                            من الممكن عدم جعل القيمة متغيرة
+ 
+                         */
+                        next_labels_margin += labels.len() - (labels.len() > 1 && next_labels_margin == 0) as usize;
+
+                        for (i, label) in labels.iter().enumerate() {
+                            if i != 0 {
+                                painter.move_down();
+                            }
+                            painter.paint(marker.clone_with_str(label));
+                        }
+                    }
+                    else if next_labels_margin == 0{
+                        // Increase the labels margin if we are on the first marker from reverse and there is no labels found
+                        next_labels_margin += 1;
+                    }
+                },
+                MarkerType::EndOfMultiLine { connection_margin, labels } => {
+
+                    painter.move_right_by(*col);
+                    
+                    let brush_pos = painter.current_brush_pos();
+
+                    painter.move_left().paint(marker.clone());
+
+                    if !labels.is_empty(){
+                        // Note it increase the labels depth if they're equal
+                        // as labels of multiline end markers have at least one depth greater than it's depth
+                        if next_labels_margin <= next_multline_margin && next_multline_margin != 0 { // This happen if it is not the first multiline
+                            next_labels_margin = next_multline_margin + 1; // Labels should be below
+                        }
+                        if next_labels_margin == 0 {
+                            painter.move_to(brush_pos);
+                        }
+                        else {
+                            for _depth in 0..next_labels_margin {
+                                painter.move_down().paint(marker.clone_with_char('|'));
+                            }
+                            painter.move_down();
+                        }
+                        
+                        // Increase the labels margin by number of labels and if it's greater than one subtract one
+                        next_labels_margin += labels.len() - (labels.len() > 1 && next_labels_margin == 0) as usize;
+
+                        for (i, label) in labels.iter().enumerate() {
+                            if i != 0 {
+                                painter.move_down();
+                            }
+                            painter.paint(marker.clone_with_str(label));
+                        }
+                    }
+
+                    painter.move_to(brush_pos).move_down_by(next_multline_margin).move_left();
+
+                    for _ in 0 .. *col {
+                        painter.move_left().paint(marker.clone_with_char('_'));
+                    }
+
+                    next_multline_margin += 1;
+
+
+                    let margin = connection_margin.get().1;
+                    
+                    free_connection_margins[margin] = true; // free this margin
+
+                    connections_painter.move_to_y_axis();
+                    let brush_pos = connections_painter.current_brush_pos();
+
+                    for _ in 0..margin*2 {
+                        connections_painter.paint(
+                            marker.clone_with_char('_')
+                        ).move_right();
+                    }
+
+                    for _ in connection_margin.get().0..brush_pos.0 {
+                        connections_painter.paint(
+                            marker.clone_with_char('|')
+                        ).move_up();
+                    }
+                    connections_painter.move_to(brush_pos).move_down();
+
+                },
+                MarkerType::StartOfMultiLine { connection_margin } => {
+
+                    painter.move_right_by(*col).paint(
+                        marker.clone()
+                    );
+
+                    for _depth in 0..next_multline_margin {
+                        painter.move_down().paint(marker.clone_with_char('|'));
+                    }
+
+                    for _ in 0 .. *col {
+                        painter.move_left().paint(marker.clone_with_char('_'));
+                    }
+
+                    next_multline_margin += 1;
+
+
+
+                    connections_painter.move_to_y_axis();
+
+                    let brush_pos = connections_painter.current_brush_pos();
+
+                    let mut is_free_margin_found = false;
+                    let mut found_margin = 0;
+                    for (margin, is_free) in free_connection_margins.iter().enumerate() {
+                        if *is_free {
+                            free_connection_margins[margin] = false;
+                            is_free_margin_found = true;
+                            found_margin = margin;
+                            break;
+                        }
+                    }
+
+                    if !is_free_margin_found {
+                        found_margin = free_connection_margins.len();
+                        free_connection_margins.push(false);
+                    }
+
+                    (*connection_margin).set((brush_pos.0, found_margin));
+
+                    for _ in 0..found_margin*2 {
+                        connections_painter.move_right().paint(
+                            marker.clone_with_char('_')
+                        );
+                    }
+
+                    connections_painter.move_down();
+
+                },
+            }
+
+        }
+
+        return painter;
+
+    }
+}
 #[cfg(test)]
 mod test_code_line{
-    use std::{io::{self, Write}, process::Command};
 
-    use owo_colors::Style;
+    #[test]
+    fn test_connection_margins(){
+        let mut connections_painter = Painter::new(
+            Marker {sign: MarkerSign::Char(' '), style: Style::new() } // Default is space
+        );
+        //connections_painter.move_right_by(10).move_left_by(10);
+        let mut unused_connection_margins = vec![];
+
+        let line1 = "احجز متغير س = 555؛";
+        let line2= "احجز متغير ص = 555؛";
+        let mut code_line1 = CodeLine::default();
+        let mut code_line2 = CodeLine::default();
+        let margin = Rc::default();
+        let margin2 = Rc::default();
+        let margin3 = Rc::default();
+        let margin4 = Rc::default();
+        code_line1.mark_as_multi_line_start(
+            5, 
+            '-', 
+            Style::new().bold().bright_cyan(),
+            Rc::clone(&margin),
+        );
+        code_line2.mark_as_multi_line_end(
+            5, 
+            '-', 
+            Style::new().bold().bright_cyan(),
+            &["عنوان"],
+            margin,
+        );
+        code_line1.mark_as_multi_line_start(
+            10, 
+            '-', 
+            Style::new().bold().yellow(),
+            Rc::clone(&margin2),
+        );
+        code_line2.mark_as_multi_line_end(
+            10, 
+            '-', 
+            Style::new().bold().yellow(),
+            &["عنوان"],
+            margin2,
+        );
+        code_line1.mark_as_multi_line_start(
+            15, 
+            '^', 
+            Style::new().bold().red(),
+            Rc::clone(&margin3),
+        );
+        code_line2.mark_as_multi_line_end(
+            15, 
+            '^', 
+            Style::new().bold().red(),
+            &["عنوان"],
+            margin3,
+        );
+        code_line1.mark_as_multi_line_start(
+            20, 
+            '^', 
+            Style::new().bold().magenta(),
+            Rc::clone(&margin4),
+        );
+        code_line2.mark_as_multi_line_end(
+            20, 
+            '^', 
+            Style::new().bold().magenta(),
+            &["عنوان"],
+            margin4,
+        );
+
+        let painter1 = code_line1.update_connection_margins(&mut unused_connection_margins, &mut connections_painter);
+        let painter2 = code_line2.update_connection_margins(&mut unused_connection_margins, &mut connections_painter);
+
+        let painter1 = format!("{}", painter1);
+        let painter2 = format!("{}", painter2);
+        let connections = connections_painter.get_sheet();
+        let mut connections = connections.iter();
+
+        let mut lines_of_1 = painter1.lines();
+        let mut lines_of_2 = painter2.lines();
+        let mut lines_of_1_len=lines_of_1.clone().count();
+        let mut lines_of_2_len=lines_of_2.clone().count();
+        let max_margin = unused_connection_margins.len()*2;
+
+        print!("{}", painter1);
+        while let Some(connection_line) = connections.next() {
+            print!("{}", " ".repeat(max_margin-connection_line.len()));
+            for c in connection_line.iter().rev() {
+                print!("{c}")
+            }
+            println!()
+        }
+
+        print!("{}", painter2);
+        // let mut i = 0;
+        // while let Some(connection_line) = connections.next() {
+        //     for c in connection_line.iter().rev() {
+        //         print!("{c}")
+        //     }
+        //     i += 1;
+        //     if i == lines_of_1_len {
+        //         break;
+        //     }
+        //     if i == 1 {
+        //         println!("{}", line1);
+        //         continue;
+        //     }
+        //     println!("{}", lines_of_1.next().unwrap());
+        // }
+        // i = 0;
+        // while let Some(connection_line) = connections.next() {
+        //     for c in connection_line.iter().rev() {
+        //         print!("{c}")
+        //     }
+        //     i += 1;
+        //     if i == lines_of_2_len {
+        //         break;
+        //     }
+        //     if i == 1 {
+        //         println!("{}", line2);
+        //         continue;
+        //     }
+        //     println!("{}", lines_of_2.next().unwrap());
+        // }
+
+    }
+
+    use std::{cell::{self, Cell}, io::{self, Write}, ops::Deref, process::Command, rc::Rc};
+
+    use owo_colors::{OwoColorize, Style};
 
     use super::{painter::Painter, CodeLine, Marker, MarkerSign};
 
@@ -337,7 +669,8 @@ mod test_code_line{
             14,
             '~', 
             Style::new().bold().green(),
-            &["من الممكن عدم جعل القيمة متغيرة"]
+            &["من الممكن عدم جعل القيمة متغيرة"],
+            Rc::default(),
         );
         println!("{}\n{}", line, code_line)
     }
@@ -351,16 +684,19 @@ mod test_code_line{
             15, 
             '-', 
             Style::new().bold().bright_cyan(),
+            Rc::default(),
         );
         code_line.mark_as_multi_line_start(
             5, 
             '-', 
             Style::new().bold().blue(),
+            Rc::default(),
         );
         code_line.mark_as_multi_line_start(
             11, 
             '-', 
             Style::new().bold().purple(),
+            Rc::default(),
         );
         code_line.mark_as_one_line(
             0,
@@ -381,19 +717,22 @@ mod test_code_line{
             2, 
             '^', 
             Style::new().bold().white(),
-            &["من الممكن عدم جعل القيمة متغيرة"]
+            &["من الممكن عدم جعل القيمة متغيرة"],
+            Rc::default(),
         );
         code_line.mark_as_multi_line_end(
             4, 
             '^', 
             Style::new().bold().blue(),
-            &["من الممكن عدم جعل القيمة متغيرة"]
+            &["من الممكن عدم جعل القيمة متغيرة"],
+            Rc::default(),
         );
         code_line.mark_as_multi_line_end(
             10, 
             '^', 
             Style::new().bold().red(),
-            &["من الممكن عدم جعل القيمة متغيرة"]
+            &["من الممكن عدم جعل القيمة متغيرة"],
+            Rc::default(),
         );
         code_line.mark_as_multi_line_end(
             19, 
@@ -402,7 +741,8 @@ mod test_code_line{
             &[
                 "من الممكن عدم جعل القيمة متغيرة",
                 "من الممكن عدم جعل القيمة متغيرة",
-            ]
+            ],
+            Rc::default(),
         );
         code_line.mark_as_one_line(
             15,
@@ -436,12 +776,14 @@ mod test_code_line{
             &[
                 "من الممكن عدم جعل القيمة متغيرة",
                 "من الممكن عدم جعل القيمة متغيرة",
-            ]
+            ],
+            Rc::default(),
         );
         code_line.mark_as_multi_line_start(
             11, 
             '~', 
             Style::new().bold().white(),
+            Rc::default(),
         );
         println!("{}\n{}", line, code_line)
     }
@@ -495,13 +837,27 @@ enum MarkerSign<'a> {
 #[derive(Clone)]
 enum MarkerType<'a> {
     OneLineStart { end_col: usize, labels: &'a [&'a str] },
-    MultiLine(MultiLineMarkerType<'a>),
-}
-
-#[derive(Clone)]
-enum MultiLineMarkerType<'a> {
-    Start,
-    End { labels: &'a [&'a str] },
+    StartOfMultiLine {
+        /// This margin and the end marker counter-part should agree on the same margin to connect between them correctly
+        /// 
+        /// The first is the current row index of the brush of the connection painter
+        /// 
+        /// The second is the margin index found in the free connection margins array
+        /// 
+        /// The end counter-part is responsible to draw the connections from it to the position of the start counter-part
+        connection_margin: Rc<Cell<(usize, usize)>>
+    },
+    EndOfMultiLine {
+        /// This margin and the start marker counter-part should agree on the same margin to connect between them correctly
+        /// 
+        /// The first is the row index of the brush of the connection painter at the start counter-part
+        /// 
+        /// The second is the margin index found in the free connection margins array
+        /// 
+        /// The end counter-part is responsible to draw the connections from it to the position of the start counter-part
+        connection_margin: Rc<Cell<(usize, usize)>>,
+        labels: &'a [&'a str],
+    },
 }
 
 #[cfg(test)]
@@ -553,8 +909,8 @@ mod tests {
 
         println!("  {} ", "|".bright_blue()); // Add empty line above
 
-        for k in reporter.lines_to_report.keys().sorted() {
-            let marker_line = &reporter.lines_to_report[k];
+        for k in reporter.code_lines.keys().sorted() {
+            let marker_line = &reporter.code_lines[k];
             println!("{} {} {}", k.bright_blue(), "|".bright_blue(), reporter.files_lines[*k]);
             println!("  {} {}", "|".bright_blue(), marker_line);
         }

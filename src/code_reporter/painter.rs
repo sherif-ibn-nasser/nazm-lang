@@ -85,6 +85,14 @@ impl<P: Clone + Display> Painter<P> {
         self.move_up_by(1)
     }
 
+    pub fn move_to_x_axis(&mut self) -> &mut Self {
+        self.move_to((0, self.brush_pos.1))
+    }
+
+    pub fn move_to_y_axis(&mut self) -> &mut Self {
+        self.move_to((self.brush_pos.0, 0))
+    }
+
     pub fn paint(&mut self, with: P) -> &mut Self {
         self.sheet[self.brush_pos.0][self.brush_pos.1] = with;
         self
@@ -96,6 +104,10 @@ impl<P: Clone + Display> Painter<P> {
 
     pub fn current_row_size(&self) -> usize {
         self.sheet[self.brush_pos.0].len()
+    }
+
+    pub fn get_sheet(self) -> Vec<Vec<P>> {
+        self.sheet
     }
 
 }
