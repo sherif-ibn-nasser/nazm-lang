@@ -74,16 +74,17 @@ impl<'a> Display for CodeReporter<'a> {
             Marker {sign: MarkerSign::Char(' '), style: Style::new() } // Default is space
         );
         let mut big_sheet = vec![];
-        for key in self.code_lines.keys().sorted() {
-            let code_line = &self.code_lines[key];
+        let mut lines_indecies = self.code_lines.keys().sorted();
+
+        for line_index in lines_indecies.clone() {
+            let code_line = &self.code_lines[line_index];
         
             let mut sheet = code_line
                 .update_connection_margins(
                     &mut free_connection_margins,
                     &mut connections_painter,
-                    self.files_lines[*key]
+                    self.files_lines[*line_index]
             ).get_sheet();
-            //sheet.push(vec![]); // Add new line
             big_sheet.push(sheet);
         }
 
@@ -91,7 +92,19 @@ impl<'a> Display for CodeReporter<'a> {
         let mut connections = connections_sheet.iter();
         let max_margin = free_connection_margins.len()*2;
 
+        let max_line_num = self.code_lines.keys().max().unwrap() + 1; // Add one to the maximum index
+        let max_line_num_indent = max_line_num.to_string().len();
+
+        writeln!(f, "{} {}", " ".repeat(max_line_num_indent), '|'.blue().bold());
         for line_of_markers in big_sheet.iter().flatten() {
+
+            if line_of_markers.len() == 1 && matches!(line_of_markers[0].sign, MarkerSign::CodeLine(_)){
+                let line_num_str = (lines_indecies.next().unwrap() + 1).to_string();
+                write!(f, "{}{} {}", line_num_str.blue().bold(), " ".repeat(max_line_num_indent-line_num_str.len()), '|'.blue().bold());
+            }
+            else {
+                write!(f, "{} {}", " ".repeat(max_line_num_indent), '|'.blue().bold());
+            }
 
             if let Some(connection_line) = connections.next() {
                 write!(f, "{}", " ".repeat(max_margin-connection_line.len()));
@@ -108,6 +121,8 @@ impl<'a> Display for CodeReporter<'a> {
             writeln!(f);
         
         }
+
+        write!(f, "{} {}", " ".repeat(max_line_num_indent), '|'.blue().bold());
 
         Ok(())
     }
@@ -302,10 +317,12 @@ impl<'a> CodeLine<'a> {
     ) -> Painter<Marker<'a>> {
         
         let mut painter = Painter::new(
-            Marker {sign: MarkerSign::Char(' '), style: Style::new() } // Default is space
+            Marker { sign: MarkerSign::Char(' '), style: Style::new() } // Default is space
         );
 
-        let painter_local_zero = painter.paint(Marker {sign: MarkerSign::Str(file_line), style: Style::new() }).move_down().current_brush_pos();
+        let painter_local_zero = painter.paint(
+            Marker { sign: MarkerSign::CodeLine(file_line), style: Style::new() }
+        ).move_down().current_brush_pos();
 
         let connections_painter_local_zero = connections_painter.move_down().current_brush_pos();
 
@@ -833,6 +850,7 @@ impl<'a> Display for Marker<'a> {
         match self.sign {
             MarkerSign::Char(c) => write!(f, "{}", c.style(self.style)),
             MarkerSign::Str(s) => write!(f, "{}", s.style(self.style)),
+            MarkerSign::CodeLine(l) => write!(f, "{}", l.style(self.style)),
         }
     }
 }
@@ -840,7 +858,8 @@ impl<'a> Display for Marker<'a> {
 #[derive(Clone)]
 enum MarkerSign<'a> {
     Char(char),
-    Str(&'a str)
+    Str(&'a str),
+    CodeLine(&'a str),
 }
 
 #[derive(Clone)]
@@ -924,7 +943,7 @@ mod tests {
             Span::new((1,5), (2,4)),
             '^',
             Style::new().red().bold(),
-            &["علامة طويلة", "علامة طويلة", "علامة طويلة", "علامة طويلة"],
+            &["علامة طويلة", "علامة طويلة", "علامة طويلة", "علامة طويلة", "ما قولتلك يا بني علامة طويلة"],
         )
         .report(
             Span::new((1,15), (2,19)),
@@ -959,12 +978,5 @@ mod tests {
         ;
 
         println!("{}", reporter);
-        // println!("  {} ", "|".bright_blue()); // Add empty line above
-
-        // for k in reporter.code_lines.keys().sorted() {
-        //     let marker_line = &reporter.code_lines[k];
-        //     println!("{} {} {}", k.bright_blue(), "|".bright_blue(), reporter.files_lines[*k]);
-        //     println!("  {} {}", "|".bright_blue(), marker_line);
-        // }
     }
 }
