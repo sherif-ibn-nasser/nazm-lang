@@ -50,6 +50,11 @@ impl<'a> CodeReporter<'a> {
             .or_insert( CodeLine::default() )
             .mark_as_multi_line_end(end_col, sign, style, labels, connection_margin);
 
+        for line in start_line + 1 .. end_line {
+            // Add lines in between to display them or to modify them later if markers were added to them
+            self.code_lines.entry(line).or_insert( CodeLine::default() );
+        }
+
         return self;
     }
 
@@ -68,14 +73,28 @@ impl<'a> Display for CodeReporter<'a> {
 
         for line_index in lines_indecies.clone() {
             let code_line = &self.code_lines[line_index];
+
+            let file_line = self.files_lines[*line_index];
+
+            big_sheet.push(vec![vec![
+                Marker {
+                    sign: MarkerSign::CodeLine(file_line),
+                    style: Style::new()
+                }
+            ]]);
         
-            let sheet = code_line
+            let painter_opt = code_line
                 .update_connection_margins(
                     &mut free_connection_margins,
                     &mut connections_painter,
-                    self.files_lines[*line_index]
-            ).get_sheet();
-            big_sheet.push(sheet);
+                    file_line,
+            );
+
+            match painter_opt {
+                Some(painter) => big_sheet.push(painter.get_sheet()),
+                None => {},
+            }
+            
         }
 
         let connections_sheet = connections_painter.get_sheet();
@@ -155,18 +174,15 @@ impl<'a> CodeLine<'a> {
         free_connection_margins: &mut Vec<bool>,
         connections_painter: &mut Painter<Marker<'a>>,
         file_line: &'a str,
-    ) -> Painter<Marker<'a>> {
+    ) -> Option<Painter<Marker<'a>>> {
         
         let mut painter = Painter::new(
             Marker { sign: MarkerSign::Char(' '), style: Style::new() } // Default is space
         );
 
-        let painter_local_zero = painter.paint(
-            Marker { sign: MarkerSign::CodeLine(file_line), style: Style::new() }
-        ).move_down().current_brush_pos();
+        let painter_local_zero = painter.current_brush_pos();
 
         let connections_painter_local_zero = connections_painter.move_down().current_brush_pos();
-
         
         // This is a special case when the multiline marker starts after spaces
         // It will make the marker starts with `/` from connections sheet not from the normal sheet
@@ -176,9 +192,16 @@ impl<'a> CodeLine<'a> {
          * |_________^
          */
 
-        let min_col = self.markers.keys().min().unwrap();
+        let min_col_opt = self.markers.keys().min();
+
+        if min_col_opt.is_none() { // No markers
+            return None; // No markers to draw in the main sheet
+        }
+
+        let min_col = min_col_opt.unwrap();
+
         let mut min_col_is_after_spaces = false;
-        
+
         if let
             (MarkerType::StartOfMultiLine { connection_margin }, true)
             = 
@@ -211,6 +234,11 @@ impl<'a> CodeLine<'a> {
             connections_painter.move_right_by(2*found_margin).paint(
                 self.markers[min_col].0.clone_with_char('/')
             );
+
+            if self.markers.len() == 1 {
+                connections_painter.move_down(); // To reset the line 208
+                return None; // No markers to draw in the main sheet
+            }
         }
 
 
@@ -409,7 +437,7 @@ impl<'a> CodeLine<'a> {
         
         connections_painter.move_to(connections_painter_local_zero).move_down_by(next_labels_margin+1);
 
-        return painter;
+        return Some(painter);
 
     }
 
@@ -512,8 +540,10 @@ mod tests {
                 "احجز متغير س = 555؛",
                 "احجز متغير ص = 555؛",
                 "احجز متغير ع = 555؛",
-                "     متغير م = 555؛",
-                "احجز متغير ل = 555؛",
+                "     متغير ل = 555؛",
+                "احجز متغير م = 555؛",
+                "احجز متغير ن = 555؛",
+                "احجز متغير هـ = 555؛",
             ]
         )
         .report(
@@ -577,9 +607,15 @@ mod tests {
             &["علامة طويلة","علامة طويلة","علامة طويلة"],
         )
         .report(
-            Span::new((3,5), (4,10)),
+            Span::new((3,5), (6,10)),
             '^',
-            Style::new().color(XtermColors::Red).bold(),
+            Style::new().color(XtermColors::GreenYellow).bold(),
+            &["علامة طويلة"],
+        )
+        .report(
+            Span::new((4,11), (5,5)),
+            '^',
+            Style::new().color(XtermColors::BayLeaf).bold(),
             &["علامة طويلة"],
         )
         ;
