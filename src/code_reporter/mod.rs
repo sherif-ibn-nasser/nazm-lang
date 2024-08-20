@@ -71,6 +71,8 @@ impl<'a> Display for CodeReporter<'a> {
         let mut big_sheet = vec![];
         let mut lines_indecies = self.code_lines.keys().sorted();
 
+        let mut num_of_displayed_lines = 0;
+
         for line_index in lines_indecies.clone() {
             let code_line = &self.code_lines[line_index];
 
@@ -82,6 +84,11 @@ impl<'a> Display for CodeReporter<'a> {
                     style: Style::new()
                 }
             ]]);
+
+            num_of_displayed_lines += 1;
+
+            // This will always align the connections sheet with other sheets
+            connections_painter.move_to_zero().move_down_by(num_of_displayed_lines);
         
             let painter_opt = code_line
                 .update_connection_margins(
@@ -91,7 +98,11 @@ impl<'a> Display for CodeReporter<'a> {
             );
 
             match painter_opt {
-                Some(painter) => big_sheet.push(painter.get_sheet()),
+                Some(painter) => {
+                    let small_sheet = painter.get_sheet();
+                    num_of_displayed_lines += small_sheet.len();
+                    big_sheet.push(small_sheet);
+                },
                 None => {},
             }
             
@@ -115,8 +126,8 @@ impl<'a> Display for CodeReporter<'a> {
                 write!(f, "{} {}", " ".repeat(max_line_num_indent), '|'.blue().bold());
             }
 
-            if let Some(connection_line) = connections.next() {
-                write!(f, "{}", " ".repeat(max_margin-connection_line.len()));
+            if let (Some(connection_line), true) = (connections.next(), max_margin > 0) {
+                write!(f, "{}", " ".repeat(max_margin-connection_line.len()+1));
                 for c in connection_line.iter().rev() {
                     write!(f, "{c}");
                 }
@@ -182,7 +193,7 @@ impl<'a> CodeLine<'a> {
 
         let painter_local_zero = painter.current_brush_pos();
 
-        let connections_painter_local_zero = connections_painter.move_down().current_brush_pos();
+        let connections_painter_local_zero = connections_painter.current_brush_pos();
         
         // This is a special case when the multiline marker starts after spaces
         // It will make the marker starts with `/` from connections sheet not from the normal sheet
@@ -231,7 +242,7 @@ impl<'a> CodeLine<'a> {
 
             (*connection_margin).set((brush_pos.0, found_margin));
 
-            connections_painter.move_right_by(2*found_margin).paint(
+            connections_painter.move_right_by(2*found_margin+1).paint(
                 self.markers[min_col].0.clone_with_char('/')
             );
 
@@ -361,7 +372,7 @@ impl<'a> CodeLine<'a> {
 
                     let brush_pos = connections_painter.current_brush_pos();
 
-                    for _ in 0..margin*2 {
+                    for _ in 0..=margin*2 {
                         connections_painter.paint(
                             marker.clone_with_char('_')
                         ).move_right();
@@ -422,10 +433,10 @@ impl<'a> CodeLine<'a> {
 
                     (*connection_margin).set((brush_pos.0, found_margin));
 
-                    for _ in 0..found_margin*2 {
-                        connections_painter.move_right().paint(
+                    for _ in 0..=found_margin*2 {
+                        connections_painter.paint(
                             marker.clone_with_char('_')
-                        );
+                        ).move_right();
                     }
 
                     next_multline_margin += 1;
@@ -434,8 +445,6 @@ impl<'a> CodeLine<'a> {
             }
 
         }
-        
-        connections_painter.move_to(connections_painter_local_zero).move_down_by(next_labels_margin+1);
 
         return Some(painter);
 
@@ -544,6 +553,9 @@ mod tests {
                 "احجز متغير م = 555؛",
                 "احجز متغير ن = 555؛",
                 "احجز متغير هـ = 555؛",
+                "احجز متغير و = 555؛",
+                "احجز متغير ي = 555؛",
+                "احجز متغير ز = 555؛",
             ]
         )
         .report(
@@ -616,6 +628,36 @@ mod tests {
             Span::new((4,11), (5,5)),
             '^',
             Style::new().color(XtermColors::BayLeaf).bold(),
+            &["علامة طويلة"],
+        )
+        .report(
+            Span::new((7,15), (7,19)),
+            '^',
+            Style::new().color(XtermColors::Dandelion).bold(),
+            &["علامة طويلة"],
+        )
+        .report(
+            Span::new((7,0), (9,4)),
+            '^',
+            Style::new().color(XtermColors::Caramel).bold(),
+            &["علامة طويلة"],
+        )
+        .report(
+            Span::new((7,5), (9,9)),
+            '^',
+            Style::new().color(XtermColors::CanCanPink).bold(),
+            &["علامة طويلة"],
+        )
+        .report(
+            Span::new((7,10), (9,15)),
+            '^',
+            Style::new().color(XtermColors::DarkRose).bold(),
+            &["علامة طويلة"],
+        )
+        .report(
+            Span::new((7,12), (9,19)),
+            '^',
+            Style::new().color(XtermColors::Dandelion).bold(),
             &["علامة طويلة"],
         )
         ;
