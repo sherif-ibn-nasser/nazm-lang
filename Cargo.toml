@@ -10,3 +10,4 @@ bpaf = { version = "*", features = ["derive"] }
 owo-colors = "*"
 documented = "*"
 strum = { version = "*", features = ["derive"] }
+itertools = "*"

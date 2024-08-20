@@ -7,7 +7,7 @@ use documented::DocumentedVariants;
 use error::{LexerError, LexerErrorType};
 use strum::IntoEnumIterator;
 pub use token::*;
-use crate::span::{Span, SpanCursor};
+use crate::span::{self, Span, SpanCursor};
 
 pub(crate) struct LexerIter<'a>{
     text: &'a str,
@@ -17,7 +17,7 @@ pub(crate) struct LexerIter<'a>{
 }
 
 impl<'a> Iterator for LexerIter<'a> {
-    type Item = (Span, TokenType, &'a str);
+    type Item = Token<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.cursor.stopped_at.0;
@@ -29,7 +29,8 @@ impl<'a> Iterator for LexerIter<'a> {
         let end = self.cursor.stopped_at.0;
         let end_byte = self.stopped_at_bidx;
         let val = &self.text[start_byte..end_byte];
-        Some((Span { start: start, end: end }, typ, val))
+        let span = Span { start: start, end: end };
+        Some(Token { val: val, span: span, typ: typ })
     }
 }
 
@@ -305,14 +306,14 @@ fn is_kufr_or_unsupported_character(c:char) -> bool{
 mod tests{
     use documented::DocumentedVariants;
     use strum::IntoEnumIterator;
-    use crate::{lexer::TokenType, span::{Span, SpanCursor}};
+    use crate::{lexer::TokenType, span::{Span, SpanCursor}, Token};
     use super::{KeywordType, LexerIter, SymbolType};
 
     #[test]
     fn test_symbols_lexing() {
         for symbol in SymbolType::iter() {
             let symbol_val = symbol.get_variant_docs().unwrap();
-            let (span, typ, val) = LexerIter::new(&symbol_val).next().unwrap();
+            let Token { span, val, typ } = LexerIter::new(&symbol_val).next().unwrap();
             assert_eq!(
                 span,
                 Span { 
@@ -334,7 +335,7 @@ mod tests{
         let mut symbols_iter = SymbolType::iter();
         let mut columns = 0;
 
-        while let Some((span, typ, val)) = tokens.next() {
+        while let Some(Token { span, val, typ }) = tokens.next() {
             let symbol = symbols_iter.next().unwrap();
             let symbol_val = symbol.get_variant_docs().unwrap();
 
@@ -364,7 +365,7 @@ mod tests{
         let mut symbols_iter = SymbolType::iter();
         let mut lines = 0;
 
-        while let Some((span, typ, val)) = tokens.next() {
+        while let Some(Token { span, val, typ }) = tokens.next() {
             let symbol = symbols_iter.next().unwrap();
             let symbol_val = symbol.get_variant_docs().unwrap();
 
@@ -380,7 +381,7 @@ mod tests{
             assert_eq!(val, symbol_val);
             assert_eq!(typ, TokenType::Symbol(symbol));
 
-            let (span, typ, val) = tokens.next().unwrap();
+            let Token { span, val, typ } = tokens.next().unwrap();
 
             assert_eq!(
                 span,
@@ -401,7 +402,7 @@ mod tests{
     fn test_keywords_lexing() {
         for keyword in KeywordType::iter() {
             let keyword_val = keyword.get_variant_docs().unwrap();
-            let (span, typ, val) = LexerIter::new(&keyword_val).next().unwrap();
+            let Token { span, val, typ } = LexerIter::new(&keyword_val).next().unwrap();
             assert_eq!(
                 span,
                 Span { 
