@@ -72,8 +72,13 @@ impl<'a> Display for CodeReporter<'a> {
         let mut lines_indecies = self.code_lines.keys().sorted();
 
         let mut num_of_displayed_lines = 0;
+        
+        let mut max_line_num = 0; // This is needed later and will be updated in the loop to not calculate it by keys.max()
 
         for line_index in lines_indecies.clone() {
+
+            max_line_num = line_index + 1; // Add one
+
             let code_line = &self.code_lines[line_index];
 
             let file_line = self.files_lines[*line_index];
@@ -112,14 +117,25 @@ impl<'a> Display for CodeReporter<'a> {
         let mut connections = connections_sheet.iter();
         let max_margin = free_connection_margins.len()*2;
 
-        let max_line_num = self.code_lines.keys().max().unwrap() + 1; // Add one to the maximum index
         let max_line_num_indent = max_line_num.to_string().len();
 
         writeln!(f, "{} {}", " ".repeat(max_line_num_indent), '|'.blue().bold());
+
+        // This is needed to add `...` between non-continues lines 
+        // i.e., display line 5 then display `...` then display line 10
+        // So we need it to compare current line with previous one
+
+        let mut prev_line_num = 0; // Start with zero (This will store the line num and not the its index)
+
         for line_of_markers in big_sheet.iter().flatten() {
 
             if line_of_markers.len() == 1 && matches!(line_of_markers[0].sign, MarkerSign::CodeLine(_)){
-                let line_num_str = (lines_indecies.next().unwrap() + 1).to_string();
+                let current_line_num = lines_indecies.next().unwrap() + 1;
+                if prev_line_num > 0 && prev_line_num + 1 < current_line_num {
+                    writeln!(f, "{}", "...".blue().bold());
+                }
+                prev_line_num = current_line_num;
+                let line_num_str = prev_line_num.to_string();
                 write!(f, "{}{} {}", line_num_str.blue().bold(), " ".repeat(max_line_num_indent-line_num_str.len()), '|'.blue().bold());
             }
             else {
@@ -141,8 +157,6 @@ impl<'a> Display for CodeReporter<'a> {
             writeln!(f);
         
         }
-
-        write!(f, "{} {}", " ".repeat(max_line_num_indent), '|'.blue().bold());
 
         Ok(())
     }
@@ -546,16 +560,20 @@ mod tests {
         
         let reporter = CodeReporter::new(
             &[
-                "احجز متغير س = 555؛",
-                "احجز متغير ص = 555؛",
-                "احجز متغير ع = 555؛",
-                "     متغير ل = 555؛",
-                "احجز متغير م = 555؛",
-                "احجز متغير ن = 555؛",
+                "احجز متغير أ = 555؛",
+                "احجز متغير ب = 555؛",
+                "احجز متغير ج = 555؛",
+                "     متغير د = 555؛",
                 "احجز متغير هـ = 555؛",
                 "احجز متغير و = 555؛",
-                "احجز متغير ي = 555؛",
                 "احجز متغير ز = 555؛",
+                "احجز متغير ح = 555؛",
+                "احجز متغير ط = 555؛",
+                "احجز متغير ي = 555؛",
+                "احجز متغير ك = 555؛",
+                "احجز متغير ل = 555؛",
+                "احجز متغير م = 555؛",
+                "احجز متغير ن = 555؛",
             ]
         )
         .report(
@@ -656,6 +674,12 @@ mod tests {
         )
         .report(
             Span::new((7,12), (9,19)),
+            '^',
+            Style::new().color(XtermColors::Dandelion).bold(),
+            &["علامة طويلة"],
+        )
+        .report(
+            Span::new((11,5), (12,5)),
             '^',
             Style::new().color(XtermColors::Dandelion).bold(),
             &["علامة طويلة"],
