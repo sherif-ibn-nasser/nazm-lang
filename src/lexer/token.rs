@@ -6,7 +6,7 @@ use crate::span::Span;
 use super::error::LexerError;
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Token<'a>{
+pub struct Token<'a> {
     pub val: &'a str,
     pub span: Span,
     pub typ: TokenType,
@@ -27,7 +27,7 @@ pub enum TokenType {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum LiteralTokenType{
+pub enum LiteralTokenType {
     Str(String),
     Char(char),
     Bool(bool),

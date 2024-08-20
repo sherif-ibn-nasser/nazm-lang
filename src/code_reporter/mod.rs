@@ -13,14 +13,16 @@ struct CodeReporter<'a> {
     code_lines: HashMap<usize, CodeLine<'a>>,
     /// Lines to read from
     files_lines: &'a [&'a str],
+    line_nums_style: Style,
 }
 
 impl<'a> CodeReporter<'a> {
 
-    fn new(files_lines: &'a [&'a str]) -> Self {
+    fn new(files_lines: &'a [&'a str], line_nums_style: Style) -> Self {
         Self {
             code_lines: HashMap::new(),
             files_lines: files_lines,
+            line_nums_style: line_nums_style,
         }
     }
 
@@ -96,7 +98,7 @@ impl<'a> Display for CodeReporter<'a> {
             connections_painter.move_to_zero().move_down_by(num_of_displayed_lines);
         
             let painter_opt = code_line
-                .update_connection_margins(
+                .draw(
                     &mut free_connection_margins,
                     &mut connections_painter,
                     file_line,
@@ -119,7 +121,7 @@ impl<'a> Display for CodeReporter<'a> {
 
         let max_line_num_indent = max_line_num.to_string().len();
 
-        writeln!(f, "{} {}", " ".repeat(max_line_num_indent), '|'.blue().bold());
+        writeln!(f, "{} {}", " ".repeat(max_line_num_indent).style(self.line_nums_style), '|'.style(self.line_nums_style));
 
         // This is needed to add `...` between non-continues lines 
         // i.e., display line 5 then display `...` then display line 10
@@ -132,14 +134,18 @@ impl<'a> Display for CodeReporter<'a> {
             if line_of_markers.len() == 1 && matches!(line_of_markers[0].sign, MarkerSign::CodeLine(_)){
                 let current_line_num = lines_indecies.next().unwrap() + 1;
                 if prev_line_num > 0 && prev_line_num + 1 < current_line_num {
-                    writeln!(f, "{}", "...".blue().bold());
+                    writeln!(f, "{}", "...".style(self.line_nums_style));
                 }
                 prev_line_num = current_line_num;
                 let line_num_str = prev_line_num.to_string();
-                write!(f, "{}{} {}", line_num_str.blue().bold(), " ".repeat(max_line_num_indent-line_num_str.len()), '|'.blue().bold());
+                write!(f, "{}{} {}",
+                    line_num_str.style(self.line_nums_style),
+                    " ".repeat(max_line_num_indent-line_num_str.len()),
+                    '|'.style(self.line_nums_style)
+                );
             }
             else {
-                write!(f, "{} {}", " ".repeat(max_line_num_indent), '|'.blue().bold());
+                write!(f, "{} {}", " ".repeat(max_line_num_indent).style(self.line_nums_style), '|'.style(self.line_nums_style));
             }
 
             if let (Some(connection_line), true) = (connections.next(), max_margin > 0) {
@@ -194,7 +200,7 @@ impl<'a> CodeLine<'a> {
         );
     }
 
-    fn update_connection_margins(
+    fn draw(
         &self,
         free_connection_margins: &mut Vec<bool>,
         connections_painter: &mut Painter<Marker<'a>>,
@@ -574,7 +580,8 @@ mod tests {
                 "احجز متغير ل = 555؛",
                 "احجز متغير م = 555؛",
                 "احجز متغير ن = 555؛",
-            ]
+            ],
+            Style::new().bold().blue(),
         )
         .report(
             Span::new((0,0), (0,4)),

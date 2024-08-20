@@ -26,9 +26,9 @@ fn main() {
 
     let mut bad_tokens = vec![];
 
-    for (span, token_typ, val) in lexer {
+    for Token { span, val, typ }  in lexer {
 
-        let color = match token_typ {
+        let color = match typ {
             TokenType::LineComment | TokenType::DelimitedComment =>XtermColors::BrightTurquoise,
             TokenType::Symbol(_) => XtermColors::UserBrightYellow,
             TokenType::Id => XtermColors::LightAnakiwaBlue,
@@ -43,13 +43,13 @@ fn main() {
 
         let mut val = format!("{}", val.color(color));
 
-        if matches!(token_typ, TokenType::Keyword(_) | TokenType::Symbol(_)) {
+        if matches!(typ, TokenType::Keyword(_) | TokenType::Symbol(_)) {
             val = format!("{}", val.bold());
         }
         
         print!("{}", val);
 
-        if let TokenType::Bad(errs) = token_typ {
+        if let TokenType::Bad(errs) = typ {
             bad_tokens.push((val, span, errs));
         }
     }
