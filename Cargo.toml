@@ -11,3 +11,4 @@ owo-colors = "*"
 documented = "*"
 strum = { version = "*", features = ["derive"] }
 itertools = "*"
+nazmc_diagnostics = { path = "nazmc_diagnostics" }

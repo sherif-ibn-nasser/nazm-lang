@@ -1,21 +1,19 @@
-mod diagnostics;
+
 mod cli;
 mod lexer;
 mod span;
 mod code_reporter;
 
 use std::{cell::RefCell, collections::HashMap, io::{self, Write}, process::Command};
-use diagnostics::Diagnostics;
 use lexer::*;
 use owo_colors::{OwoColorize, XtermColors};
 
+
 fn main() {
 
-    let mut files: HashMap<String, Vec<String>> = HashMap::new();
+    let (file_path, file_content) = cli::read_file();
 
-    let diagnostics = RefCell::new(Diagnostics::new());
-
-    let file_content = cli::read_file();
+    // let diagnostics = FileDiagnostics::new(&file_path);
 
     let lexer = LexerIter::new(&file_content);
 
