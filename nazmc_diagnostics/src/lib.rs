@@ -1,7 +1,7 @@
 use std::{fmt::Display, path::Path, usize};
 
 use const_colors::{bold, cyan, end, green, magenta, red, yellow};
-use nazmc_diagnostics_macros::nazmc_error_code;
+pub use nazmc_diagnostics_macros::{nazmc_diagnostic, nazmc_error_code};
 
 mod error_codes;
 
@@ -9,6 +9,14 @@ pub struct FileDiagnostics<'a> {
     diagnostics: Vec<String>,
     file_path: &'a Path,
 }
+
+pub(crate) struct DiagnosticsCodeChecker;
+
+#[nazmc_diagnostic(0000)]
+fn add(){}
+
+#[nazmc_diagnostic(0001)]
+struct SubError;
 
 #[derive(Default)]
 struct DiagnosticBuilder<Level: DiagnosticLevel, M = NoMsg, P = NoPath, CW = NoCodeWindow, CD = NoChainedDiagnostics> {
@@ -72,14 +80,14 @@ impl DiagnosticLevel for Note {
 #[derive(Default)]
 struct NoMsg;
 
-type Msg<'a> = &'a str;
+type WithMsg<'a> = &'a str;
 
 /* Diagnostic builder path states */
 
 #[derive(Default)]
 struct NoPath;
 
-struct WithPath<'a>(&'a Path);
+type WithPath<'a> = &'a Path;
 
 /* Diagnostic builder code window states */
 
@@ -136,17 +144,41 @@ impl <L: DiagnosticLevel, M, P, CW, CD> DiagnosticBuilder<L, M, P, CW, CD> {
 
 }
 
-// impl <L, P, CW, CD> DiagnosticBuilder<L, NoMsg, P, CW, CD> {
-//     fn msg(self, msg: Msg) -> DiagnosticBuilder<L, Msg, P, CW, CD> {
-//         DiagnosticBuilder::<L, Msg, P, CW, CD> {
-//             level: self.level,
-//             msg: msg,
-//             path: self.path,
-//             code_window: self.code_window,
-//             chained_diagnostic: self.chained_diagnostic,
-//         }
-//     }
-// }
+impl <L: DiagnosticLevel, P, CW, CD> DiagnosticBuilder<L, NoMsg, P, CW, CD> {
+    fn msg(self, msg: WithMsg) -> DiagnosticBuilder<L, WithMsg, P, CW, CD> {
+        DiagnosticBuilder {
+            level: self.level,
+            msg: msg,
+            path: self.path,
+            code_window: self.code_window,
+            chained_diagnostic: self.chained_diagnostic,
+        }
+    }
+}
+
+impl <L: DiagnosticLevel, M, CW, CD> DiagnosticBuilder<L, M, NoPath, CW, CD> {
+    fn path(self, path: WithPath) -> DiagnosticBuilder<L, M, WithPath, CW, CD> {
+        DiagnosticBuilder {
+            level: self.level,
+            msg: self.msg,
+            path: path,
+            code_window: self.code_window,
+            chained_diagnostic: self.chained_diagnostic,
+        }
+    }
+}
+
+impl <L: DiagnosticLevel, M, P, CD> DiagnosticBuilder<L, M, P, NoCodeWindow, CD> {
+    fn code_window(self, code_window: CodeWindow) -> DiagnosticBuilder<L, M, P, CodeWindow, CD> {
+        DiagnosticBuilder {
+            level: self.level,
+            msg: self.msg,
+            path: self.path,
+            code_window: code_window,
+            chained_diagnostic: self.chained_diagnostic,
+        }
+    }
+}
 
 
 // impl<'a> Display for FileDiagnostics<'a> {

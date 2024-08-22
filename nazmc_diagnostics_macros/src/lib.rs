@@ -1,6 +1,6 @@
 use owo_colors::OwoColorize;
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 
 #[proc_macro_attribute]
 pub fn nazmc_error_code(attr: TokenStream, input: TokenStream) -> TokenStream {
@@ -36,4 +36,31 @@ pub fn nazmc_error_code(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     output
 
+}
+
+
+
+#[proc_macro_attribute]
+pub fn nazmc_diagnostic(attr: TokenStream, input: TokenStream) -> TokenStream {
+
+    let code = attr.to_string();
+
+    if code.len() != 4 || !code.chars().all(|c| c.is_ascii_digit()) {
+        panic!("Expected code, found `{}`", code)
+    }
+
+    let fn_name = format_ident!("e{}", code);
+
+    let full_code = "خطأ".to_string()+"["+&code+"]";
+    let styled_code = format!("{}", full_code.bold().red());
+    
+    let mut output : TokenStream = quote! {
+        impl DiagnosticsCodeChecker {
+            fn #fn_name(){}
+        }
+    }.into();
+
+    output.extend(input);
+
+    output
 }

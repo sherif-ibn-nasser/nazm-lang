@@ -1,7 +1,7 @@
+use nazmc_diagnostics_macros::nazmc_diagnostic;
 use nazmc_diagnostics_macros::nazmc_error_code;
 use crate::ErrorLevel;
 use crate::DiagnosticLevel;
-
 // Derive error level for theses class and append codes to them
 
 #[cfg(test)]
