@@ -3,7 +3,11 @@ use std::{fmt::Display, path::Path, usize};
 use const_colors::{bold, cyan, end, green, magenta, red, yellow};
 pub use nazmc_diagnostics_macros::{nazmc_diagnostic, nazmc_error_code};
 
-mod error_codes;
+pub mod span;
+pub mod errors;
+
+mod code_reporter;
+
 
 pub struct FileDiagnostics<'a> {
     diagnostics: Vec<String>,
@@ -12,8 +16,10 @@ pub struct FileDiagnostics<'a> {
 
 pub(crate) struct DiagnosticsCodeChecker;
 
-#[nazmc_diagnostic(0000)]
-fn add(){}
+#[nazmc_diagnostic(4444)]
+fn add(){
+
+}
 
 #[nazmc_diagnostic(0001)]
 struct SubError;
@@ -43,16 +49,19 @@ impl<E> DiagnosticLevel for E where E: ErrorLevel {
 
 #[derive(Default)]
 /// Default error diagnostic level (no codes)
+struct NoLevel;
 
-struct Error;
-
-impl DiagnosticLevel for Error {
+impl DiagnosticLevel for NoLevel {
     const NAME: &'static str = "";
 }
 
-// impl DiagnosticLevel for Error {
-//     const NAME: &'static str = concat!(red!(), bold!(), "خطأ", end!());
-// }
+
+#[derive(Default)]
+struct Error;
+
+impl DiagnosticLevel for Error {
+    const NAME: &'static str = concat!(red!(), bold!(), "خطأ", end!());
+}
 
 #[derive(Default)]
 struct Warning;
@@ -105,7 +114,7 @@ struct NoChainedDiagnostics;
 #[derive(Default)]
 struct ChainedDiagnostics(Vec<String>);
 
-impl <L: DiagnosticLevel, M, P, CW, CD> DiagnosticBuilder<L, M, P, CW, CD> {
+impl DiagnosticBuilder<NoLevel, NoMsg, NoPath, NoCodeWindow, NoChainedDiagnostics> {
     
     fn error() -> DiagnosticBuilder<Error> {
         DiagnosticBuilder {

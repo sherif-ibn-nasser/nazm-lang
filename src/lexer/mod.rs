@@ -5,9 +5,9 @@ mod error;
 use std::str::Chars;
 use documented::DocumentedVariants;
 use error::{LexerError, LexerErrorType};
+use nazmc_diagnostics::span::{Span, SpanCursor};
 use strum::IntoEnumIterator;
 pub use token::*;
-use crate::span::{self, Span, SpanCursor};
 
 pub(crate) struct LexerIter<'a>{
     text: &'a str,
@@ -305,8 +305,9 @@ fn is_kufr_or_unsupported_character(c:char) -> bool{
 
 mod tests{
     use documented::DocumentedVariants;
+    use nazmc_diagnostics::span::{Span, SpanCursor};
     use strum::IntoEnumIterator;
-    use crate::{lexer::TokenType, span::{Span, SpanCursor}, Token};
+    use crate::{lexer::TokenType, Token};
     use super::{KeywordType, LexerIter, SymbolType};
 
     #[test]

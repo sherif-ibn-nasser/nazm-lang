@@ -88,7 +88,9 @@ name = "nazmc_diagnostics"
 version = "0.1.0"
 dependencies = [
  "const_colors",
+ "itertools",
  "nazmc_diagnostics_macros",
+ "owo-colors",
 ]
 
 [[package]]

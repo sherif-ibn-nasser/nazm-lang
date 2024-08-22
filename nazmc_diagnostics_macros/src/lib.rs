@@ -46,7 +46,7 @@ pub fn nazmc_diagnostic(attr: TokenStream, input: TokenStream) -> TokenStream {
     let code = attr.to_string();
 
     if code.len() != 4 || !code.chars().all(|c| c.is_ascii_digit()) {
-        panic!("Expected code, found `{}`", code)
+        panic!("Expected 4-digits code, found `{}`", code)
     }
 
     let fn_name = format_ident!("e{}", code);
