@@ -8,7 +8,7 @@ use crate::span::Span;
 
 mod painter;
 
-struct CodeReporter<'a> {
+pub struct CodeReporter<'a> {
     /// Map lines indecies and main depth line on them
     code_lines: HashMap<usize, CodeLine<'a>>,
     /// Lines to read from
@@ -18,7 +18,7 @@ struct CodeReporter<'a> {
 
 impl<'a> CodeReporter<'a> {
 
-    fn new(files_lines: &'a [&'a str], line_nums_style: Style) -> Self {
+    pub fn new(files_lines: &'a [&'a str], line_nums_style: Style) -> Self {
         Self {
             code_lines: HashMap::new(),
             files_lines: files_lines,
@@ -26,7 +26,7 @@ impl<'a> CodeReporter<'a> {
         }
     }
 
-    fn report(mut self, span: Span, sign: char, style: Style, labels: &'a [&'a str]) -> Self {
+    pub fn mark(&mut self, span: Span, sign: char, style: Style, labels: &'a [&'a str]) -> &mut Self {
 
         let start_line = span.start.line;
         let start_col = span.start.col;
@@ -66,6 +66,7 @@ impl<'a> CodeReporter<'a> {
 impl<'a> Display for CodeReporter<'a> {
 
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+
         let mut free_connection_margins = vec![];
         let mut connections_painter = Painter::new(
             Marker {sign: MarkerSign::Char(' '), style: Style::new() } // Default is space
@@ -583,109 +584,109 @@ mod tests {
             ],
             Style::new().bold().blue(),
         )
-        .report(
+        .mark(
             Span::new((0,0), (0,4)),
             '?',
             Style::new().blue().cyan(),
             &["القيمة ليست متغيرة"],
         )
-        .report(
+        .mark(
             Span::new((0,15), (0,18)),
             '~',
             Style::new().blue().green(),
             &["القيمة ليست متغيرة", "القيمة ليست متغيرة", "القيمة ليست متغيرة"],
         )
-        .report(
+        .mark(
             Span::new((0,5), (0,10)),
             '-',
             Style::new().blue().bold(),
             &["القيمة ليست متغيرة"],
         )
-        .report(
+        .mark(
             Span::new((2,5), (2,10)),
             '^',
             Style::new().yellow().bold(),
             &["القيمة ليست متغيرة", "القيمة ليست متغيرة"],
         )
-        .report(
+        .mark(
             Span::new((1,5), (2,4)),
             '^',
             Style::new().red().bold(),
             &["علامة طويلة", "علامة طويلة", "علامة طويلة", "علامة طويلة", "ما قولتلك يا بني علامة طويلة"],
         )
-        .report(
+        .mark(
             Span::new((1,15), (2,19)),
             '^',
             Style::new().color(XtermColors::FlushOrange).bold(),
             &["علامة طويلة"],
         )
-        .report(
+        .mark(
             Span::new((0,13), (2,13)),
             '^',
             Style::new().color(XtermColors::PinkFlamingo).bold(),
             &["علامة طويلة"],
         )
-        .report(
+        .mark(
             Span::new((1,0), (2,0)),
             '^',
             Style::new().color(XtermColors::Brown).bold(),
             &["علامة طويلة"],
         )
-        .report(
+        .mark(
             Span::new((0,11), (1,4)),
             '^',
             Style::new().magenta().bold(),
             &["علامة طويلة","علامة طويلة","علامة طويلة"],
         )
-        .report(
+        .mark(
             Span::new((1,8), (1,10)),
             '^',
             Style::new().color(XtermColors::Bermuda).bold(),
             &["علامة طويلة","علامة طويلة","علامة طويلة"],
         )
-        .report(
+        .mark(
             Span::new((3,5), (6,10)),
             '^',
             Style::new().color(XtermColors::GreenYellow).bold(),
             &["علامة طويلة"],
         )
-        .report(
+        .mark(
             Span::new((4,11), (5,5)),
             '^',
             Style::new().color(XtermColors::BayLeaf).bold(),
             &["علامة طويلة"],
         )
-        .report(
+        .mark(
             Span::new((7,15), (7,19)),
             '^',
             Style::new().color(XtermColors::Dandelion).bold(),
             &["علامة طويلة"],
         )
-        .report(
+        .mark(
             Span::new((7,0), (9,4)),
             '^',
             Style::new().color(XtermColors::Caramel).bold(),
             &["علامة طويلة"],
         )
-        .report(
+        .mark(
             Span::new((7,5), (9,9)),
             '^',
             Style::new().color(XtermColors::CanCanPink).bold(),
             &["علامة طويلة"],
         )
-        .report(
+        .mark(
             Span::new((7,10), (9,15)),
             '^',
             Style::new().color(XtermColors::DarkRose).bold(),
             &["علامة طويلة"],
         )
-        .report(
+        .mark(
             Span::new((7,12), (9,19)),
             '^',
             Style::new().color(XtermColors::Dandelion).bold(),
             &["علامة طويلة"],
         )
-        .report(
+        .mark(
             Span::new((11,5), (12,5)),
             '^',
             Style::new().color(XtermColors::Dandelion).bold(),

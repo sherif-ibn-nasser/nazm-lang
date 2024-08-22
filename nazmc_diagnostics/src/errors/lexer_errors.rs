@@ -17,11 +17,6 @@ impl<'a> LexerDiagnostics<'a> {
         token_val: &str,
         span: Span,
     ){
-        DiagnosticBuilder::
-            error()
-            .path(&self.file_path)
-            .msg(&format!("الرمز `{}` غير معروف", token_val))
-            
-        ;
+        
     }
 }

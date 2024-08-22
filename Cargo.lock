@@ -23,12 +23,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "const_colors"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "849b4a2a9f71cb25845f7f55d53cc7cab084be3ad4b94e1a53e2881ab292a46c"
-
-[[package]]
 name = "documented"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -87,19 +81,8 @@ dependencies = [
 name = "nazmc_diagnostics"
 version = "0.1.0"
 dependencies = [
- "const_colors",
  "itertools",
- "nazmc_diagnostics_macros",
  "owo-colors",
-]
-
-[[package]]
-name = "nazmc_diagnostics_macros"
-version = "0.1.0"
-dependencies = [
- "owo-colors",
- "quote",
- "syn",
 ]
 
 [[package]]

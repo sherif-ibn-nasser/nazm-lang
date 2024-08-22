@@ -4,7 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-nazmc_diagnostics_macros = { path = "../nazmc_diagnostics_macros" }
-const_colors = "*"
 owo-colors = "*"
 itertools = "*"

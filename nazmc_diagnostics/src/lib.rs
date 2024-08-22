@@ -1,203 +1,139 @@
 use std::{fmt::Display, path::Path, usize};
 
-use const_colors::{bold, cyan, end, green, magenta, red, yellow};
-pub use nazmc_diagnostics_macros::{nazmc_diagnostic, nazmc_error_code};
+use owo_colors::{OwoColorize, Style};
+use span::{Span, SpanCursor};
 
 pub mod span;
 pub mod errors;
 
 mod code_reporter;
 
+use code_reporter::CodeReporter;
+
 
 pub struct FileDiagnostics<'a> {
-    diagnostics: Vec<String>,
+    diagnostics: Vec<Diagnostic<'a>>,
     file_path: &'a Path,
 }
 
-pub(crate) struct DiagnosticsCodeChecker;
-
-#[nazmc_diagnostic(4444)]
-fn add(){
-
+struct Diagnostic<'a> {
+    level: DiagnosticLevel,
+    msg: &'a str,
+    code_window: Option<CodeWindow<'a>>,
+    chained_diagnostics: Vec<Diagnostic<'a>>,
 }
 
-#[nazmc_diagnostic(0001)]
-struct SubError;
+impl<'a> Diagnostic<'a> {
 
-#[derive(Default)]
-struct DiagnosticBuilder<Level: DiagnosticLevel, M = NoMsg, P = NoPath, CW = NoCodeWindow, CD = NoChainedDiagnostics> {
-    level: Level,
-    msg: M,
-    path: P,
-    code_window: CW,
-    chained_diagnostic: CD,
-}
-
-pub trait DiagnosticLevel {
-    const NAME: &'static str;
-}
-
-/* Diagnostic builder levels states */
-
-pub trait ErrorLevel : Default {
-    const CODE: &'static str;
-}
-
-impl<E> DiagnosticLevel for E where E: ErrorLevel {
-    const NAME: &'static str = E::CODE;
-}
-
-#[derive(Default)]
-/// Default error diagnostic level (no codes)
-struct NoLevel;
-
-impl DiagnosticLevel for NoLevel {
-    const NAME: &'static str = "";
-}
-
-
-#[derive(Default)]
-struct Error;
-
-impl DiagnosticLevel for Error {
-    const NAME: &'static str = concat!(red!(), bold!(), "خطأ", end!());
-}
-
-#[derive(Default)]
-struct Warning;
-
-impl DiagnosticLevel for Warning {
-    const NAME: &'static str = concat!(yellow!(), bold!(), "تنبيه", end!());
-}
-
-#[derive(Default)]
-struct Help;
-
-impl DiagnosticLevel for Help {
-    const NAME: &'static str = concat!(green!(), bold!(), "مساعدة", end!());
-}
-
-#[derive(Default)]
-struct Note;
-
-impl DiagnosticLevel for Note {
-    const NAME: &'static str = concat!(magenta!(), bold!(), "ملحوظة", end!());
-}
-
-/* Diagnostic builder msg states */
-
-#[derive(Default)]
-struct NoMsg;
-
-type WithMsg<'a> = &'a str;
-
-/* Diagnostic builder path states */
-
-#[derive(Default)]
-struct NoPath;
-
-type WithPath<'a> = &'a Path;
-
-/* Diagnostic builder code window states */
-
-#[derive(Default)]
-struct NoCodeWindow;
-
-#[derive(Default)]
-struct CodeWindow;
-
-/* Diagnostic builder chained diagnostic states */
-
-#[derive(Default)]
-struct NoChainedDiagnostics;
-
-#[derive(Default)]
-struct ChainedDiagnostics(Vec<String>);
-
-impl DiagnosticBuilder<NoLevel, NoMsg, NoPath, NoCodeWindow, NoChainedDiagnostics> {
+    fn new(level: DiagnosticLevel, msg: &'a str) -> Self {
+        Diagnostic { level: level, msg: msg, code_window: None, chained_diagnostics: vec![] }
+    }
     
-    fn error() -> DiagnosticBuilder<Error> {
-        DiagnosticBuilder {
-            level: Error,
-            ..Default::default()
+    fn set_code_window(&mut self, code_window: CodeWindow<'a>) {
+        self.code_window = Some(code_window);
+    }
+
+    fn chain(&mut self, with: Diagnostic<'a>) -> &mut Self {
+        self.chained_diagnostics.push(with);
+        self
+    }
+}
+
+enum DiagnosticLevel {
+    Error,
+    ErrorWithCode(usize),
+    Warning,
+    Help,
+    Note,
+}
+
+impl<'a> Display for Diagnostic<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        
+        let _ = match self.level {
+            DiagnosticLevel::Error => write!(f, "{}", "خطأ".bold().red()),
+            DiagnosticLevel::ErrorWithCode(error_code) => write!(f, "{}{}{}{}", "خطأ".bold().red(), "[".bold() ,error_code.bold().red(), "]". bold()),
+            DiagnosticLevel::Warning => write!(f, "{}", "خطأ".bold().red()),
+            DiagnosticLevel::Help => write!(f, "{}", "مساعدة".bold().green()),
+            DiagnosticLevel::Note => write!(f, "{}", "ملحوظة".bold().cyan()),
+        };
+
+        let _ = writeln!(f, "{} {}", ":".bold(), self.msg.bold());
+
+        if let Some(code_window) = &self.code_window {
+            let _ = write!(f, "{}", code_window);
+        }
+
+        for chained_diagnostic in &self.chained_diagnostics {
+            let _ = writeln!(f, "{}", chained_diagnostic);
+        }
+
+        Ok(())
+    }
+}
+
+struct CodeWindow<'a> {
+    file_path: &'a str,
+    cursor: SpanCursor,
+    code_reporter: CodeReporter<'a>,
+}
+
+impl<'a> CodeWindow<'a> {
+
+    fn new(&mut self, file_path: &'a str, files_lines: &'a [&'a str], cursor: SpanCursor) -> Self {
+        Self {
+            file_path: file_path,
+            cursor: cursor,
+            code_reporter: CodeReporter::new(files_lines, Style::new().bold().blue())
         }
     }
 
-    fn error_with_code<E: ErrorLevel>(error_code: E) -> DiagnosticBuilder<E> {
-        DiagnosticBuilder {
-            level: error_code,
-            ..Default::default()
-        }
+    fn mark_error(&mut self, span: Span, labels: &'a [&'a str]) -> &mut Self {
+        self.code_reporter.mark(span, '^', Style::new().bold().red(), labels);
+        self
     }
 
-    fn warning() -> DiagnosticBuilder<Warning> {
-        DiagnosticBuilder {
-            level: Warning,
-            ..Default::default()
-        }
+    fn mark_warning(&mut self, span: Span, labels: &'a [&'a str]) -> &mut Self {
+        self.code_reporter.mark(span, '^', Style::new().bold().yellow(), labels);
+        self
     }
 
-    fn help() -> DiagnosticBuilder<Help> {
-        DiagnosticBuilder {
-            level: Help,
-            ..Default::default()
-        }
+    fn mark_help(&mut self, span: Span, labels: &'a [&'a str]) -> &mut Self {
+        self.code_reporter.mark(span, '=', Style::new().bold().green(), labels);
+        self
     }
 
-    fn note() -> DiagnosticBuilder<Note> {
-        DiagnosticBuilder {
-            level: Note,
-            ..Default::default()
-        }
+    fn mark_note(&mut self, span: Span, labels: &'a [&'a str]) -> &mut Self {
+        self.code_reporter.mark(span, '~', Style::new().bold().cyan(), labels);
+        self
+    }
+
+    fn mark_secondary(&mut self, span: Span, labels: &'a [&'a str]) -> &mut Self {
+        self.code_reporter.mark(span, '-', Style::new().bold().blue(), labels);
+        self
+    }
+
+    fn mark_tertiary(&mut self, span: Span, labels: &'a [&'a str]) -> &mut Self {
+        self.code_reporter.mark(span, '*', Style::new().bold().bright_magenta(), labels);
+        self
     }
 
 }
 
-impl <L: DiagnosticLevel, P, CW, CD> DiagnosticBuilder<L, NoMsg, P, CW, CD> {
-    fn msg(self, msg: WithMsg) -> DiagnosticBuilder<L, WithMsg, P, CW, CD> {
-        DiagnosticBuilder {
-            level: self.level,
-            msg: msg,
-            path: self.path,
-            code_window: self.code_window,
-            chained_diagnostic: self.chained_diagnostic,
-        }
+impl<'a> Display for CodeWindow<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+
+        let _ = writeln!(
+            f,
+            "{}{} {}:{}:{}",
+            "المسار".bold().blue(),
+            ":".bold(),
+            self.file_path.bold(),
+            self.cursor.line.bold(),
+            self.cursor.col.bold()
+        );
+
+        write!(f, "{}", self.code_reporter)
+        
     }
 }
-
-impl <L: DiagnosticLevel, M, CW, CD> DiagnosticBuilder<L, M, NoPath, CW, CD> {
-    fn path(self, path: WithPath) -> DiagnosticBuilder<L, M, WithPath, CW, CD> {
-        DiagnosticBuilder {
-            level: self.level,
-            msg: self.msg,
-            path: path,
-            code_window: self.code_window,
-            chained_diagnostic: self.chained_diagnostic,
-        }
-    }
-}
-
-impl <L: DiagnosticLevel, M, P, CD> DiagnosticBuilder<L, M, P, NoCodeWindow, CD> {
-    fn code_window(self, code_window: CodeWindow) -> DiagnosticBuilder<L, M, P, CodeWindow, CD> {
-        DiagnosticBuilder {
-            level: self.level,
-            msg: self.msg,
-            path: self.path,
-            code_window: code_window,
-            chained_diagnostic: self.chained_diagnostic,
-        }
-    }
-}
-
-
-// impl<'a> Display for FileDiagnostics<'a> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         let mut diagnostics_str = String::new();
-
-//         for diagnostic in &self.diagnostics {
-//             diagnostics_str.push_str(&format!("{}\n", diagnostic))
-//         }
-
-//         write!(f, "{}", diagnostics_str)
-//     }
-// }
