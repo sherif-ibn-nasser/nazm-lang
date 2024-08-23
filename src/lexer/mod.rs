@@ -5,15 +5,22 @@ mod error;
 use std::str::Chars;
 use documented::DocumentedVariants;
 use error::{LexerError, LexerErrorType};
+use itertools::Itertools;
+use nazmc_diagnostics::{span::{Span, SpanCursor}, PhaseDiagnostics};
 use strum::IntoEnumIterator;
 pub use token::*;
-use crate::span::{self, Span, SpanCursor};
 
 pub(crate) struct LexerIter<'a>{
-    text: &'a str,
+    content: &'a str,
     cursor: CharsCursor<'a>,
     /// The byte index the cursor stopped at
     stopped_at_bidx: usize,
+    /// The file lines to fill from lexing
+    file_lines: Vec<&'a str>,
+    /// The diagnostics of lexing phase
+    diagnostics: PhaseDiagnostics<'a>,
+    /// The start byte index of current line
+    current_line_start_bidx: usize,
 }
 
 impl<'a> Iterator for LexerIter<'a> {
@@ -28,18 +35,36 @@ impl<'a> Iterator for LexerIter<'a> {
         }
         let end = self.cursor.stopped_at.0;
         let end_byte = self.stopped_at_bidx;
-        let val = &self.text[start_byte..end_byte];
-        let span = Span { start: start, end: end };
-        Some(Token { val: val, span: span, typ: typ })
+        let val = &self.content[start_byte..end_byte];
+        let span = Span { start, end };
+        Some(Token { val, span, typ })
     }
 }
 
 impl<'a> LexerIter<'a> {
 
-    pub fn new(text: &'a str) -> Self {
-        let mut _self = Self { text: text, cursor: CharsCursor::new(text), stopped_at_bidx: 0 };
+    pub fn new(content: &'a str) -> Self {
+        let mut _self = Self {
+            content,
+            cursor: CharsCursor::new(content),
+            stopped_at_bidx: 0,
+            diagnostics: PhaseDiagnostics::new(),
+            file_lines: vec![],
+            current_line_start_bidx: 0,
+        };
         _self.cursor.next(); // Init cursor::stopped_at with first char
         _self
+    }
+
+    pub fn get_file_lines_and_diagnostics(mut self) -> (Vec<&'a str>, PhaseDiagnostics<'a>) {
+
+        for _ in self.by_ref() {}
+
+        if self.file_lines.is_empty() {
+            self.file_lines.push("");
+        }
+
+        (self.file_lines, self.diagnostics)
     }
 
     fn next_token_type(&mut self) -> TokenType {
@@ -58,11 +83,11 @@ impl<'a> LexerIter<'a> {
             }
             _ => {
 
-                if self.stopped_at_bidx == self.text.len() {
+                if self.stopped_at_bidx == self.content.len() {
                     return TokenType::EOF;
                 }
 
-                let text = &self.text[self.stopped_at_bidx..];
+                let text = &self.content[self.stopped_at_bidx..];
 
                 for symbol in SymbolType::iter() {
                     if symbol.get_variant_docs().is_ok_and(|val| text.starts_with(val)){
@@ -80,11 +105,36 @@ impl<'a> LexerIter<'a> {
     }
 
     fn next_cursor(&mut self) -> Option<(SpanCursor, char)> {
+
+        let current_line = &self.content[self.current_line_start_bidx..self.stopped_at_bidx];
+
         let size = self.cursor.stopped_at.1.len_utf8();
 
         self.stopped_at_bidx += size;
 
-        self.cursor.next()
+        let stopped_at_eol = self.cursor.stopped_at.1 == '\n';
+
+        if stopped_at_eol {
+            self.file_lines.push(current_line);
+            self.current_line_start_bidx = self.stopped_at_bidx;
+        }
+
+        let next = self.cursor.next();
+
+        if next.is_none() {
+
+            if stopped_at_eol {
+                self.file_lines.push("");
+            }
+
+            else if self.current_line_start_bidx < self.content.len() {  
+                let current_line = &self.content[self.current_line_start_bidx..self.stopped_at_bidx];
+                self.file_lines.push(current_line);
+                self.current_line_start_bidx = self.stopped_at_bidx;
+            }
+        }
+
+        next
     }
 
     fn next_cursor_non_eol(&mut self) -> Option<(SpanCursor, char)> {
@@ -171,7 +221,7 @@ impl<'a> LexerIter<'a> {
 
         let end = self.stopped_at_bidx;
         
-        let id = &self.text[start..end];
+        let id = &self.content[start..end];
 
         if id == "مؤكد" {
             return TokenType::Literal(LiteralTokenType::Bool(true));
@@ -186,7 +236,7 @@ impl<'a> LexerIter<'a> {
             }
         }
 
-        return TokenType::Id;
+        TokenType::Id
 
     }
 
@@ -297,23 +347,72 @@ fn is_kufr_or_unsupported_character(c:char) -> bool{
         }
     }
 
-    return false
+    false
 }
 
 
 #[cfg(test)]
 
 mod tests{
+    use std::vec;
+
     use documented::DocumentedVariants;
+    use itertools::Itertools;
+    use nazmc_diagnostics::span::{Span, SpanCursor};
     use strum::IntoEnumIterator;
-    use crate::{lexer::TokenType, span::{Span, SpanCursor}, Token};
+    use crate::{lexer::TokenType, Token};
     use super::{KeywordType, LexerIter, SymbolType};
+
+    #[test]
+    fn test_lines() {
+
+        assert_eq!(vec![""], LexerIter::new("").get_file_lines_and_diagnostics().0);
+
+        let content = concat!(
+            "\n",
+            "/*\n",
+            "multiline comment\n",
+            "*/\n",
+            "123456789\n",
+            "\n",
+            "احجز\n",
+            "\n",
+            "a\n",
+        );
+
+        let lexer: LexerIter = LexerIter::new(content);
+
+        let (lines, _) = lexer.get_file_lines_and_diagnostics();
+        let expected_lines = content.split('\n').collect_vec();
+
+        assert_eq!(expected_lines, lines);
+
+        // No new line at the end
+        let content = concat!(
+            "\n",
+            "/*\n",
+            "multiline comment\n",
+            "*/\n",
+            "123456789\n",
+            "\n",
+            "احجز\n",
+            "\n",
+            "a",
+        );
+
+        let lexer: LexerIter = LexerIter::new(content);
+
+        let (lines, _) = lexer.get_file_lines_and_diagnostics();
+        let expected_lines = content.split('\n').collect_vec();
+
+        assert_eq!(expected_lines, lines);
+    }
 
     #[test]
     fn test_symbols_lexing() {
         for symbol in SymbolType::iter() {
             let symbol_val = symbol.get_variant_docs().unwrap();
-            let Token { span, val, typ } = LexerIter::new(&symbol_val).next().unwrap();
+            let Token { span, val, typ } = LexerIter::new(symbol_val).next().unwrap();
             assert_eq!(
                 span,
                 Span { 
@@ -331,11 +430,11 @@ mod tests{
             symbols_line.push_str(symbol_val);
         }
 
-        let mut tokens = LexerIter::new(&symbols_line);
+        let tokens = LexerIter::new(&symbols_line);
         let mut symbols_iter = SymbolType::iter();
         let mut columns = 0;
 
-        while let Some(Token { span, val, typ }) = tokens.next() {
+        for Token { span, val, typ } in tokens {
             let symbol = symbols_iter.next().unwrap();
             let symbol_val = symbol.get_variant_docs().unwrap();
 
@@ -402,7 +501,7 @@ mod tests{
     fn test_keywords_lexing() {
         for keyword in KeywordType::iter() {
             let keyword_val = keyword.get_variant_docs().unwrap();
-            let Token { span, val, typ } = LexerIter::new(&keyword_val).next().unwrap();
+            let Token { span, val, typ } = LexerIter::new(keyword_val).next().unwrap();
             assert_eq!(
                 span,
                 Span { 

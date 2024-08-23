@@ -22,7 +22,7 @@ fn print_err(msg: String){
     println!("{}{} {}{}",err.bright_red(),err_col,msg,err_dot)
 }
 
-pub fn read_file() -> String{
+pub fn read_file() -> (PathBuf, String){
 
     let file_path=c_l_i().fallback_to_usage().run().file;
     
@@ -54,7 +54,7 @@ pub fn read_file() -> String{
     
     match fs::read_to_string(&file_path) {
         Ok(content) => {
-            return content;
+            (file_path, content)
         },
         Err(_) => {
             print_err(format!("{} {} {}", "لا يمكن قراءة الملف".bold() ,file_path_str.bright_red().bold(), "أو أنه غير موجود".bold()));

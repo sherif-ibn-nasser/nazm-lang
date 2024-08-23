@@ -1,8 +1,6 @@
 use documented::{DocumentedFields, DocumentedVariants};
 use strum::EnumIter;
-
-use crate::span::Span;
-
+use nazmc_diagnostics::span::*;
 use super::error::LexerError;
 
 #[derive(Clone, PartialEq, Debug)]

@@ -72,8 +72,17 @@ dependencies = [
  "bpaf",
  "documented",
  "itertools",
+ "nazmc_diagnostics",
  "owo-colors",
  "strum",
+]
+
+[[package]]
+name = "nazmc_diagnostics"
+version = "0.1.0"
+dependencies = [
+ "itertools",
+ "owo-colors",
 ]
 
 [[package]]

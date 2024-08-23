@@ -1,10 +1,10 @@
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 pub struct Span{
     pub start: SpanCursor,
     pub end: SpanCursor,
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 pub struct SpanCursor{
     /// The line index
     pub line: usize,

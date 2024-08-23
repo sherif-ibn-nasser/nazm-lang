@@ -1,24 +1,19 @@
-mod diagnostics;
+
 mod cli;
 mod lexer;
-mod span;
-mod code_reporter;
 
-use std::{cell::RefCell, collections::HashMap, io::{self, Write}, process::Command};
-use diagnostics::Diagnostics;
+use std::{io::{self, Write}, process::Command};
 use lexer::*;
 use owo_colors::{OwoColorize, XtermColors};
 
+
 fn main() {
 
-    let mut files: HashMap<String, Vec<String>> = HashMap::new();
+    let (file_path, file_content) = cli::read_file();
 
-    let diagnostics = RefCell::new(Diagnostics::new());
-
-    let file_content = cli::read_file();
-
-    let lexer = LexerIter::new(&file_content);
-
+    let mut lexer = LexerIter::new(&file_content);
+    // parse(&mut lexer);
+    //let (file_lines, lexer_diagnosstics) = lexer.get_file_lines_and_diagnostics();
 
     // RTL printing
     let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
@@ -26,7 +21,7 @@ fn main() {
 
     let mut bad_tokens = vec![];
 
-    for Token { span, val, typ }  in lexer {
+    for Token { span, val, typ } in lexer {
 
         let color = match typ {
             TokenType::LineComment | TokenType::DelimitedComment =>XtermColors::BrightTurquoise,
