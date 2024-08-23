@@ -5,6 +5,7 @@ mod error;
 use std::str::Chars;
 use documented::DocumentedVariants;
 use error::{LexerError, LexerErrorType};
+use itertools::Itertools;
 use nazmc_diagnostics::{span::{Span, SpanCursor}, PhaseDiagnostics};
 use strum::IntoEnumIterator;
 pub use token::*;
@@ -58,6 +59,10 @@ impl<'a> LexerIter<'a> {
     pub fn get_file_lines_and_diagnostics(mut self) -> (Vec<&'a str>, PhaseDiagnostics<'a>) {
 
         for _ in self.by_ref() {}
+
+        if self.file_lines.is_empty() {
+            self.file_lines.push("");
+        }
 
         (self.file_lines, self.diagnostics)
     }
@@ -349,6 +354,8 @@ fn is_kufr_or_unsupported_character(c:char) -> bool{
 #[cfg(test)]
 
 mod tests{
+    use std::vec;
+
     use documented::DocumentedVariants;
     use itertools::Itertools;
     use nazmc_diagnostics::span::{Span, SpanCursor};
@@ -358,6 +365,9 @@ mod tests{
 
     #[test]
     fn test_lines() {
+
+        assert_eq!(vec![""], LexerIter::new("").get_file_lines_and_diagnostics().0);
+
         let content = concat!(
             "\n",
             "/*\n",
