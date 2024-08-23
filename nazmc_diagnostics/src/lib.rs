@@ -5,7 +5,6 @@ use owo_colors::{OwoColorize, Style};
 use span::{Span, SpanCursor};
 
 pub mod span;
-pub mod errors;
 
 mod code_reporter;
 

@@ -21,7 +21,7 @@ fn main() {
 
     let mut bad_tokens = vec![];
 
-    for Token { span, val, typ }  in lexer {
+    for Token { span, val, typ } in lexer {
 
         let color = match typ {
             TokenType::LineComment | TokenType::DelimitedComment =>XtermColors::BrightTurquoise,
