@@ -2,7 +2,7 @@
 mod cli;
 mod lexer;
 
-use std::{cell::RefCell, collections::HashMap, io::{self, Write}, process::Command};
+use std::{io::{self, Write}, process::Command};
 use lexer::*;
 use owo_colors::{OwoColorize, XtermColors};
 
@@ -11,10 +11,9 @@ fn main() {
 
     let (file_path, file_content) = cli::read_file();
 
-    // let diagnostics = FileDiagnostics::new(&file_path);
-
-    let lexer = LexerIter::new(&file_content);
-
+    let mut lexer = LexerIter::new(&file_content);
+    // parse(&mut lexer);
+    //let (file_lines, lexer_diagnosstics) = lexer.get_file_lines_and_diagnostics();
 
     // RTL printing
     let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();

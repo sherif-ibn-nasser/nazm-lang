@@ -1,22 +1,28 @@
-use std::path::Path;
 
 use crate::*;
 use crate::span::*;
 
+impl<'a> PhaseDiagnostics<'a> {
 
-struct LexerDiagnostics<'a> {
-    file_path: &'a Path,
-    file_lines: &'a [&'a str],
-}
+    pub fn report_unknown_token(&mut self, cursor: SpanCursor){
 
-impl<'a> LexerDiagnostics<'a> {
-
-
-    pub fn report_unknown_token(
-        &self,
-        token_val: &str,
-        span: Span,
-    ){
+        let mut err = Diagnostic::new(
+            DiagnosticLevel::Error,
+            "رمز غير صالح"
+        );
         
+        let mut code_window = self.new_code_window(cursor);
+
+        code_window.mark_error(
+            Span {
+                start: cursor,
+                end: SpanCursor { line: cursor.line, col: cursor.col + 1 }
+            },
+            &[], // No labels
+        );
+
+        err.set_code_window(code_window);
+
+        self.diagnostics.push(err)
     }
 }

@@ -7,7 +7,7 @@ impl<'a> LexerIter<'a> {
 
     pub(crate) fn next_num_token(&mut self) -> TokenType {
 
-        let prefix = &self.text[self.stopped_at_bidx..];
+        let prefix = &self.content[self.stopped_at_bidx..];
 
         if prefix.starts_with("2#") {
             self.next_cursor(); self.next_cursor(); self.next_cursor(); // Skip "2#" and stop on next digit
@@ -41,7 +41,7 @@ impl<'a> LexerIter<'a> {
             );
         }
 
-        let dot_or_exp = &self.text[self.stopped_at_bidx..];
+        let dot_or_exp = &self.content[self.stopped_at_bidx..];
 
         if !dot_or_exp.starts_with("^^") && !dot_or_exp.starts_with(".") {
 
@@ -67,7 +67,7 @@ impl<'a> LexerIter<'a> {
 
         if dot_or_exp.starts_with(".") {
             
-            let after_dot = &self.text[self.stopped_at_bidx+1..];
+            let after_dot = &self.content[self.stopped_at_bidx+1..];
             
             // Number before dot may be treated as an int object, so check if after the dot is a digit to build the float
             if !after_dot.starts_with(|ch: char| ch.is_ascii_digit() ) {
@@ -88,7 +88,7 @@ impl<'a> LexerIter<'a> {
             }
         }
         
-        let dot_or_exp = &self.text[self.stopped_at_bidx..];
+        let dot_or_exp = &self.content[self.stopped_at_bidx..];
 
         if dot_or_exp.starts_with("^^") {
 
@@ -222,7 +222,7 @@ impl<'a> LexerIter<'a> {
         let end_col = self.cursor.stopped_at.0.col;
         let end = self.stopped_at_bidx;
         
-        let id = &self.text[start..end];
+        let id = &self.content[start..end];
 
         match id {
             "ص1" | "ص2" | "ص4" | "ص8" | "ص" |

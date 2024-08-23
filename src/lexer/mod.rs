@@ -5,15 +5,19 @@ mod error;
 use std::str::Chars;
 use documented::DocumentedVariants;
 use error::{LexerError, LexerErrorType};
-use nazmc_diagnostics::span::{Span, SpanCursor};
+use nazmc_diagnostics::{span::{Span, SpanCursor}, PhaseDiagnostics};
 use strum::IntoEnumIterator;
 pub use token::*;
 
 pub(crate) struct LexerIter<'a>{
-    text: &'a str,
+    content: &'a str,
     cursor: CharsCursor<'a>,
     /// The byte index the cursor stopped at
     stopped_at_bidx: usize,
+    /// The file lines to fill from lexing
+    file_lines: Vec<&'a str>,
+    /// The diagnostics of lexing phase
+    diagnostics: PhaseDiagnostics<'a>,
 }
 
 impl<'a> Iterator for LexerIter<'a> {
@@ -28,18 +32,28 @@ impl<'a> Iterator for LexerIter<'a> {
         }
         let end = self.cursor.stopped_at.0;
         let end_byte = self.stopped_at_bidx;
-        let val = &self.text[start_byte..end_byte];
-        let span = Span { start: start, end: end };
-        Some(Token { val: val, span: span, typ: typ })
+        let val = &self.content[start_byte..end_byte];
+        let span = Span { start, end };
+        Some(Token { val, span, typ })
     }
 }
 
 impl<'a> LexerIter<'a> {
 
-    pub fn new(text: &'a str) -> Self {
-        let mut _self = Self { text: text, cursor: CharsCursor::new(text), stopped_at_bidx: 0 };
+    pub fn new(content: &'a str) -> Self {
+        let mut _self = Self {
+            content,
+            cursor: CharsCursor::new(content),
+            stopped_at_bidx: 0,
+            diagnostics: PhaseDiagnostics::new(),
+            file_lines: vec![],
+        };
         _self.cursor.next(); // Init cursor::stopped_at with first char
         _self
+    }
+
+    pub fn get_file_lines_and_diagnostics(self) -> (Vec<&'a str>, PhaseDiagnostics<'a>) {
+        (self.file_lines, self.diagnostics)
     }
 
     fn next_token_type(&mut self) -> TokenType {
@@ -58,11 +72,11 @@ impl<'a> LexerIter<'a> {
             }
             _ => {
 
-                if self.stopped_at_bidx == self.text.len() {
+                if self.stopped_at_bidx == self.content.len() {
                     return TokenType::EOF;
                 }
 
-                let text = &self.text[self.stopped_at_bidx..];
+                let text = &self.content[self.stopped_at_bidx..];
 
                 for symbol in SymbolType::iter() {
                     if symbol.get_variant_docs().is_ok_and(|val| text.starts_with(val)){
@@ -171,7 +185,7 @@ impl<'a> LexerIter<'a> {
 
         let end = self.stopped_at_bidx;
         
-        let id = &self.text[start..end];
+        let id = &self.content[start..end];
 
         if id == "مؤكد" {
             return TokenType::Literal(LiteralTokenType::Bool(true));
@@ -186,7 +200,7 @@ impl<'a> LexerIter<'a> {
             }
         }
 
-        return TokenType::Id;
+        TokenType::Id
 
     }
 

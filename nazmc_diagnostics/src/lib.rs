@@ -1,5 +1,6 @@
-use std::{fmt::Display, path::Path, usize};
+use std::{fmt::Display, path::Path};
 
+use itertools::Itertools;
 use owo_colors::{OwoColorize, Style};
 use span::{Span, SpanCursor};
 
@@ -8,34 +9,73 @@ pub mod errors;
 
 mod code_reporter;
 
-use code_reporter::CodeReporter;
+use code_reporter::{BuiltCodeReporter, CodeReporter, UnderConstructionCodeReporter};
 
-
-pub struct FileDiagnostics<'a> {
-    diagnostics: Vec<Diagnostic<'a>>,
-    file_path: &'a Path,
+/// Represents the diagnostics for any compiler phase
+pub struct PhaseDiagnostics<'a> {
+    diagnostics: Vec<Diagnostic<'a, UnderConstructionCodeWindow<'a>>>,
 }
 
-struct Diagnostic<'a> {
+impl<'a> PhaseDiagnostics<'a> {
+
+    pub fn new() -> Self {
+        Self { diagnostics: vec![], }
+    }
+
+    #[inline]
+    fn new_code_window(&self, cursor: SpanCursor) -> UnderConstructionCodeWindow<'a> {
+        UnderConstructionCodeWindow {
+            cursor: cursor,
+            file_path: NoPath,
+            code_reporter: CodeReporter::new()
+        }
+    }
+
+    fn build(self, file_path: &'a Path, file_lines: &'a [&'a str]) -> Vec<Diagnostic<'a, BuiltCodeWindow<'a>>> {
+        self.diagnostics.into_iter().map(
+            |d| d.build(file_path, file_lines, Style::new().bold().blue())
+        ).collect_vec()
+    }
+}
+
+type UnderConstructionCodeWindow<'a> = CodeWindow<'a, NoPath, UnderConstructionCodeReporter>;
+
+type BuiltCodeWindow<'a> = CodeWindow<'a, &'a Path, BuiltCodeReporter<'a>>;
+
+struct Diagnostic<'a, CodeWindowBuildingState> {
     level: DiagnosticLevel,
     msg: &'a str,
-    code_window: Option<CodeWindow<'a>>,
-    chained_diagnostics: Vec<Diagnostic<'a>>,
+    code_window: Option<CodeWindowBuildingState>,
+    chained_diagnostics: Vec<Diagnostic<'a, CodeWindowBuildingState>>,
 }
 
-impl<'a> Diagnostic<'a> {
+impl<'a> Diagnostic<'a, UnderConstructionCodeWindow<'a>> {
 
     fn new(level: DiagnosticLevel, msg: &'a str) -> Self {
         Diagnostic { level: level, msg: msg, code_window: None, chained_diagnostics: vec![] }
     }
     
-    fn set_code_window(&mut self, code_window: CodeWindow<'a>) {
+    fn set_code_window(&mut self, code_window: UnderConstructionCodeWindow<'a>) {
         self.code_window = Some(code_window);
     }
 
-    fn chain(&mut self, with: Diagnostic<'a>) -> &mut Self {
+    fn chain(&mut self, with: Diagnostic<'a, UnderConstructionCodeWindow<'a>>) -> &mut Self {
         self.chained_diagnostics.push(with);
         self
+    }
+
+    fn build(self, file_path: &'a Path, file_lines: &'a [&'a str], line_nums_style: Style) -> Diagnostic<'a, BuiltCodeWindow<'a>> {
+        Diagnostic {
+            level: self.level,
+            msg: self.msg,
+            code_window: self.code_window.map(
+                |code_window| code_window.build(file_path, file_lines, line_nums_style)
+            ),
+            chained_diagnostics: self.chained_diagnostics.into_iter()
+                .map(
+                    |d| d.build(file_path, file_lines, line_nums_style)
+                ).collect_vec()
+        }
     }
 }
 
@@ -47,7 +87,7 @@ enum DiagnosticLevel {
     Note,
 }
 
-impl<'a> Display for Diagnostic<'a> {
+impl<'a> Display for Diagnostic<'a, BuiltCodeWindow<'a>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         
         let _ = match self.level {
@@ -72,21 +112,15 @@ impl<'a> Display for Diagnostic<'a> {
     }
 }
 
-struct CodeWindow<'a> {
-    file_path: &'a str,
+struct NoPath;
+
+struct CodeWindow<'a, PathState, CodeReporterState> {
     cursor: SpanCursor,
-    code_reporter: CodeReporter<'a>,
+    file_path: PathState,
+    code_reporter: CodeReporter<'a, CodeReporterState>,
 }
 
-impl<'a> CodeWindow<'a> {
-
-    fn new(&mut self, file_path: &'a str, files_lines: &'a [&'a str], cursor: SpanCursor) -> Self {
-        Self {
-            file_path: file_path,
-            cursor: cursor,
-            code_reporter: CodeReporter::new(files_lines, Style::new().bold().blue())
-        }
-    }
+impl<'a> CodeWindow<'a, NoPath, UnderConstructionCodeReporter> {
 
     fn mark_error(&mut self, span: Span, labels: &'a [&'a str]) -> &mut Self {
         self.code_reporter.mark(span, '^', Style::new().bold().red(), labels);
@@ -118,9 +152,17 @@ impl<'a> CodeWindow<'a> {
         self
     }
 
+    fn build(self, file_path: &'a Path, file_lines: &'a [&'a str], line_nums_style: Style) -> CodeWindow<'a, &'a Path, BuiltCodeReporter<'a>> {
+        CodeWindow { 
+            cursor: self.cursor,
+            file_path: file_path,
+            code_reporter: self.code_reporter.build(file_lines, line_nums_style)
+        }
+    }
+
 }
 
-impl<'a> Display for CodeWindow<'a> {
+impl<'a> Display for CodeWindow<'a, &'a Path, BuiltCodeReporter<'a>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 
         let _ = writeln!(
@@ -128,7 +170,7 @@ impl<'a> Display for CodeWindow<'a> {
             "{}{} {}:{}:{}",
             "المسار".bold().blue(),
             ":".bold(),
-            self.file_path.bold(),
+            self.file_path.display().bold(),
             self.cursor.line.bold(),
             self.cursor.col.bold()
         );
