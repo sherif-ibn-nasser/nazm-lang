@@ -1,20 +1,22 @@
+use std::default;
+
 use documented::{DocumentedFields, DocumentedVariants};
 use strum::EnumIter;
 use nazmc_diagnostics::span::*;
 use super::error::LexerError;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Default)]
 pub struct Token<'a> {
     pub val: &'a str,
     pub span: Span,
     pub typ: TokenType,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Default)]
 pub enum TokenType {
-    Bad(Vec<LexerError>),
-    EOL,
+    #[default]
     EOF,
+    EOL,
     Space,
     LineComment,
     DelimitedComment,
@@ -22,6 +24,7 @@ pub enum TokenType {
     Id,
     Symbol(SymbolType),
     Keyword(KeywordType),
+    Bad(Vec<LexerError>),
 }
 
 #[derive(Clone, PartialEq, Debug)]

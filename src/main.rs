@@ -1,10 +1,12 @@
 
 mod cli;
 mod lexer;
+mod parser;
 
 use std::{io::{self, Write}, process::Command};
 use lexer::*;
 use owo_colors::{OwoColorize, XtermColors};
+use parser::NazmcParse;
 
 
 fn main() {
@@ -12,6 +14,7 @@ fn main() {
     let (file_path, file_content) = cli::read_file();
 
     let mut lexer = LexerIter::new(&file_content);
+
     // parse(&mut lexer);
     //let (file_lines, lexer_diagnosstics) = lexer.get_file_lines_and_diagnostics();
 
