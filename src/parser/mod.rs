@@ -1,4 +1,5 @@
-use nazmc_diagnostics::span::Span;
+
+use nazmc_parse_derive::NazmcParse;
 
 use crate::{LexerIter, Token, TokenType};
 
