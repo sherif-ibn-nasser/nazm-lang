@@ -1,15 +1,30 @@
 
+use std::marker::PhantomData;
+
+use ast::{FnKeyword, Id};
+use nazmc_diagnostics::span::Span;
 use nazmc_parse_derive::NazmcParse;
 
 use crate::{LexerIter, Token, TokenType};
 
 pub(crate) mod ast;
 
-pub(crate) type ParseResult<'a, Tree> =  Result<Tree, ParseError<'a, Tree>>;
+pub(crate) type Required<Tree: NazmcParse> =  Result<Tree, ParseError<Tree>>;
+
+pub(crate) type Optional<Tree: NazmcParse> =  Option<Tree>;
+
+pub(crate) type ZeroOrMany<Tree: NazmcParse> =  Vec<Required<Tree>>;
+
+pub(crate) enum ParseError<Tree> {
+    /// Triggered when a child in the node tree has a parse error
+    IncompleteTree(Tree),
+    /// Triggered when a mismatch in tokens happen
+    UnexpectedToken { expected: TokenType, found: (Span, TokenType) },
+}
 
 /// The trait for all AST nodes to implement
-pub(crate) trait NazmcParse<'a> where Self: std::marker::Sized {
-    fn parse(lexer: &mut LexerIter<'a>) -> ParseResult<'a, Self>;
+pub(crate) trait NazmcParse where Self: std::marker::Sized {
+    fn parse(lexer: &mut LexerIter) -> Required<Self>;
 }
 
 impl<'a> LexerIter<'a> {
@@ -28,9 +43,11 @@ impl<'a> LexerIter<'a> {
     }
 }
 
-pub(crate) enum ParseError<'a, Tree> {
-    /// Triggered when a child in the node tree has a parse error
-    IncompleteTree(Tree),
-    /// Triggered when a mismatch in tokens happen
-    UnexpectedToken { expected: TokenType, found: Token<'a> },
+
+#[derive(NazmcParse)]
+pub(crate) struct S {
+    span: Span,
+    fn_keyword: FnKeyword,
 }
+
+pub(crate) fn assert_nazmc_parse_is_implemented<T: NazmcParse>() {}

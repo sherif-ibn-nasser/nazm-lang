@@ -3,12 +3,12 @@
 version = 3
 
 [[package]]
-name = "nazmc_parser_derive"
+name = "nazmc_parse_derive"
 version = "0.1.0"
 dependencies = [
  "proc-macro-error",
  "quote",
- "syn 2.0.76",
+ "syn",
 ]
 
 [[package]]
@@ -20,7 +20,7 @@ dependencies = [
  "proc-macro-error-attr",
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn",
  "version_check",
 ]
 
@@ -58,16 +58,6 @@ name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
-dependencies = [
- "proc-macro2",
- "unicode-ident",
-]
-
-[[package]]
-name = "syn"
-version = "2.0.76"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "578e081a14e0cefc3279b0472138c513f37b41a08d5a3cca9b6e4e8ceb6cd525"
 dependencies = [
  "proc-macro2",
  "quote",
