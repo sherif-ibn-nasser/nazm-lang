@@ -56,15 +56,15 @@ impl<'a> LexerIter<'a> {
         _self
     }
 
-    pub fn get_file_lines_and_diagnostics(mut self) -> (Vec<&'a str>, PhaseDiagnostics<'a>) {
+    pub fn collect_all(mut self) -> (Vec<Token<'a>>, Vec<&'a str>, PhaseDiagnostics<'a>) {
 
-        for _ in self.by_ref() {}
+        let tokens = self.by_ref().collect_vec();
 
         if self.file_lines.is_empty() {
             self.file_lines.push("");
         }
 
-        (self.file_lines, self.diagnostics)
+        (tokens, self.file_lines, self.diagnostics)
     }
 
     fn next_token_type(&mut self) -> TokenType {
@@ -366,7 +366,7 @@ mod tests{
     #[test]
     fn test_lines() {
 
-        assert_eq!(vec![""], LexerIter::new("").get_file_lines_and_diagnostics().0);
+        assert_eq!(vec![""], LexerIter::new("").collect_all().1);
 
         let content = concat!(
             "\n",
@@ -382,7 +382,7 @@ mod tests{
 
         let lexer: LexerIter = LexerIter::new(content);
 
-        let (lines, _) = lexer.get_file_lines_and_diagnostics();
+        let (_, lines, _) = lexer.collect_all();
         let expected_lines = content.split('\n').collect_vec();
 
         assert_eq!(expected_lines, lines);
@@ -402,7 +402,7 @@ mod tests{
 
         let lexer: LexerIter = LexerIter::new(content);
 
-        let (lines, _) = lexer.get_file_lines_and_diagnostics();
+        let (_, lines, _) = lexer.collect_all();
         let expected_lines = content.split('\n').collect_vec();
 
         assert_eq!(expected_lines, lines);

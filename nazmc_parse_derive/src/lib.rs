@@ -60,7 +60,7 @@ fn check_field(field: &Field) {
     let Some(field_type) = extract_field_type(ty) else {
         emit_error!(
             ty.span(),
-            "Field must be one of those types: Required<_>, Optiona<_>, ZeroOrMany<_,_>, OneOrMany<_,_> where every _ : NazmcParse";
+            "Field must be one of those types: Required<_>, Option<_>, ZeroOrMany<_,_>, OneOrMany<_,_> where every _ : NazmcParse";
             note = "The type should be pure and not in path notation, i.e., Required<_> and not crate::Required<_>";
         );
         return;
@@ -71,7 +71,7 @@ fn check_field(field: &Field) {
 enum ParseFieldType<'a> {
     Required(&'a Type),
     /// i.e. ZeroOrOne
-    Optional(&'a Type),
+    Option(&'a Type),
     ZeroOrMany(&'a Type, &'a Type),
     OneOrMany(&'a Type, &'a Type),
 }
@@ -96,10 +96,10 @@ fn extract_field_type(ty: &Type) -> Option<ParseFieldType> {
             let GenericArgument::Type(ty) = &args[0] else { return None; };
             Some(ParseFieldType::Required(ty))
         },
-        "Optional" => {
+        "Option" => {
             if args.len() != 1 { return None }
             let GenericArgument::Type(ty) = &args[0] else { return None; };
-            Some(ParseFieldType::Optional(ty))
+            Some(ParseFieldType::Option(ty))
         },
         "ZeroOrMany" => {
             if args.len() != 2 { return None }

@@ -1,30 +1,40 @@
-use std::marker::PhantomData;
-
 use nazmc_diagnostics::span::Span;
 
-use crate::{parser::{NazmcParse, ParseError, Required}, LexerIter, Token, TokenType, SymbolType, KeywordType};
+use crate::{parser::{NazmcParse, ParseError, Required, TokensIter}, KeywordType, SymbolType, Token, TokenType};
 
 use paste::paste;
 
 pub(crate) struct Id { span: Span, val: String }
 
-impl NazmcParse for Id {
-    fn parse(lexer: &mut LexerIter) -> Required<Self> {
-        match lexer.next_non_space_or_comment() {
+impl NazmcParse for Required<Id> {
+
+    fn parse(iter: &mut TokensIter) -> Self {
+        
+        let peek_idx = iter.peek_idx;
+
+        match iter.next_non_space_or_comment() {
             Some(Token { val, span, typ: TokenType::Id })
-                => Required::Ok(Id { span, val: val.to_string() }),
-            Some(token) => Required::Err(
-                ParseError::UnexpectedToken {
-                    expected: TokenType::Id,
-                    found: (token.span, token.typ),
-                }
-            ),
-            None => Required::Err(
-                ParseError::UnexpectedToken {
-                    expected: TokenType::Id,
-                    found: (Span::default(), TokenType::EOF),
-                }
-            ),
+                => Required::Ok(Id { span: *span, val: val.to_string() }),
+            Some(token) => {
+                let err = Required::Err(
+                    ParseError::UnexpectedToken {
+                        expected: TokenType::Id,
+                        found: (token.span, token.typ.clone()),
+                    }
+                );
+                iter.peek_idx = peek_idx;
+                err
+            }
+            None => {
+                let err = Required::Err(
+                    ParseError::UnexpectedToken {
+                        expected: TokenType::Id,
+                        found: (Span::default(), TokenType::EOF),
+                    }
+                );
+                iter.peek_idx = peek_idx;
+                err
+            },
         }
     }
     
@@ -36,23 +46,35 @@ macro_rules! create_keyword_parser {
         paste! {
             pub(crate) struct [<$keyword Keyword>] { span: Span }
 
-            impl NazmcParse for [<$keyword Keyword>]{
-                fn parse(lexer: &mut LexerIter) -> Required<Self> {
-                    match lexer.next_non_space_or_comment() {
+            impl NazmcParse for Required<[<$keyword Keyword>]>{
+
+                fn parse(iter: &mut TokensIter) -> Self {
+
+                    let peek_idx = iter.peek_idx;
+
+                    match iter.next_non_space_or_comment() {
                         Some(Token { span, typ: TokenType::Keyword(KeywordType::$keyword), .. })
-                            => Required::Ok([<$keyword Keyword>] { span }),
-                        Some(token) => Required::Err(
-                            ParseError::UnexpectedToken {
-                                expected: TokenType::Keyword(KeywordType::$keyword),
-                                found: (token.span, token.typ),
-                            }
-                        ),
-                        None => Required::Err(
-                            ParseError::UnexpectedToken {
-                                expected: TokenType::Keyword(KeywordType::$keyword),
-                                found: (Span::default(), TokenType::EOF),
-                            }
-                        ),
+                            => Required::Ok([<$keyword Keyword>] { span: *span }),
+                        Some(token) => {
+                            let err = Required::Err(
+                                ParseError::UnexpectedToken {
+                                    expected: TokenType::Keyword(KeywordType::$keyword),
+                                    found: (token.span, token.typ.clone()),
+                                }
+                            );
+                            iter.peek_idx = peek_idx;
+                            err
+                        },
+                        None => {
+                            let err = Required::Err(
+                                ParseError::UnexpectedToken {
+                                    expected: TokenType::Keyword(KeywordType::$keyword),
+                                    found: (Span::default(), TokenType::EOF),
+                                }
+                            );
+                            iter.peek_idx = peek_idx;
+                            err
+                        },
                     }
                 }
             }
@@ -67,23 +89,35 @@ macro_rules! create_symbol_parser {
         paste! {
             pub(crate) struct [<$symbol Symbol>] { span: Span }
 
-            impl NazmcParse for [<$symbol Symbol>]{
-                fn parse(lexer: &mut LexerIter) -> Required<Self> {
-                    match lexer.next_non_space_or_comment() {
+            impl NazmcParse for Required<[<$symbol Symbol>]> {
+
+                fn parse(iter: &mut TokensIter) -> Self {
+
+                    let peek_idx = iter.peek_idx;
+
+                    match iter.next_non_space_or_comment() {
                         Some(Token { span, typ: TokenType::Symbol(SymbolType::$symbol), .. })
-                            => Required::Ok([<$symbol Symbol>] { span }),
-                        Some(token) => Required::Err(
-                            ParseError::UnexpectedToken {
-                                expected: TokenType::Symbol(SymbolType::$symbol),
-                                found: (token.span, token.typ),
-                            }
-                        ),
-                        None => Required::Err(
-                            ParseError::UnexpectedToken {
-                                expected: TokenType::Symbol(SymbolType::$symbol),
-                                found: (Span::default(), TokenType::EOF),
-                            }
-                        ),
+                            => Required::Ok([<$symbol Symbol>] { span: *span }),
+                        Some(token) => {
+                            let err = Required::Err(
+                                ParseError::UnexpectedToken {
+                                    expected: TokenType::Symbol(SymbolType::$symbol),
+                                    found: (token.span, token.typ.clone()),
+                                }
+                            );
+                            iter.peek_idx = peek_idx;
+                            err
+                        },
+                        None => {
+                            let err = Required::Err(
+                                ParseError::UnexpectedToken {
+                                    expected: TokenType::Symbol(SymbolType::$symbol),
+                                    found: (Span::default(), TokenType::EOF),
+                                }
+                            );
+                            iter.peek_idx = peek_idx;
+                            err
+                        },
                     }
                 }
             }
@@ -152,7 +186,7 @@ create_symbol_parser!(Equal);
 
 #[cfg(test)]
 mod tests {
-    use crate::{parser::{NazmcParse, ParseError}, LexerIter, SymbolType, TokenType};
+    use crate::{parser::{NazmcParse, ParseError, Required, TokensIter}, LexerIter, SymbolType, TokenType};
 
     use super::{CloseCurlyBracesSymbol, CloseParenthesisSymbol, FnKeyword, Id, OpenCurlyBracesSymbol, OpenParenthesisSymbol};
 
@@ -161,13 +195,15 @@ mod tests {
         let content = "دالة البداية(/* تعليق */){}";
 
         let mut lexer = LexerIter::new(content);
+        let (tokens, ..) = lexer.collect_all();
+        let mut iter = TokensIter::new(&tokens);
 
-        let _fn = FnKeyword::parse(&mut lexer);
-        let _id = Id::parse(&mut lexer);
-        let _open_paren = OpenParenthesisSymbol::parse(&mut lexer);
-        let _close_paren = CloseParenthesisSymbol::parse(&mut lexer);
-        let _open_curly = OpenCurlyBracesSymbol::parse(&mut lexer);
-        let _close_curly = CloseCurlyBracesSymbol::parse(&mut lexer);
+        let _fn = Required::<FnKeyword>::parse(&mut iter);
+        let _id = Required::<Id>::parse(&mut iter);
+        let _open_paren = Required::<OpenParenthesisSymbol>::parse(&mut iter);
+        let _close_paren =Required::<CloseParenthesisSymbol>::parse(&mut iter);
+        let _open_curly = Required::<OpenCurlyBracesSymbol>::parse(&mut iter);
+        let _close_curly =Required::<CloseCurlyBracesSymbol>::parse(&mut iter);
 
         assert!(_fn.is_ok());
         assert!(_id.is_ok());
@@ -181,12 +217,15 @@ mod tests {
     fn test_fail() {
         let content = "دالة البداية(عدد: ص8){}";
 
-        let mut lexer = LexerIter::new(content);
+        let lexer = LexerIter::new(content);
 
-        let _fn = FnKeyword::parse(&mut lexer);
-        let _id = Id::parse(&mut lexer);
-        let _open_paren = OpenParenthesisSymbol::parse(&mut lexer);
-        let _close_paren = CloseParenthesisSymbol::parse(&mut lexer);
+        let (tokens, ..) = lexer.collect_all();
+        let mut iter = TokensIter::new(&tokens);
+
+        let _fn = Required::<FnKeyword>::parse(&mut iter);
+        let _id = Required::<Id>::parse(&mut iter);
+        let _open_paren = Required::<OpenParenthesisSymbol>::parse(&mut iter);
+        let _close_paren = Required::<CloseParenthesisSymbol>::parse(&mut iter);
 
         assert!(_fn.is_ok());
         assert!(_id.is_ok());

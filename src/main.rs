@@ -6,15 +6,17 @@ mod parser;
 use std::{io::{self, Write}, process::Command};
 use lexer::*;
 use owo_colors::{OwoColorize, XtermColors};
-use parser::NazmcParse;
+use parser::tokens_iter::TokensIter;
 
 
 fn main() {
 
     let (file_path, file_content) = cli::read_file();
 
-    let mut lexer = LexerIter::new(&file_content);
+    let (tokens, file_lines, lexer_diagnostics) = LexerIter::new(&file_content).collect_all();
 
+    let tokens_iter = TokensIter::new(&tokens);
+    
     // parse(&mut lexer);
     //let (file_lines, lexer_diagnosstics) = lexer.get_file_lines_and_diagnostics();
 
@@ -24,7 +26,7 @@ fn main() {
 
     let mut bad_tokens = vec![];
 
-    for Token { span, val, typ } in lexer {
+    for Token { span, val, typ } in tokens {
 
         let color = match typ {
             TokenType::LineComment | TokenType::DelimitedComment =>XtermColors::BrightTurquoise,
