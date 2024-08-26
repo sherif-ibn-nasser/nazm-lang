@@ -20,8 +20,9 @@ where
     fn parse(iter: &mut TokensIter) -> Self;
 }
 
-/// Represents a node in the AST. Each node contains a span (indicating the location in the source code)
-/// and a `tree`, which is a generic type representing the structure of the parsed data.
+/// Represents an AST node that wraps around a successful parse result. It includes the `Span`
+/// information for the node and the parsed `tree` itself. This structure also manages error
+/// recovery by resetting tokens if parsing fails.
 pub(crate) struct ASTNode<Tree>
 where
     ParseResult<Tree>: NazmcParse,
@@ -30,9 +31,9 @@ where
     tree: Tree,
 }
 
-/// `ParseResult` is an enum that represents the outcome of a parsing operation. It can either be
-/// a successfully parsed `ASTNode` or an `Unexpected` result, indicating an unexpected token
-/// during parsing.
+/// The default result of a parsing attempt. `ParseResult` can either be `Parsed`, indicating
+/// successful parsing, or `Unexpected`, indicating an unexpected token was encountered. This
+/// enum is fundamental in error reporting and control flow within the parsing process.
 pub(crate) enum ParseResult<Tree>
 where
     ParseResult<Tree>: NazmcParse,
