@@ -1,14 +1,8 @@
-use std::str::FromStr;
-
-use proc_macro::{Span, TokenStream};
+use proc_macro::TokenStream;
 use proc_macro_error::{abort, emit_error, proc_macro_error};
-use quote::ToTokens;
 use syn::{
-    parse_macro_input,
-    punctuated::Punctuated,
-    spanned::Spanned,
-    token::{Comma, Else},
-    DataEnum, DataStruct, DeriveInput, Field, GenericArgument, Type, TypePath,
+    parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::Comma, DataEnum,
+    DataStruct, DeriveInput, Field, GenericArgument, Type, TypePath,
 };
 
 #[proc_macro_error]
@@ -45,7 +39,7 @@ fn check_field(field: &Field) {
     let Some(field_type) = extract_field_type(ty) else {
         emit_error!(
             ty.span(),
-            "Field must be one of those types: ParseResult<_>, Optional<_>, Vec<ASTNode<_>>, ZeroOrMany<_,_>, OneOrMany<_,_> where ParseResult<_> : NazmcParse";
+            "Field must be one of those types:\n ASTNode<_>,\n ParseResult<_>,\n Optional<_>,\n Vec<ASTNode<_>>,\n ZeroOrMany<_,_> or OneOrMany<_,_> where ParseResult<_> : NazmcParse";
             note = "The type should be pure and not in path notation, i.e., ParseResult<_> and not crate::ParseResult<_>";
         );
         return;
@@ -53,6 +47,7 @@ fn check_field(field: &Field) {
 }
 
 enum ParseFieldType<'a> {
+    ASTNode(&'a Type),
     ParseResult(&'a Type),
     /// i.e. ZeroOrOne
     Optional(&'a Type),
@@ -67,13 +62,19 @@ fn extract_field_type(ty: &Type) -> Option<ParseFieldType> {
     };
 
     match segment.as_str() {
-        "ParseResult" => {
+        "ASTNode" => {
             if args.len() != 1 {
                 return None;
             }
             let GenericArgument::Type(ty) = &args[0] else {
                 return None;
             };
+            Some(ParseFieldType::ASTNode(ty))
+        }
+        "ParseResult" => {
+            if args.len() != 1 {
+                return None;
+            }
             let GenericArgument::Type(ty) = &args[0] else {
                 return None;
             };
@@ -83,9 +84,6 @@ fn extract_field_type(ty: &Type) -> Option<ParseFieldType> {
             if args.len() != 1 {
                 return None;
             }
-            let GenericArgument::Type(ty) = &args[0] else {
-                return None;
-            };
             let GenericArgument::Type(ty) = &args[0] else {
                 return None;
             };

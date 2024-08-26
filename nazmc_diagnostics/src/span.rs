@@ -6,7 +6,7 @@ pub struct Span {
     pub end: SpanCursor,
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 pub struct SpanCursor {
     /// The line index
     pub line: usize,
@@ -33,15 +33,6 @@ impl Span {
         Self {
             start: self.start,
             end: with.end,
-        }
-    }
-}
-
-impl Default for SpanCursor {
-    fn default() -> Self {
-        Self {
-            line: usize::MAX,
-            col: usize::MAX,
         }
     }
 }

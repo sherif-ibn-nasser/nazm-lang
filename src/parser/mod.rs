@@ -1,4 +1,7 @@
-use nazmc_diagnostics::span::{self, Span};
+/// This module defines the core components and traits required for parsing an Abstract Syntax Tree (AST)
+/// in the Nazmc language parser. It provides the foundational structures and parsing logic for different
+/// AST node types, ensuring that the syntax is correctly interpreted and processed.
+use nazmc_diagnostics::span::Span;
 use nazmc_parse_derive::NazmcParse;
 use tokens_iter::TokensIter;
 
@@ -8,7 +11,8 @@ pub(crate) mod ast;
 
 pub(crate) mod tokens_iter;
 
-/// The trait for all AST nodes to implement
+/// The `NazmcParse` trait must be implemented by all AST nodes. It defines a `parse` method that takes
+/// a mutable reference to a `TokensIter` and returns an instance of the implementing type.
 pub(crate) trait NazmcParse
 where
     Self: Sized,
@@ -16,6 +20,8 @@ where
     fn parse(iter: &mut TokensIter) -> Self;
 }
 
+/// Represents a node in the AST. Each node contains a span (indicating the location in the source code)
+/// and a `tree`, which is a generic type representing the structure of the parsed data.
 pub(crate) struct ASTNode<Tree>
 where
     ParseResult<Tree>: NazmcParse,
@@ -24,7 +30,9 @@ where
     tree: Tree,
 }
 
-/// The default parsing method
+/// `ParseResult` is an enum that represents the outcome of a parsing operation. It can either be
+/// a successfully parsed `ASTNode` or an `Unexpected` result, indicating an unexpected token
+/// during parsing.
 pub(crate) enum ParseResult<Tree>
 where
     ParseResult<Tree>: NazmcParse,
@@ -33,8 +41,7 @@ where
     Unexpected { span: Span, found: TokenType },
 }
 
-// Parsing methods
-
+/// `Optional` represents an optional AST node. It either contains a parsed node (`Some`) or nothing (`None`).
 pub(crate) enum Optional<Tree>
 where
     ParseResult<Tree>: NazmcParse,
@@ -43,6 +50,9 @@ where
     None,
 }
 
+/// `ZeroOrMany` represents zero or more occurrences of a certain AST node type, followed by a terminator.
+/// It is useful for parsing lists of items with a terminator. The generated list may include `Unexpected`
+/// results, as it continues parsing until the terminator is encountered, even if unexpected tokens are found.
 pub(crate) struct ZeroOrMany<Tree, Terminator>
 where
     ParseResult<Tree>: NazmcParse,
@@ -52,6 +62,8 @@ where
     terminator: ParseResult<Terminator>,
 }
 
+/// `OneOrMany` represents a sequence that starts with at least one occurrence of a specific AST node type, followed by a terminator.
+/// It ensures that at least the first item is successfully parsed. The implementation may change in the future and might be rewritten in terms of other components.
 pub(crate) struct OneOrMany<Tree, Terminator>
 where
     ParseResult<Tree>: NazmcParse,
@@ -62,7 +74,7 @@ where
     terminator: ParseResult<Terminator>,
 }
 
-// Parsing methods implementation
+/// Implementations of the `NazmcParse` trait for different parsing structures.
 
 impl<Tree> NazmcParse for Optional<Tree>
 where
@@ -81,6 +93,7 @@ where
     ParseResult<Tree>: NazmcParse,
 {
     fn parse(iter: &mut TokensIter) -> Self {
+        // Parses multiple AST nodes into a `Vec`. It continues parsing until no more valid nodes are found.
         let mut items = vec![];
         while let ParseResult::Parsed(tree) = ParseResult::parse(iter) {
             items.push(tree)
@@ -152,7 +165,7 @@ where
     }
 }
 
-// Utility methods
+/// Additional utility methods for `ParseResult`, `Optional`, and the `Spanned` trait implementation.
 
 impl<Tree> Default for ParseResult<Tree>
 where
@@ -167,18 +180,21 @@ impl<Tree> ParseResult<Tree>
 where
     ParseResult<Tree>: NazmcParse,
 {
+    /// Checks if the result is a successfully parsed node.
     fn is_parsed(&self) -> bool {
         matches!(self, ParseResult::Parsed(_))
     }
 
+    /// Checks if the result is an unexpected token.
     fn is_unexpected(&self) -> bool {
         matches!(self, ParseResult::Unexpected { .. })
     }
 
+    /// Returns an `Unexpected` result indicating an unexpected end of file.
     fn unexpected_eof() -> Self {
         Self::Unexpected {
             span: Span::default(),
-            found: TokenType::default(),
+            found: TokenType::EOF,
         }
     }
 }
@@ -187,17 +203,19 @@ impl<Tree> Optional<Tree>
 where
     ParseResult<Tree>: NazmcParse,
 {
+    /// Checks if the optional node contains a value.
     fn is_some(&self) -> bool {
         matches!(self, Self::Some(_))
     }
 
+    /// Checks if the optional node is empty.
     fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
 }
 
-// Spanned
-
+/// The `Spanned` trait allows retrieval of the `Span` associated with an AST node,
+/// which indicates the location of the node in the source code.
 pub(crate) trait Spanned {
     fn span(&self) -> Span;
 }
@@ -219,31 +237,6 @@ where
         match self {
             Self::Parsed(tree) => tree.span,
             Self::Unexpected { span, .. } => *span,
-        }
-    }
-}
-
-impl<Tree> Spanned for Optional<Tree>
-where
-    ParseResult<Tree>: NazmcParse,
-{
-    fn span(&self) -> Span {
-        match self {
-            Optional::Some(node) => node.span(),
-            Optional::None => Span::default(),
-        }
-    }
-}
-
-impl<Tree> Spanned for Vec<ASTNode<Tree>>
-where
-    ParseResult<Tree>: NazmcParse,
-{
-    fn span(&self) -> Span {
-        if self.is_empty() {
-            Span::default()
-        } else {
-            self[0].span().merged_with(&self[self.len() - 1].span())
         }
     }
 }
@@ -290,13 +283,13 @@ mod tests {
 
     // TODO:
 
-    // #[derive(NazmcParse)]
-    // struct SimpleFn {
-    //     _fn: ParseResult<FnKeyword>,
-    //     _id: ParseResult<Id>,
-    //     _open_psren: ParseResult<OpenParenthesisSymbol>,
-    //     _params: ZeroOrMany<FnParam, CloseParenthesisSymbol>,
-    // }
+    #[derive(NazmcParse)]
+    struct SimpleFn {
+        _fn: ParseResult<FnKeyword>,
+        _id: ParseResult<Id>,
+        _open_psren: ParseResult<OpenParenthesisSymbol>,
+        _params: ASTNode<CloseParenthesisSymbol>,
+    }
 
     // #[derive(NazmcParse)]
     // struct FnParam {
