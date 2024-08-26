@@ -1,42 +1,44 @@
-
 mod cli;
 mod lexer;
 mod parser;
 
-use std::{io::{self, Write}, process::Command};
 use lexer::*;
 use owo_colors::{OwoColorize, XtermColors};
 use parser::tokens_iter::TokensIter;
-
+use std::{
+    io::{self, Write},
+    process::Command,
+};
 
 fn main() {
-
     let (file_path, file_content) = cli::read_file();
 
     let (tokens, file_lines, lexer_diagnostics) = LexerIter::new(&file_content).collect_all();
 
     let tokens_iter = TokensIter::new(&tokens);
-    
+
     // parse(&mut lexer);
     //let (file_lines, lexer_diagnosstics) = lexer.get_file_lines_and_diagnostics();
 
     // RTL printing
     let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
-    io::stdout().write_all(&output.stdout[1..output.stdout.len()-1]).unwrap();
+    io::stdout()
+        .write_all(&output.stdout[1..output.stdout.len() - 1])
+        .unwrap();
 
     let mut bad_tokens = vec![];
 
     for Token { span, val, typ } in tokens {
-
         let color = match typ {
-            TokenType::LineComment | TokenType::DelimitedComment =>XtermColors::BrightTurquoise,
+            TokenType::LineComment | TokenType::DelimitedComment => XtermColors::BrightTurquoise,
             TokenType::Symbol(_) => XtermColors::UserBrightYellow,
             TokenType::Id => XtermColors::LightAnakiwaBlue,
-            TokenType::Keyword(_) | TokenType::Literal(LiteralTokenType::Bool(_))
-            => XtermColors::FlushOrange,
-            TokenType::Literal(
-                LiteralTokenType::Str(_) | LiteralTokenType::Char(_)
-            ) => XtermColors::PinkSalmon,
+            TokenType::Keyword(_) | TokenType::Literal(LiteralTokenType::Bool(_)) => {
+                XtermColors::FlushOrange
+            }
+            TokenType::Literal(LiteralTokenType::Str(_) | LiteralTokenType::Char(_)) => {
+                XtermColors::PinkSalmon
+            }
             TokenType::Literal(_) => XtermColors::ChelseaCucumber,
             _ => XtermColors::UserWhite,
         };
@@ -46,7 +48,7 @@ fn main() {
         if matches!(typ, TokenType::Keyword(_) | TokenType::Symbol(_)) {
             val = format!("{}", val.bold());
         }
-        
+
         print!("{}", val);
 
         if let TokenType::Bad(errs) = typ {

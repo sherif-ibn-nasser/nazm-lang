@@ -1,3 +1,3 @@
-mod native;
+mod terminal;
 
-pub(crate) use native::*;
+pub(crate) use terminal::*;

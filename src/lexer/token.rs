@@ -1,9 +1,7 @@
-use std::default;
-
-use documented::{DocumentedFields, DocumentedVariants};
-use strum::EnumIter;
-use nazmc_diagnostics::span::*;
 use super::error::LexerError;
+use documented::{DocumentedFields, DocumentedVariants};
+use nazmc_diagnostics::span::*;
+use strum::EnumIter;
 
 #[derive(Clone, PartialEq, Debug, Default)]
 pub struct Token<'a> {
@@ -63,7 +61,6 @@ pub enum Base {
 
 #[derive(Clone, PartialEq, Debug, DocumentedVariants, DocumentedFields, EnumIter)]
 pub enum SymbolType {
-
     /// <..<
     LessDotDotLess,
     /// <..
@@ -170,7 +167,6 @@ pub enum SymbolType {
     Colon,
     /// =
     Equal,
-    
 }
 
 #[derive(DocumentedVariants, Debug, Clone, PartialEq, EnumIter)]

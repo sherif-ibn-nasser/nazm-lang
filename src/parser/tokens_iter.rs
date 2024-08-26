@@ -6,7 +6,6 @@ pub(crate) struct TokensIter<'a> {
 }
 
 impl<'a> TokensIter<'a> {
-
     pub(crate) fn new(tokens: &'a [Token<'a>]) -> Self {
         Self {
             peek_idx: 0,
@@ -33,8 +32,7 @@ impl<'a> TokensIter<'a> {
     pub(crate) fn recent_nth(&self, nth: usize) -> Option<&Token<'a>> {
         if self.peek_idx > nth {
             self.nth(self.peek_idx - nth - 1)
-        }
-        else {
+        } else {
             None
         }
     }
@@ -43,8 +41,7 @@ impl<'a> TokensIter<'a> {
     pub(crate) fn nth(&self, nth: usize) -> Option<&Token<'a>> {
         if nth < self.tokens.len() {
             Some(&self.tokens[nth])
-        }
-        else {
+        } else {
             None
         }
     }
@@ -52,22 +49,20 @@ impl<'a> TokensIter<'a> {
     #[inline]
     pub(crate) fn next(&mut self) -> Option<&Token<'a>> {
         if self.peek_idx == self.tokens.len() {
-            return None
+            return None;
         }
         self.peek_idx += 1;
         self.recent()
     }
 
     pub(crate) fn next_non_space_or_comment(&mut self) -> Option<&Token<'a>> {
-
-        while let Some(
-            Token {
-                typ: TokenType::EOL | TokenType::DelimitedComment | TokenType::LineComment | TokenType::Space,
-                ..
-            }
-        ) = self.next() { }
+        while let Some(Token {
+            typ:
+                TokenType::EOL | TokenType::DelimitedComment | TokenType::LineComment | TokenType::Space,
+            ..
+        }) = self.next()
+        {}
 
         self.peek()
     }
-    
 }
