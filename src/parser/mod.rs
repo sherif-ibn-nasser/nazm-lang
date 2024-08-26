@@ -24,6 +24,7 @@ where
     tree: Tree,
 }
 
+/// The default parsing method
 pub(crate) enum ParseResult<Tree>
 where
     ParseResult<Tree>: NazmcParse,
@@ -72,6 +73,19 @@ where
             ParseResult::Parsed(tree) => Self::Some(tree),
             ParseResult::Unexpected { .. } => Self::None,
         }
+    }
+}
+
+impl<Tree> NazmcParse for Vec<ASTNode<Tree>>
+where
+    ParseResult<Tree>: NazmcParse,
+{
+    fn parse(iter: &mut TokensIter) -> Self {
+        let mut items = vec![];
+        while let ParseResult::Parsed(tree) = ParseResult::parse(iter) {
+            items.push(tree)
+        }
+        items
     }
 }
 
@@ -161,13 +175,6 @@ where
         matches!(self, ParseResult::Unexpected { .. })
     }
 
-    fn span(&self) -> &Span {
-        match self {
-            Self::Parsed(tree) => &tree.span,
-            Self::Unexpected { span, .. } => span,
-        }
-    }
-
     fn unexpected_eof() -> Self {
         Self::Unexpected {
             span: Span::default(),
@@ -189,32 +196,112 @@ where
     }
 }
 
-impl<Tree, Terminator> ZeroOrMany<Tree, Terminator>
+// Spanned
+
+pub(crate) trait Spanned {
+    fn span(&self) -> Span;
+}
+
+impl<T> Spanned for ASTNode<T>
+where
+    ParseResult<T>: NazmcParse,
+{
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl<Tree> Spanned for ParseResult<Tree>
+where
+    ParseResult<Tree>: NazmcParse,
+{
+    fn span(&self) -> Span {
+        match self {
+            Self::Parsed(tree) => tree.span,
+            Self::Unexpected { span, .. } => *span,
+        }
+    }
+}
+
+impl<Tree> Spanned for Optional<Tree>
+where
+    ParseResult<Tree>: NazmcParse,
+{
+    fn span(&self) -> Span {
+        match self {
+            Optional::Some(node) => node.span(),
+            Optional::None => Span::default(),
+        }
+    }
+}
+
+impl<Tree> Spanned for Vec<ASTNode<Tree>>
+where
+    ParseResult<Tree>: NazmcParse,
+{
+    fn span(&self) -> Span {
+        if self.is_empty() {
+            Span::default()
+        } else {
+            self[0].span().merged_with(&self[self.len() - 1].span())
+        }
+    }
+}
+
+impl<Tree, Terminator> Spanned for ZeroOrMany<Tree, Terminator>
 where
     ParseResult<Tree>: NazmcParse,
     ParseResult<Terminator>: NazmcParse,
 {
     fn span(&self) -> Span {
         if self.items.is_empty() {
-            *self.terminator.span()
+            self.terminator.span()
         } else {
-            self.items[0].span().merged_with(self.terminator.span())
+            self.items[0].span().merged_with(&self.terminator.span())
         }
     }
 }
 
-impl<Tree, Terminator> OneOrMany<Tree, Terminator>
+impl<Tree, Terminator> Spanned for OneOrMany<Tree, Terminator>
 where
     ParseResult<Tree>: NazmcParse,
     ParseResult<Terminator>: NazmcParse,
 {
     fn span(&self) -> Span {
         if self.first.is_parsed() {
-            self.first.span().merged_with(self.terminator.span())
+            self.first.span().merged_with(&self.terminator.span())
         } else if self.rest.is_empty() {
-            *self.terminator.span()
+            self.terminator.span()
         } else {
-            self.rest[0].span().merged_with(self.terminator.span())
+            self.rest[0].span().merged_with(&self.terminator.span())
         }
     }
+}
+
+#[cfg(test)]
+
+mod tests {
+    use nazmc_parse_derive::NazmcParse;
+
+    use super::{
+        ast::{CloseParenthesisSymbol, ColonSymbol, FnKeyword, Id, OpenParenthesisSymbol},
+        ASTNode, OneOrMany, Optional, ParseResult, ZeroOrMany,
+    };
+
+    // TODO:
+
+    // #[derive(NazmcParse)]
+    // struct SimpleFn {
+    //     _fn: ParseResult<FnKeyword>,
+    //     _id: ParseResult<Id>,
+    //     _open_psren: ParseResult<OpenParenthesisSymbol>,
+    //     _params: ZeroOrMany<FnParam, CloseParenthesisSymbol>,
+    // }
+
+    // #[derive(NazmcParse)]
+    // struct FnParam {
+    //     _name: ParseResult<Id>,
+    //     _colon: ParseResult<ColonSymbol>,
+    //     _type: ParseResult<Id>,
+    // }
 }

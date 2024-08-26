@@ -1,10 +1,12 @@
+use std::usize;
+
 #[derive(Clone, Copy, PartialEq, Debug, Default)]
 pub struct Span {
     pub start: SpanCursor,
     pub end: SpanCursor,
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct SpanCursor {
     /// The line index
     pub line: usize,
@@ -31,6 +33,15 @@ impl Span {
         Self {
             start: self.start,
             end: with.end,
+        }
+    }
+}
+
+impl Default for SpanCursor {
+    fn default() -> Self {
+        Self {
+            line: usize::MAX,
+            col: usize::MAX,
         }
     }
 }
