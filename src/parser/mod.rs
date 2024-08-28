@@ -57,9 +57,33 @@ where
     None,
 }
 
-/// `ZeroOrMany` represents zero or more occurrences of a certain AST node type, followed by a terminator.
-/// It is useful for parsing lists of items with a terminator. The generated list may include `Unexpected`
-/// results, as it continues parsing until the terminator is encountered, even if unexpected tokens are found.
+/// Parses a sequence of items where the number of items can vary from zero to many.
+///
+/// The `ZeroOrMany` parser continues to parse items until a terminator or an unexpected token is encountered.
+/// It handles variable-length sequences robustly and attempts to recover from errors by backtracking and
+/// continuing parsing if possible.
+///
+/// # Parsing Logic
+///
+/// 1. **Initial Parsing:** Begins by parsing items and tracking both successfully parsed items and unexpected tokens.
+/// 2. **Continue Parsing:** Continues to parse items until a terminator (specific end token) is found or an unexpected token is encountered.
+/// 3. **Error Handling:** When an unexpected token is encountered, it attempts to recover by backtracking and re-parsing the terminator. If recovery fails, it treats the unexpected token as part of the results, skips it, and resumes parsing.
+/// 4. **Return Results:** Returns the collected items and any terminator information or handles unexpected tokens as needed.
+///
+/// You can think of it as a loop that processes two variants: items (trees) and terminators.
+/// The loop continues parsing items, and if parsing an item fails, it backtracks and tries to parse the terminator.
+/// Once the terminator is found, the loop ends.
+///
+/// # Parameters
+/// - `item_parser`: A parser for individual items in the sequence.
+/// - `terminator_parser`: A parser for the terminator that signifies the end of the sequence.
+///
+/// # Returns
+/// A result containing the successfully parsed items, terminator information if present, or details about any errors encountered during parsing.
+///
+/// # Errors
+/// The parser will handle unexpected tokens by attempting recovery or including them in the results if recovery fails.
+
 pub(crate) struct ZeroOrMany<Tree, Terminator>
 where
     ParseResult<Tree>: NazmcParse,
@@ -121,6 +145,7 @@ where
     ParseResult<Tree>: NazmcParse,
     ParseResult<Terminator>: NazmcParse,
 {
+    /// see [ZeroOrMany]
     fn parse(iter: &mut TokensIter) -> Self {
         let mut items = vec![];
 
@@ -132,19 +157,28 @@ where
                     terminator: ParseResult::unexpected_eof(iter.peek_start_span()),
                 };
             }
-
+            let old_peek_idx = iter.peek_idx;
             match ParseResult::<Tree>::parse(iter) {
                 parsed_node @ ParseResult::Parsed(..) => {
                     items.push(parsed_node);
                 }
-                ParseResult::Unexpected { .. } => {
+                unexpected_token @ ParseResult::Unexpected { .. } => {
+                    let new_peek_idx = iter.peek_idx;
+
+                    iter.peek_idx = old_peek_idx; // Try to backtrack and parse the terminator
+
                     // Check for terminator
                     if let terminator @ ParseResult::Parsed(..) =
                         ParseResult::<Terminator>::parse(iter)
                     {
                         return Self { items, terminator };
                     }
-                    // Skip this unexpected token
+
+                    // Backtracking doesn't work either
+                    // so add this unexpected result to items
+                    // then reset to failure and skip this unexpected token
+                    items.push(unexpected_token);
+                    iter.peek_idx = new_peek_idx;
                     iter.next_non_space_or_comment();
                 }
             }
@@ -470,8 +504,7 @@ where
 }
 
 #[cfg(test)]
-
-mod tests {
+mod tests2 {
 
     use ast::*;
 
@@ -483,21 +516,25 @@ mod tests {
     pub(crate) struct SimpleFn {
         pub(crate) _fn: ASTNode<FnKeyword>,
         pub(crate) _id: ParseResult<Id>,
-        pub(crate) _params: ParseResult<FnParams>,
+        pub(crate) _params_decl: ParseResult<FnParams>,
     }
 
     #[derive(NazmcParse)]
     pub(crate) struct FnParams {
         pub(crate) _open_paren: ASTNode<OpenParenthesisSymbol>,
-        pub(crate) _rest_fn_params: Vec<ASTNode<FnParamWithComma>>,
-        pub(crate) _last_fn_param: Optional<FnParam>,
-        pub(crate) _close_paren: ParseResult<CloseParenthesisSymbol>,
+        pub(crate) _params: ZeroOrMany<FnParamWithComma, FnParamWithCloseParenthesis>,
     }
 
     #[derive(NazmcParse)]
     pub(crate) struct FnParamWithComma {
-        _fn_param: ParseResult<FnParam>,
+        _fn_param: ASTNode<FnParam>,
         _comma: ASTNode<CommaSymbol>,
+    }
+
+    #[derive(NazmcParse)]
+    pub(crate) struct FnParamWithCloseParenthesis {
+        _fn_param: Optional<FnParam>,
+        _close_paren: ASTNode<CloseParenthesisSymbol>,
     }
 
     #[derive(NazmcParse)]
@@ -515,18 +552,24 @@ mod tests {
 
         let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
 
-        let ParseResult::Parsed(fn_tree) = parse_result else {
+        let ParseResult::Parsed(fn_node) = parse_result else {
             panic!();
         };
 
-        assert!(!fn_tree.tree._fn.is_broken);
-        assert!(fn_tree.tree._id.is_parsed_and_valid());
+        assert!(!fn_node.tree._fn.is_broken);
+        assert!(fn_node.tree._id.is_parsed_and_valid());
 
-        let params = fn_tree.tree._params.unwrap().tree;
-        assert!(!params._open_paren.is_broken);
-        assert!(params._rest_fn_params.is_empty());
-        assert!(params._last_fn_param.is_none());
-        assert!(params._close_paren.is_parsed_and_valid());
+        let params_decl = fn_node.tree._params_decl.unwrap();
+        assert!(!params_decl.is_broken);
+        assert!(!params_decl.tree._open_paren.is_broken);
+
+        let params = params_decl.tree._params;
+        assert!(params.items.is_empty());
+        let terminator = params.terminator.unwrap();
+
+        assert!(!terminator.is_broken);
+        assert!(terminator.tree._fn_param.is_none()); // No params
+        assert!(!terminator.tree._close_paren.is_broken);
     }
 
     #[test]
@@ -537,18 +580,24 @@ mod tests {
 
         let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
 
-        let ParseResult::Parsed(fn_tree) = parse_result else {
+        let ParseResult::Parsed(fn_node) = parse_result else {
             panic!();
         };
 
-        assert!(!fn_tree.tree._fn.is_broken);
-        assert!(fn_tree.tree._id.is_parsed_and_valid());
+        assert!(!fn_node.tree._fn.is_broken);
+        assert!(fn_node.tree._id.is_parsed_and_valid());
 
-        let params = fn_tree.tree._params.unwrap().tree;
-        assert!(!params._open_paren.is_broken);
-        assert!(params._rest_fn_params.is_empty());
-        assert!(params._last_fn_param.is_some_and_valid());
-        assert!(params._close_paren.is_parsed_and_valid());
+        let params_decl = fn_node.tree._params_decl.unwrap();
+        assert!(!params_decl.is_broken);
+        assert!(!params_decl.tree._open_paren.is_broken);
+
+        let params = params_decl.tree._params;
+        assert!(params.items.is_empty());
+        let terminator = params.terminator.unwrap();
+
+        assert!(!terminator.is_broken);
+        assert!(terminator.tree._fn_param.is_some_and_valid()); // The first param
+        assert!(!terminator.tree._close_paren.is_broken);
     }
 
     #[test]
@@ -559,19 +608,25 @@ mod tests {
 
         let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
 
-        let ParseResult::Parsed(fn_tree) = parse_result else {
+        let ParseResult::Parsed(fn_node) = parse_result else {
             panic!();
         };
 
-        assert!(!fn_tree.tree._fn.is_broken);
-        assert!(fn_tree.tree._id.is_parsed_and_valid());
+        assert!(!fn_node.tree._fn.is_broken);
+        assert!(fn_node.tree._id.is_parsed_and_valid());
 
-        let params = fn_tree.tree._params.unwrap().tree;
-        assert!(!params._open_paren.is_broken);
-        assert!(params._rest_fn_params.len() == 1);
-        assert!(params._rest_fn_params.is_parsed_and_valid());
-        assert!(params._last_fn_param.is_none());
-        assert!(params._close_paren.is_parsed_and_valid());
+        let params_decl = fn_node.tree._params_decl.unwrap();
+        assert!(!params_decl.is_broken);
+        assert!(!params_decl.tree._open_paren.is_broken);
+
+        let params = params_decl.tree._params;
+        assert!(params.items.len() == 1); // One param with a comma found
+        assert!(params.items[0].is_parsed_and_valid());
+        let terminator = params.terminator.unwrap();
+
+        assert!(!terminator.is_broken);
+        assert!(terminator.tree._fn_param.is_none()); // No params after the trailing comma
+        assert!(!terminator.tree._close_paren.is_broken);
     }
 
     #[test]
@@ -582,19 +637,25 @@ mod tests {
 
         let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
 
-        let ParseResult::Parsed(fn_tree) = parse_result else {
+        let ParseResult::Parsed(fn_node) = parse_result else {
             panic!();
         };
 
-        assert!(!fn_tree.tree._fn.is_broken);
-        assert!(fn_tree.tree._id.is_parsed_and_valid());
+        assert!(!fn_node.tree._fn.is_broken);
+        assert!(fn_node.tree._id.is_parsed_and_valid());
 
-        let params = fn_tree.tree._params.unwrap().tree;
-        assert!(!params._open_paren.is_broken);
-        assert!(params._rest_fn_params.len() == 1);
-        assert!(params._rest_fn_params.is_parsed_and_valid());
-        assert!(params._last_fn_param.is_some_and_valid());
-        assert!(params._close_paren.is_parsed_and_valid());
+        let params_decl = fn_node.tree._params_decl.unwrap();
+        assert!(!params_decl.is_broken);
+        assert!(!params_decl.tree._open_paren.is_broken);
+
+        let params = params_decl.tree._params;
+        assert!(params.items.len() == 1); // One param with a comma are found
+        assert!(params.items[0].is_parsed_and_valid());
+        let terminator = params.terminator.unwrap();
+
+        assert!(!terminator.is_broken);
+        assert!(terminator.tree._fn_param.is_some_and_valid()); // A param after the lat comma is found
+        assert!(!terminator.tree._close_paren.is_broken);
     }
 
     #[test]
@@ -605,18 +666,25 @@ mod tests {
 
         let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
 
-        let ParseResult::Parsed(fn_tree) = parse_result else {
+        let ParseResult::Parsed(fn_node) = parse_result else {
             panic!();
         };
 
-        assert!(!fn_tree.tree._fn.is_broken);
-        assert!(fn_tree.tree._id.is_parsed_and_valid());
+        assert!(!fn_node.tree._fn.is_broken);
+        assert!(fn_node.tree._id.is_parsed_and_valid());
 
-        let params = fn_tree.tree._params.unwrap().tree;
-        assert!(!params._open_paren.is_broken);
-        assert!(params._rest_fn_params.len() == 2);
-        assert!(params._rest_fn_params.is_parsed_and_valid());
-        assert!(params._last_fn_param.is_none());
-        assert!(params._close_paren.is_parsed_and_valid());
+        let params_decl = fn_node.tree._params_decl.unwrap();
+        assert!(!params_decl.is_broken);
+        assert!(!params_decl.tree._open_paren.is_broken);
+
+        let params = params_decl.tree._params;
+        assert!(params.items.len() == 2); // Two param with a comma are found
+        assert!(params.items[0].is_parsed_and_valid());
+        assert!(params.items[1].is_parsed_and_valid());
+        let terminator = params.terminator.unwrap();
+
+        assert!(!terminator.is_broken);
+        assert!(terminator.tree._fn_param.is_none()); // No params found after the trailing comma
+        assert!(!terminator.tree._close_paren.is_broken);
     }
 }
