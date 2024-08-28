@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use ast::{CloseParenthesisSymbol, FnKeyword, Id, OpenParenthesisSymbol};
 /// This module defines the core components and traits required for parsing an Abstract Syntax Tree (AST)
 /// in the Nazmc language parser. It provides the foundational structures and parsing logic for different
@@ -215,6 +217,30 @@ where
 
 /// Additional utility methods for `ParseResult`, `Optional`, and the `Spanned` trait implementation.
 
+impl<Tree> Debug for ParseResult<Tree>
+where
+    ParseResult<Tree>: NazmcParse,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Parsed(tree) => f
+                .debug_struct("Parsed")
+                .field("is_broken", &tree.is_broken)
+                .finish(),
+            Self::Unexpected {
+                span,
+                found,
+                is_start_failure,
+            } => f
+                .debug_struct("Unexpected")
+                .field("span", span)
+                .field("found", found)
+                .field("is_start_failure", is_start_failure)
+                .finish(),
+        }
+    }
+}
+
 impl<Tree> ParseResult<Tree>
 where
     ParseResult<Tree>: NazmcParse,
@@ -234,11 +260,10 @@ where
     }
 
     pub(crate) fn unwrap(self) -> ASTNode<Tree> {
-        match self {
-            ParseResult::Parsed(tree) => tree,
-            ParseResult::Unexpected { span, found, is_start_failure } =>
-                panic!("Calling `unwrap` on ParseResult::Uexpected {{ span: {:?}, found: {:?}, is_start_failure: {:?} }}", span, found, is_start_failure),
-        }
+        let ParseResult::Parsed(tree) = self else {
+            panic!("Calling `unwrap` on {:?}", self);
+        };
+        tree
     }
 }
 
@@ -504,7 +529,7 @@ where
 }
 
 #[cfg(test)]
-mod tests2 {
+mod tests {
 
     use ast::*;
 
@@ -542,6 +567,37 @@ mod tests2 {
         pub(crate) _name: ASTNode<Id>,
         pub(crate) _colon: ParseResult<ColonSymbol>,
         pub(crate) _type: ParseResult<Id>,
+    }
+
+    #[test]
+    fn test_wrong_params() {
+        let (tokens, ..) =
+            LexerIter::new("دالة البداية(123 دالة، ت: ح 444، س: ص، ع: ك،) {}").collect_all();
+        let mut tokens_iter = TokensIter::new(&tokens);
+        tokens_iter.next(); // Init recent
+
+        let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
+
+        let ParseResult::Parsed(fn_node) = parse_result else {
+            panic!();
+        };
+
+        assert!(fn_node.is_broken);
+        assert!(!fn_node.tree._fn.is_broken);
+
+        let params_decl = fn_node.tree._params_decl.unwrap();
+        assert!(params_decl.is_broken);
+        assert!(!params_decl.tree._open_paren.is_broken);
+
+        let params = params_decl.tree._params;
+        assert!(params.terminator.is_parsed_and_valid()); // It found the close paren
+
+        for item in params.items {
+            println!("{:?}", item)
+        }
+
+        println!("-----");
+        println!("{:?}", params.terminator);
     }
 
     #[test]
