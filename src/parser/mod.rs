@@ -483,22 +483,21 @@ mod tests {
     pub(crate) struct SimpleFn {
         pub(crate) _fn: ASTNode<FnKeyword>,
         pub(crate) _id: ParseResult<Id>,
-        pub(crate) _open_paren: ParseResult<OpenParenthesisSymbol>,
         pub(crate) _params: ParseResult<FnParams>,
-        pub(crate) _close_paren: ParseResult<CloseParenthesisSymbol>,
     }
 
     #[derive(NazmcParse)]
     pub(crate) struct FnParams {
-        pub(crate) _first_param: ASTNode<FnParam>,
-        pub(crate) _rest_fn_params: Vec<ASTNode<CommaWithFnParam>>,
-        pub(crate) _trailing_comma: Optional<CommaSymbol>,
+        pub(crate) _open_paren: ASTNode<OpenParenthesisSymbol>,
+        pub(crate) _rest_fn_params: Vec<ASTNode<FnParamWithComma>>,
+        pub(crate) _last_fn_param: Optional<FnParam>,
+        pub(crate) _close_paren: ParseResult<CloseParenthesisSymbol>,
     }
 
     #[derive(NazmcParse)]
-    pub(crate) struct CommaWithFnParam {
+    pub(crate) struct FnParamWithComma {
+        _fn_param: ParseResult<FnParam>,
         _comma: ASTNode<CommaSymbol>,
-        _next_fn_param: ASTNode<FnParam>,
     }
 
     #[derive(NazmcParse)]
@@ -506,6 +505,28 @@ mod tests {
         pub(crate) _name: ASTNode<Id>,
         pub(crate) _colon: ParseResult<ColonSymbol>,
         pub(crate) _type: ParseResult<Id>,
+    }
+
+    #[test]
+    fn test_zero_params() {
+        let (tokens, ..) = LexerIter::new("دالة البداية() {}").collect_all();
+        let mut tokens_iter = TokensIter::new(&tokens);
+        tokens_iter.next(); // Init recent
+
+        let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
+
+        let ParseResult::Parsed(fn_tree) = parse_result else {
+            panic!();
+        };
+
+        assert!(!fn_tree.tree._fn.is_broken);
+        assert!(fn_tree.tree._id.is_parsed_and_valid());
+
+        let params = fn_tree.tree._params.unwrap().tree;
+        assert!(!params._open_paren.is_broken);
+        assert!(params._rest_fn_params.is_empty());
+        assert!(params._last_fn_param.is_none());
+        assert!(params._close_paren.is_parsed_and_valid());
     }
 
     #[test]
@@ -522,14 +543,12 @@ mod tests {
 
         assert!(!fn_tree.tree._fn.is_broken);
         assert!(fn_tree.tree._id.is_parsed_and_valid());
-        assert!(fn_tree.tree._open_paren.is_parsed_and_valid());
-        assert!(fn_tree.tree._params.is_parsed_and_valid());
-        assert!(fn_tree.tree._close_paren.is_parsed_and_valid());
 
-        let params = fn_tree.tree._params.unwrap();
-        assert!(!params.tree._first_param.is_broken);
-        assert!(params.tree._rest_fn_params.is_empty());
-        assert!(params.tree._trailing_comma.is_none());
+        let params = fn_tree.tree._params.unwrap().tree;
+        assert!(!params._open_paren.is_broken);
+        assert!(params._rest_fn_params.is_empty());
+        assert!(params._last_fn_param.is_some_and_valid());
+        assert!(params._close_paren.is_parsed_and_valid());
     }
 
     #[test]
@@ -546,14 +565,13 @@ mod tests {
 
         assert!(!fn_tree.tree._fn.is_broken);
         assert!(fn_tree.tree._id.is_parsed_and_valid());
-        assert!(fn_tree.tree._open_paren.is_parsed_and_valid());
-        assert!(fn_tree.tree._params.is_parsed_and_valid());
-        assert!(fn_tree.tree._close_paren.is_parsed_and_valid());
 
-        let params = fn_tree.tree._params.unwrap();
-        assert!(!params.tree._first_param.is_broken);
-        assert!(params.tree._rest_fn_params.is_empty());
-        assert!(params.tree._trailing_comma.is_some_and_valid());
+        let params = fn_tree.tree._params.unwrap().tree;
+        assert!(!params._open_paren.is_broken);
+        assert!(params._rest_fn_params.len() == 1);
+        assert!(params._rest_fn_params.is_parsed_and_valid());
+        assert!(params._last_fn_param.is_none());
+        assert!(params._close_paren.is_parsed_and_valid());
     }
 
     #[test]
@@ -570,15 +588,13 @@ mod tests {
 
         assert!(!fn_tree.tree._fn.is_broken);
         assert!(fn_tree.tree._id.is_parsed_and_valid());
-        assert!(fn_tree.tree._open_paren.is_parsed_and_valid());
-        assert!(fn_tree.tree._params.is_parsed_and_valid());
-        assert!(fn_tree.tree._close_paren.is_parsed_and_valid());
 
-        let params = fn_tree.tree._params.unwrap();
-        assert!(!params.tree._first_param.is_broken);
-        assert!(params.tree._rest_fn_params.len() == 1);
-        assert!(params.tree._rest_fn_params.is_parsed_and_valid());
-        assert!(params.tree._trailing_comma.is_none());
+        let params = fn_tree.tree._params.unwrap().tree;
+        assert!(!params._open_paren.is_broken);
+        assert!(params._rest_fn_params.len() == 1);
+        assert!(params._rest_fn_params.is_parsed_and_valid());
+        assert!(params._last_fn_param.is_some_and_valid());
+        assert!(params._close_paren.is_parsed_and_valid());
     }
 
     #[test]
@@ -595,14 +611,12 @@ mod tests {
 
         assert!(!fn_tree.tree._fn.is_broken);
         assert!(fn_tree.tree._id.is_parsed_and_valid());
-        assert!(fn_tree.tree._open_paren.is_parsed_and_valid());
-        assert!(fn_tree.tree._params.is_parsed_and_valid());
-        assert!(fn_tree.tree._close_paren.is_parsed_and_valid());
 
-        let params = fn_tree.tree._params.unwrap();
-        assert!(!params.tree._first_param.is_broken);
-        assert!(params.tree._rest_fn_params.len() == 1);
-        assert!(params.tree._rest_fn_params.is_parsed_and_valid());
-        assert!(params.tree._trailing_comma.is_some_and_valid());
+        let params = fn_tree.tree._params.unwrap().tree;
+        assert!(!params._open_paren.is_broken);
+        assert!(params._rest_fn_params.len() == 2);
+        assert!(params._rest_fn_params.is_parsed_and_valid());
+        assert!(params._last_fn_param.is_none());
+        assert!(params._close_paren.is_parsed_and_valid());
     }
 }
