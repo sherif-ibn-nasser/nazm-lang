@@ -21,6 +21,7 @@ impl NazmcParse for ParseResult<Id> {
             }) => {
                 let ok = ParseResult::Parsed(ASTNode {
                     span: *span,
+                    is_broken: false,
                     tree: Id {
                         val: val.to_string(),
                     },
@@ -31,11 +32,9 @@ impl NazmcParse for ParseResult<Id> {
             Some(token) => ParseResult::Unexpected {
                 span: token.span,
                 found: token.typ.clone(),
+                is_start_failure: true,
             },
-            None => ParseResult::Unexpected {
-                span: Span::default(),
-                found: TokenType::EOF,
-            },
+            None => ParseResult::unexpected_eof(iter.peek_start_span()),
         }
     }
 }
@@ -53,6 +52,7 @@ macro_rules! create_keyword_parser {
                         Some(Token { span, typ: TokenType::Keyword(KeywordType::$keyword), .. }) => {
                             let ok = ParseResult::Parsed(ASTNode {
                                 span: *span,
+                                is_broken: false,
                                 tree: [<$keyword Keyword>],
                             });
                             iter.next_non_space_or_comment();
@@ -61,11 +61,9 @@ macro_rules! create_keyword_parser {
                         Some(token) => ParseResult::Unexpected {
                             span: token.span,
                             found: token.typ.clone(),
+                            is_start_failure: true,
                         },
-                        None => ParseResult::Unexpected {
-                            span: Span::default(),
-                            found: TokenType::EOF,
-                        },
+                        None => ParseResult::unexpected_eof(iter.peek_start_span()),
                     }
                 }
             }
@@ -87,6 +85,7 @@ macro_rules! create_symbol_parser {
                         {
                             let ok = ParseResult::Parsed(ASTNode {
                                 span: *span,
+                                is_broken: false,
                                 tree: [<$symbol Symbol>],
                             });
                             iter.next_non_space_or_comment();
@@ -95,11 +94,9 @@ macro_rules! create_symbol_parser {
                         Some(token) => ParseResult::Unexpected {
                             span: token.span,
                             found: token.typ.clone(),
+                            is_start_failure: true,
                         },
-                        None => ParseResult::Unexpected {
-                            span: Span::default(),
-                            found: TokenType::EOF,
-                        },
+                        None => ParseResult::unexpected_eof(iter.peek_start_span()),
                     }
                 }
             }
@@ -168,7 +165,7 @@ create_symbol_parser!(Equal);
 #[cfg(test)]
 mod tests {
     use crate::{
-        parser::{NazmcParse, ParseResult, TokensIter},
+        parser::{IsParsed, NazmcParse, ParseResult, TokensIter},
         LexerIter, TokenType,
     };
 

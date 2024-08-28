@@ -1,3 +1,5 @@
+use nazmc_diagnostics::span::Span;
+
 use crate::{Token, TokenType};
 
 pub(crate) struct TokensIter<'a> {
@@ -64,5 +66,13 @@ impl<'a> TokensIter<'a> {
         {}
 
         self.peek()
+    }
+
+    /// Returns a zero-column span located after the recent token or the zero span if no recent found
+    pub(crate) fn peek_start_span(&self) -> Span {
+        match self.recent() {
+            Some(token) => Span::after(&token.span),
+            None => Span::default(),
+        }
     }
 }

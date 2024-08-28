@@ -29,10 +29,20 @@ impl Span {
         }
     }
 
+    #[inline]
     pub fn merged_with(&self, with: &Span) -> Self {
         Self {
             start: self.start,
             end: with.end,
+        }
+    }
+
+    /// Returns a zero-column span located after given the span
+    #[inline]
+    pub fn after(given: &Span) -> Self {
+        Self {
+            start: given.end,
+            end: given.end,
         }
     }
 }

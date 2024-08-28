@@ -1,3 +1,4 @@
+use ast::{CloseParenthesisSymbol, FnKeyword, Id, OpenParenthesisSymbol};
 /// This module defines the core components and traits required for parsing an Abstract Syntax Tree (AST)
 /// in the Nazmc language parser. It provides the foundational structures and parsing logic for different
 /// AST node types, ensuring that the syntax is correctly interpreted and processed.
@@ -5,7 +6,7 @@ use nazmc_diagnostics::span::Span;
 use nazmc_parse_derive::NazmcParse;
 use tokens_iter::TokensIter;
 
-use crate::TokenType;
+use crate::{Token, TokenType};
 
 pub(crate) mod ast;
 
@@ -28,6 +29,7 @@ where
     ParseResult<Tree>: NazmcParse,
 {
     span: Span,
+    is_broken: bool,
     tree: Tree,
 }
 
@@ -39,7 +41,11 @@ where
     ParseResult<Tree>: NazmcParse,
 {
     Parsed(ASTNode<Tree>),
-    Unexpected { span: Span, found: TokenType },
+    Unexpected {
+        span: Span,
+        found: TokenType,
+        is_start_failure: bool,
+    },
 }
 
 /// `Optional` represents an optional AST node. It either contains a parsed node (`Some`) or nothing (`None`).
@@ -116,7 +122,7 @@ where
             if iter.peek().is_none() {
                 return Self {
                     items,
-                    terminator: ParseResult::unexpected_eof(),
+                    terminator: ParseResult::unexpected_eof(iter.peek_start_span()),
                 };
             }
 
@@ -151,7 +157,7 @@ where
                 return Self {
                     first: unexpected_node,
                     rest: vec![],
-                    terminator: ParseResult::default(),
+                    terminator: ParseResult::unexpected_eof(iter.peek_start_span()),
                 };
             }
         };
@@ -168,34 +174,21 @@ where
 
 /// Additional utility methods for `ParseResult`, `Optional`, and the `Spanned` trait implementation.
 
-impl<Tree> Default for ParseResult<Tree>
-where
-    ParseResult<Tree>: NazmcParse,
-{
-    fn default() -> Self {
-        Self::unexpected_eof()
-    }
-}
-
 impl<Tree> ParseResult<Tree>
 where
     ParseResult<Tree>: NazmcParse,
 {
-    /// Checks if the result is a successfully parsed node.
-    fn is_parsed(&self) -> bool {
-        matches!(self, ParseResult::Parsed(_))
-    }
-
     /// Checks if the result is an unexpected token.
-    fn is_unexpected(&self) -> bool {
+    pub(crate) fn is_unexpected(&self) -> bool {
         matches!(self, ParseResult::Unexpected { .. })
     }
 
     /// Returns an `Unexpected` result indicating an unexpected end of file.
-    fn unexpected_eof() -> Self {
+    pub(crate) fn unexpected_eof(span: Span) -> Self {
         Self::Unexpected {
-            span: Span::default(),
+            span,
             found: TokenType::EOF,
+            is_start_failure: true,
         }
     }
 }
@@ -205,28 +198,170 @@ where
     ParseResult<Tree>: NazmcParse,
 {
     /// Checks if the optional node contains a value.
-    fn is_some(&self) -> bool {
+    pub(crate) fn is_some(&self) -> bool {
         matches!(self, Self::Some(_))
     }
 
+    /// Checks if the optional node contains a successfully parsed node.
+    pub(crate) fn is_some_and_valid(&self) -> bool {
+        matches!(
+            self,
+            Self::Some(ASTNode {
+                is_broken: false,
+                ..
+            })
+        )
+    }
+
+    /// Checks if the optional node contains a broken parsed node.
+    pub(crate) fn is_some_and_broken(&self) -> bool {
+        matches!(
+            self,
+            Self::Some(ASTNode {
+                is_broken: true,
+                ..
+            })
+        )
+    }
+
     /// Checks if the optional node is empty.
-    fn is_none(&self) -> bool {
+    pub(crate) fn is_none(&self) -> bool {
         matches!(self, Self::None)
+    }
+}
+
+pub(crate) trait IsParsed {
+    fn is_parsed(&self) -> bool {
+        self.is_parsed_and_broken() || self.is_parsed_and_valid()
+    }
+
+    fn is_parsed_and_valid(&self) -> bool;
+
+    fn is_parsed_and_broken(&self) -> bool;
+}
+
+impl<Tree> IsParsed for ParseResult<Tree>
+where
+    ParseResult<Tree>: NazmcParse,
+{
+    /// Checks if the result is a parsed node.
+    fn is_parsed(&self) -> bool {
+        matches!(self, ParseResult::Parsed(_))
+    }
+
+    /// Checks if the result is a successfully parsed node.
+    fn is_parsed_and_valid(&self) -> bool {
+        matches!(
+            self,
+            ParseResult::Parsed(ASTNode {
+                is_broken: false,
+                ..
+            })
+        )
+    }
+
+    /// Checks if the result is a broken parsed node.
+    fn is_parsed_and_broken(&self) -> bool {
+        matches!(
+            self,
+            ParseResult::Parsed(ASTNode {
+                is_broken: true,
+                ..
+            })
+        )
+    }
+}
+
+impl<Tree> IsParsed for Optional<Tree>
+where
+    ParseResult<Tree>: NazmcParse,
+{
+    fn is_parsed(&self) -> bool {
+        true // It is always parsed
+    }
+
+    fn is_parsed_and_valid(&self) -> bool {
+        self.is_some_and_valid() || self.is_none() // None is parsed and valid
+    }
+
+    fn is_parsed_and_broken(&self) -> bool {
+        self.is_some_and_broken()
+    }
+}
+
+impl<Tree> IsParsed for Vec<ASTNode<Tree>>
+where
+    ParseResult<Tree>: NazmcParse,
+{
+    fn is_parsed(&self) -> bool {
+        true // The vec is always is parsed as it may parse with no nodes
+    }
+
+    fn is_parsed_and_valid(&self) -> bool {
+        self.iter().all(|tree| !tree.is_broken)
+    }
+
+    fn is_parsed_and_broken(&self) -> bool {
+        self.iter().any(|tree| tree.is_broken)
+    }
+}
+
+impl<Tree, Terminator> IsParsed for ZeroOrMany<Tree, Terminator>
+where
+    ParseResult<Tree>: NazmcParse,
+    ParseResult<Terminator>: NazmcParse,
+{
+    fn is_parsed(&self) -> bool {
+        self.items.iter().all(|item| item.is_parsed()) && self.terminator.is_parsed()
+    }
+
+    fn is_parsed_and_valid(&self) -> bool {
+        self.items.iter().all(|item| item.is_parsed_and_valid())
+            && self.terminator.is_parsed_and_valid()
+    }
+
+    fn is_parsed_and_broken(&self) -> bool {
+        self.items.iter().any(|item| item.is_parsed_and_broken())
+            || self.terminator.is_parsed_and_broken()
+    }
+}
+
+impl<Tree, Terminator> IsParsed for OneOrMany<Tree, Terminator>
+where
+    ParseResult<Tree>: NazmcParse,
+    ParseResult<Terminator>: NazmcParse,
+{
+    fn is_parsed(&self) -> bool {
+        self.first.is_parsed()
+            && self.rest.iter().all(|item| item.is_parsed())
+            && self.terminator.is_parsed()
+    }
+
+    fn is_parsed_and_valid(&self) -> bool {
+        self.first.is_parsed_and_valid()
+            && self.rest.iter().all(|item| item.is_parsed_and_valid())
+            && self.terminator.is_parsed_and_valid()
+    }
+
+    fn is_parsed_and_broken(&self) -> bool {
+        self.first.is_parsed_and_broken()
+            || self.rest.iter().any(|item| item.is_parsed_and_broken())
+            || self.terminator.is_parsed_and_broken()
     }
 }
 
 /// The `Spanned` trait allows retrieval of the `Span` associated with an AST node,
 /// which indicates the location of the node in the source code.
 pub(crate) trait Spanned {
-    fn span(&self) -> Span;
+    fn span(&self) -> Option<Span>;
 }
 
 impl<T> Spanned for ASTNode<T>
 where
     ParseResult<T>: NazmcParse,
 {
-    fn span(&self) -> Span {
-        self.span
+    fn span(&self) -> Option<Span> {
+        Some(self.span)
     }
 }
 
@@ -234,10 +369,35 @@ impl<Tree> Spanned for ParseResult<Tree>
 where
     ParseResult<Tree>: NazmcParse,
 {
-    fn span(&self) -> Span {
+    fn span(&self) -> Option<Span> {
         match self {
-            Self::Parsed(tree) => tree.span,
-            Self::Unexpected { span, .. } => *span,
+            Self::Parsed(tree) => Some(tree.span),
+            Self::Unexpected { span, .. } => Some(*span),
+        }
+    }
+}
+
+impl<Tree> Spanned for Optional<Tree>
+where
+    ParseResult<Tree>: NazmcParse,
+{
+    fn span(&self) -> Option<Span> {
+        match self {
+            Self::Some(tree) => Some(tree.span),
+            Self::None => None,
+        }
+    }
+}
+
+impl<Tree> Spanned for Vec<ASTNode<Tree>>
+where
+    ParseResult<Tree>: NazmcParse,
+{
+    fn span(&self) -> Option<Span> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(self[0].span.merged_with(&self.last().unwrap().span))
         }
     }
 }
@@ -247,11 +407,16 @@ where
     ParseResult<Tree>: NazmcParse,
     ParseResult<Terminator>: NazmcParse,
 {
-    fn span(&self) -> Span {
+    fn span(&self) -> Option<Span> {
         if self.items.is_empty() {
             self.terminator.span()
         } else {
-            self.items[0].span().merged_with(&self.terminator.span())
+            Some(
+                self.items[0]
+                    .span()
+                    .unwrap()
+                    .merged_with(&self.terminator.span().unwrap()),
+            )
         }
     }
 }
@@ -261,13 +426,23 @@ where
     ParseResult<Tree>: NazmcParse,
     ParseResult<Terminator>: NazmcParse,
 {
-    fn span(&self) -> Span {
+    fn span(&self) -> Option<Span> {
         if self.first.is_parsed() {
-            self.first.span().merged_with(&self.terminator.span())
+            Some(
+                self.first
+                    .span()
+                    .unwrap()
+                    .merged_with(&self.terminator.span().unwrap()),
+            )
         } else if self.rest.is_empty() {
             self.terminator.span()
         } else {
-            self.rest[0].span().merged_with(&self.terminator.span())
+            Some(
+                self.rest[0]
+                    .span()
+                    .unwrap()
+                    .merged_with(&self.terminator.span().unwrap()),
+            )
         }
     }
 }
@@ -275,27 +450,37 @@ where
 #[cfg(test)]
 
 mod tests {
-    use nazmc_parse_derive::NazmcParse;
 
-    use super::{
-        ast::{CloseParenthesisSymbol, ColonSymbol, FnKeyword, Id, OpenParenthesisSymbol},
-        ASTNode, OneOrMany, Optional, ParseResult, ZeroOrMany,
-    };
+    use ast::*;
 
-    // TODO:
+    use crate::LexerIter;
+
+    use super::*;
 
     #[derive(NazmcParse)]
-    struct SimpleFn {
-        _fn: ParseResult<FnKeyword>,
-        _id: ParseResult<Id>,
-        _open_psren: ParseResult<OpenParenthesisSymbol>,
-        _params: ASTNode<CloseParenthesisSymbol>,
+    pub(crate) struct SimpleFn {
+        pub(crate) _fn: ASTNode<FnKeyword>,
+        pub(crate) _id: ParseResult<Id>,
+        pub(crate) _open_paren: ParseResult<OpenParenthesisSymbol>,
+        pub(crate) _params: ZeroOrMany<FnParam, CloseParenthesisSymbol>,
     }
 
-    // #[derive(NazmcParse)]
-    // struct FnParam {
-    //     _name: ParseResult<Id>,
-    //     _colon: ParseResult<ColonSymbol>,
-    //     _type: ParseResult<Id>,
-    // }
+    #[derive(NazmcParse)]
+    pub(crate) struct FnParam {
+        pub(crate) _name: ASTNode<Id>,
+        pub(crate) _colon: ParseResult<ColonSymbol>,
+        pub(crate) _type: ParseResult<Id>,
+        pub(crate) _comma: Optional<CommaSymbol>,
+    }
+
+    #[test]
+    fn test() {
+        let (tokens, ..) = LexerIter::new("دالة البداية(س: ص8، ك: م) {}").collect_all();
+        let mut tokens_iter = TokensIter::new(&tokens);
+        tokens_iter.next(); // Init recent
+
+        let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
+
+        assert!(parse_result.is_parsed_and_valid());
+    }
 }

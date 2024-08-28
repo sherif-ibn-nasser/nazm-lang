@@ -10,3 +10,4 @@ proc-macro = true
 syn = "*"
 quote = "*"
 proc-macro-error = "*"
+proc-macro2 = "*"
