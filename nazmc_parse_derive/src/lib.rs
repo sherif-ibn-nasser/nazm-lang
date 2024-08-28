@@ -63,6 +63,7 @@ fn derive_for_struct(tree_name: &Ident, data_struct: DataStruct) -> TokenStream2
 
     let mut is_start_failure = true;
 
+    // TODO: Optimze and remove span as Option when it is surely determined
     for (field, field_ty) in fields_zipped {
         let field_name = field.ident.clone().unwrap();
 
@@ -72,6 +73,7 @@ fn derive_for_struct(tree_name: &Ident, data_struct: DataStruct) -> TokenStream2
 
         if let ParseFieldType::ASTNode(ty) = field_ty {
             fields_stms.extend(quote! {
+                let peek_idx = iter.peek_idx;
                 let #field_name = match <ParseResult<#ty>>::parse(iter) {
                     ParseResult::Parsed(tree) => {
                         if tree.is_broken {
@@ -80,12 +82,14 @@ fn derive_for_struct(tree_name: &Ident, data_struct: DataStruct) -> TokenStream2
                         span = Some(span.unwrap_or(tree.span).merged_with(&tree.span));
                         tree
                     },
-                    ParseResult::Unexpected { span, found, .. } =>
+                    ParseResult::Unexpected { span, found, .. } =>{
+                        iter.peek_idx = peek_idx;
                         return ParseResult::Unexpected {
                             span,
                             found,
                             is_start_failure: #is_start_failure,
-                        },
+                        };
+                    }
                 };
             });
 
