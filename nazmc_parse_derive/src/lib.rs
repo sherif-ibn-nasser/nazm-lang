@@ -15,7 +15,13 @@ pub fn derive_nazmc_parser(input: TokenStream) -> TokenStream {
     let tree_name = &derive_input.ident;
 
     let impl_parse_block = match derive_input.data {
-        syn::Data::Struct(data_struct) => derive_for_struct(tree_name, data_struct),
+        syn::Data::Struct(data_struct) => {
+            let r = derive_for_struct(tree_name, data_struct);
+            if r.to_string().is_empty() {
+                return TokenStream::new();
+            }
+            r
+        }
         syn::Data::Enum(data_enum) => derive_for_enum(data_enum),
         syn::Data::Union(_) => abort!(
             tree_name.span(),
@@ -71,31 +77,39 @@ fn derive_for_struct(tree_name: &Ident, data_struct: DataStruct) -> TokenStream2
             #field_name: #field_name,
         });
 
-        if let ParseFieldType::ASTNode(ty) = field_ty {
-            fields_stms.extend(quote! {
-                let peek_idx = iter.peek_idx;
-                let #field_name = match <ParseResult<#ty>>::parse(iter) {
-                    ParseResult::Parsed(tree) => {
-                        if tree.is_broken {
-                            is_broken = true;
-                        }
-                        span = Some(span.unwrap_or(tree.span).merged_with(&tree.span));
-                        tree
-                    },
-                    ParseResult::Unexpected { span, found, .. } =>{
-                        iter.peek_idx = peek_idx;
-                        return ParseResult::Unexpected {
-                            span,
-                            found,
-                            is_start_failure: #is_start_failure,
-                        };
-                    }
+        match field_ty {
+            ParseFieldType::BoxedASTNode(ty) | ParseFieldType::ASTNode(ty) => {
+                let return_tree_stm = if matches!(field_ty, ParseFieldType::BoxedASTNode(_)) {
+                    quote! { Box::new(tree) }
+                } else {
+                    quote! { tree }
                 };
-            });
+                fields_stms.extend(quote! {
+                    let peek_idx = iter.peek_idx;
+                    let #field_name = match <ParseResult<#ty>>::parse(iter) {
+                        ParseResult::Parsed(tree) => {
+                            if tree.is_broken {
+                                is_broken = true;
+                            }
+                            span = Some(span.unwrap_or(tree.span).merged_with(&tree.span));
+                            #return_tree_stm
+                        },
+                        ParseResult::Unexpected { span, found, .. } =>{
+                            iter.peek_idx = peek_idx;
+                            return ParseResult::Unexpected {
+                                span,
+                                found,
+                                is_start_failure: #is_start_failure,
+                            };
+                        }
+                    };
+                });
 
-            is_start_failure = false; // This will make future ASTNode type return `false`
+                is_start_failure = false; // This will make future ASTNode type return `false`
 
-            continue;
+                continue;
+            }
+            _ => {}
         }
 
         let field_ty_token = field.ty.clone();
@@ -137,7 +151,12 @@ fn check_field(field: &Field) -> Option<ParseFieldType> {
     extract_field_type(ty).or_else(||{
         emit_error!(
             ty.span(),
-            "Field must be one of those types:\n ASTNode<_>,\n ParseResult<_>,\n Optional<_>,\n Vec<ASTNode<_>>,\n ZeroOrMany<_,_> or OneOrMany<_,_> where ParseResult<_> : NazmcParse";
+            "Field must be one of those types:\n
+            ASTNode<_> or Boxed,\n
+            ParseResult<_> or Boxed,\n
+            Optional<_> or Boxed,\n
+            Vec<ASTNode<_>>,\n
+            ZeroOrMany<_,_> or OneOrMany<_,_> where ParseResult<_> : NazmcParse";
             note = "The type should be pure and not in path notation, i.e., ParseResult<_> and not crate::ParseResult<_>";
         );
         None
@@ -145,6 +164,8 @@ fn check_field(field: &Field) -> Option<ParseFieldType> {
 }
 
 enum ParseFieldType<'a> {
+    Boxed(&'a Type),
+    BoxedASTNode(&'a Type),
     ASTNode(&'a Type),
     ParseResult(&'a Type),
     /// i.e. ZeroOrOne
@@ -160,6 +181,35 @@ fn extract_field_type(ty: &Type) -> Option<ParseFieldType> {
     };
 
     match segment.as_str() {
+        "Box" => {
+            if args.len() != 1 {
+                return None;
+            }
+
+            let GenericArgument::Type(ty) = &args[0] else {
+                return None;
+            };
+
+            let Some((segment, args)) = extract_segment_and_generic_args(ty) else {
+                return None;
+            };
+
+            if args.len() != 1
+                || segment != "ASTNode" && segment != "ParseResult" && segment != "Optional"
+            {
+                return None;
+            }
+
+            let GenericArgument::Type(ty) = &args[0] else {
+                return None;
+            };
+
+            if segment != "ASTNode" {
+                return Some(ParseFieldType::Boxed(ty));
+            }
+
+            Some(ParseFieldType::BoxedASTNode(ty))
+        }
         "ASTNode" => {
             if args.len() != 1 {
                 return None;

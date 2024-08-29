@@ -109,6 +109,16 @@ where
 
 /// Implementations of the `NazmcParse` trait for different parsing structures.
 
+impl<ParseMethod> NazmcParse for Box<ParseMethod>
+where
+    ParseMethod: NazmcParse,
+{
+    fn parse(iter: &mut TokensIter) -> Self {
+        let parsed = ParseMethod::parse(iter);
+        Box::new(parsed)
+    }
+}
+
 impl<Tree> NazmcParse for Optional<Tree>
 where
     ParseResult<Tree>: NazmcParse,
@@ -321,6 +331,23 @@ pub(crate) trait IsParsed {
     fn is_parsed_and_broken(&self) -> bool;
 }
 
+impl<ParseMethod> IsParsed for Box<ParseMethod>
+where
+    ParseMethod: NazmcParse + IsParsed,
+{
+    fn is_parsed_and_valid(&self) -> bool {
+        ParseMethod::is_parsed_and_valid(self)
+    }
+
+    fn is_parsed_and_broken(&self) -> bool {
+        ParseMethod::is_parsed_and_broken(self)
+    }
+
+    fn is_parsed(&self) -> bool {
+        ParseMethod::is_parsed(self)
+    }
+}
+
 impl<Tree> IsParsed for ParseResult<Tree>
 where
     ParseResult<Tree>: NazmcParse,
@@ -435,6 +462,15 @@ where
 /// which indicates the location of the node in the source code.
 pub(crate) trait Spanned {
     fn span(&self) -> Option<Span>;
+}
+
+impl<ParseMethod> Spanned for Box<ParseMethod>
+where
+    ParseMethod: NazmcParse + Spanned,
+{
+    fn span(&self) -> Option<Span> {
+        ParseMethod::span(self)
+    }
 }
 
 impl<T> Spanned for ASTNode<T>
