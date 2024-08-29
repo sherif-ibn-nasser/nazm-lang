@@ -574,6 +574,12 @@ mod tests {
     use super::*;
 
     #[derive(NazmcParse)]
+    pub(crate) enum TermBinOp {
+        Plus(ASTNode<PlusSymbol>),
+        Minus(ASTNode<MinusSymbol>),
+    }
+
+    #[derive(NazmcParse)]
     pub(crate) struct SimpleFn {
         pub(crate) _fn: ASTNode<FnKeyword>,
         pub(crate) _id: ParseResult<Id>,
@@ -634,6 +640,57 @@ mod tests {
 
         println!("-----");
         println!("{:?}", params.terminator);
+    }
+
+    #[test]
+    fn test_enum() {
+        let (tokens, ..) = LexerIter::new("+-  /** */ - +").collect_all();
+        let mut tokens_iter = TokensIter::new(&tokens);
+        tokens_iter.next(); // Init recent
+
+        let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
+        assert!(parse_result.is_parsed_and_valid());
+        let op = parse_result.unwrap().tree;
+        assert!(matches!(
+            op,
+            TermBinOp::Plus(ASTNode {
+                is_broken: false,
+                ..
+            })
+        ));
+
+        let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
+        assert!(parse_result.is_parsed_and_valid());
+        let op = parse_result.unwrap().tree;
+        assert!(matches!(
+            op,
+            TermBinOp::Minus(ASTNode {
+                is_broken: false,
+                ..
+            })
+        ));
+
+        let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
+        assert!(parse_result.is_parsed_and_valid());
+        let op = parse_result.unwrap().tree;
+        assert!(matches!(
+            op,
+            TermBinOp::Minus(ASTNode {
+                is_broken: false,
+                ..
+            })
+        ));
+
+        let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
+        assert!(parse_result.is_parsed_and_valid());
+        let op = parse_result.unwrap().tree;
+        assert!(matches!(
+            op,
+            TermBinOp::Plus(ASTNode {
+                is_broken: false,
+                ..
+            })
+        ));
     }
 
     #[test]

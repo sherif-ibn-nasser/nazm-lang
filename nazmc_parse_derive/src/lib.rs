@@ -1,7 +1,9 @@
 use proc_macro::TokenStream;
+use proc_macro2::Span as Span2;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::{abort, emit_error, proc_macro_error};
 use quote::quote;
+use quote::IdentFragment;
 use syn::{
     parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::Comma, DataEnum,
     DataStruct, DeriveInput, Field, GenericArgument, Ident, Type, TypePath,
@@ -22,7 +24,13 @@ pub fn derive_nazmc_parser(input: TokenStream) -> TokenStream {
             }
             r
         }
-        syn::Data::Enum(data_enum) => derive_for_enum(data_enum),
+        syn::Data::Enum(data_enum) => {
+            let r = derive_for_enum(tree_name, data_enum);
+            if r.to_string().is_empty() {
+                return TokenStream::new();
+            }
+            r
+        }
         syn::Data::Union(_) => abort!(
             tree_name.span(),
             "Cannot dervie the trait `NazmcParse` for unions"
@@ -142,8 +150,114 @@ fn derive_for_struct(tree_name: &Ident, data_struct: DataStruct) -> TokenStream2
     }
 }
 
-fn derive_for_enum(data_enum: DataEnum) -> TokenStream2 {
-    todo!()
+fn derive_for_enum(enum_name: &Ident, data_enum: DataEnum) -> TokenStream2 {
+    let emit_err = |span: &Span2| {
+        emit_error!(
+            span,
+            "Variant must be a tuple with a one field of the type ASTNode<_> where ParseResult<_>: NazmcParse"
+        )
+    };
+
+    if data_enum.variants.len() <= 1 {
+        emit_error!(
+            enum_name.span(),
+            "Enum must have at least two variants to generate parsing methods on them"
+        );
+        return quote! {};
+    }
+
+    let mut types = vec![];
+
+    for v in data_enum.variants.iter().clone() {
+        if v.fields.len() != 1 {
+            emit_err(&v.span());
+            continue;
+        }
+
+        let ty = &v.fields.iter().clone().next().unwrap().ty;
+
+        let ty_extracted = extract_segment_and_generic_args(ty);
+
+        if ty_extracted.is_none() {
+            emit_err(&ty.span());
+            continue;
+        }
+
+        let (segment, args) = ty_extracted.unwrap();
+
+        if args.len() != 1 || segment != "ASTNode" {
+            emit_err(&ty.span());
+            continue;
+        }
+
+        let GenericArgument::Type(ty) = &args[0] else {
+            emit_err(&ty.span());
+            continue;
+        };
+
+        types.push(ty);
+    }
+
+    // Errors occured in fields
+    if types.len() != data_enum.variants.len() {
+        return quote! {};
+    }
+
+    let last_variant_idx = data_enum.variants.len() - 1;
+
+    let mut impl_parse_block = quote! {
+
+        let peek_idx = iter.peek_idx;
+
+    };
+
+    let iter = data_enum.variants.iter().zip(types.iter()).enumerate();
+
+    for (i, (variant, ty)) in iter {
+        let variant_name = &variant.ident;
+
+        let variant_stm = if i < last_variant_idx {
+            quote! {
+                if let ParseResult::Parsed(tree) = <ParseResult<#ty>>::parse(iter) {
+                    return ParseResult::Parsed(
+                        ASTNode {
+                            span: tree.span,
+                            is_broken: tree.is_broken,
+                            tree: #enum_name::#variant_name(tree),
+                        }
+                    );
+                }
+
+                iter.peek_idx = peek_idx; // Backtrack
+            }
+        } else {
+            quote! {
+                match <ParseResult<#ty>>::parse(iter) {
+                    ParseResult::Parsed(tree) => {
+                        return ParseResult::Parsed(
+                            ASTNode {
+                                span: tree.span,
+                                is_broken: tree.is_broken,
+                                tree: #enum_name::#variant_name(tree),
+                            }
+                        );
+                    }
+                    ParseResult::Unexpected { span, found, is_start_failure } => {
+                        // No backtracking after last variant
+                        return ParseResult::Unexpected {
+                            span,
+                            found,
+                            is_start_failure,
+                        };
+                    }
+                }
+            }
+        };
+
+        impl_parse_block.extend(variant_stm);
+    }
+
+    impl_parse_block
 }
 
 fn check_field(field: &Field) -> Option<ParseFieldType> {
