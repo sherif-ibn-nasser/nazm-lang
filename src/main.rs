@@ -8,7 +8,7 @@ use owo_colors::{OwoColorize, XtermColors};
 use parser::{
     ast::{CloseParenthesisSymbol, FnKeyword, Id, OpenParenthesisSymbol},
     tokens_iter::TokensIter,
-    ASTNode, NazmcParse, ParseResult,
+    NazmcParse, ParseResult, SyntaxNode,
 };
 use std::{
     io::{self, Write},

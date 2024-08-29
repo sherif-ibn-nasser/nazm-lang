@@ -26,7 +26,7 @@ where
 /// Represents an AST node that wraps around a successful parse result. It includes the `Span`
 /// information for the node and the parsed `tree` itself. This structure also manages error
 /// recovery by resetting tokens if parsing fails.
-pub(crate) struct ASTNode<Tree>
+pub(crate) struct SyntaxNode<Tree>
 where
     ParseResult<Tree>: NazmcParse,
 {
@@ -42,7 +42,7 @@ pub(crate) enum ParseResult<Tree>
 where
     ParseResult<Tree>: NazmcParse,
 {
-    Parsed(ASTNode<Tree>),
+    Parsed(SyntaxNode<Tree>),
     Unexpected {
         span: Span,
         found: TokenType,
@@ -55,7 +55,7 @@ pub(crate) enum Optional<Tree>
 where
     ParseResult<Tree>: NazmcParse,
 {
-    Some(ASTNode<Tree>),
+    Some(SyntaxNode<Tree>),
     None,
 }
 
@@ -131,7 +131,7 @@ where
     }
 }
 
-impl<Tree> NazmcParse for Vec<ASTNode<Tree>>
+impl<Tree> NazmcParse for Vec<SyntaxNode<Tree>>
 where
     ParseResult<Tree>: NazmcParse,
 {
@@ -269,7 +269,7 @@ where
         }
     }
 
-    pub(crate) fn unwrap(self) -> ASTNode<Tree> {
+    pub(crate) fn unwrap(self) -> SyntaxNode<Tree> {
         let ParseResult::Parsed(tree) = self else {
             panic!("Calling `unwrap` on {:?}", self);
         };
@@ -290,7 +290,7 @@ where
     pub(crate) fn is_some_and_valid(&self) -> bool {
         matches!(
             self,
-            Self::Some(ASTNode {
+            Self::Some(SyntaxNode {
                 is_broken: false,
                 ..
             })
@@ -301,7 +301,7 @@ where
     pub(crate) fn is_some_and_broken(&self) -> bool {
         matches!(
             self,
-            Self::Some(ASTNode {
+            Self::Some(SyntaxNode {
                 is_broken: true,
                 ..
             })
@@ -313,7 +313,7 @@ where
         matches!(self, Self::None)
     }
 
-    pub(crate) fn unwrap(self) -> ASTNode<Tree> {
+    pub(crate) fn unwrap(self) -> SyntaxNode<Tree> {
         match self {
             Self::Some(tree) => tree,
             Self::None => panic!("Calling `unwrap` on Optional::None"),
@@ -361,7 +361,7 @@ where
     fn is_parsed_and_valid(&self) -> bool {
         matches!(
             self,
-            ParseResult::Parsed(ASTNode {
+            ParseResult::Parsed(SyntaxNode {
                 is_broken: false,
                 ..
             })
@@ -372,7 +372,7 @@ where
     fn is_parsed_and_broken(&self) -> bool {
         matches!(
             self,
-            ParseResult::Parsed(ASTNode {
+            ParseResult::Parsed(SyntaxNode {
                 is_broken: true,
                 ..
             })
@@ -397,7 +397,7 @@ where
     }
 }
 
-impl<Tree> IsParsed for Vec<ASTNode<Tree>>
+impl<Tree> IsParsed for Vec<SyntaxNode<Tree>>
 where
     ParseResult<Tree>: NazmcParse,
 {
@@ -473,7 +473,7 @@ where
     }
 }
 
-impl<T> Spanned for ASTNode<T>
+impl<T> Spanned for SyntaxNode<T>
 where
     ParseResult<T>: NazmcParse,
 {
@@ -506,7 +506,7 @@ where
     }
 }
 
-impl<Tree> Spanned for Vec<ASTNode<Tree>>
+impl<Tree> Spanned for Vec<SyntaxNode<Tree>>
 where
     ParseResult<Tree>: NazmcParse,
 {
@@ -575,38 +575,38 @@ mod tests {
 
     #[derive(NazmcParse)]
     pub(crate) enum TermBinOp {
-        Plus(ASTNode<PlusSymbol>),
-        Minus(ASTNode<MinusSymbol>),
+        Plus(SyntaxNode<PlusSymbol>),
+        Minus(SyntaxNode<MinusSymbol>),
     }
 
     #[derive(NazmcParse)]
     pub(crate) struct SimpleFn {
-        pub(crate) _fn: ASTNode<FnKeyword>,
+        pub(crate) _fn: SyntaxNode<FnKeyword>,
         pub(crate) _id: ParseResult<Id>,
         pub(crate) _params_decl: ParseResult<FnParams>,
     }
 
     #[derive(NazmcParse)]
     pub(crate) struct FnParams {
-        pub(crate) _open_paren: ASTNode<OpenParenthesisSymbol>,
+        pub(crate) _open_paren: SyntaxNode<OpenParenthesisSymbol>,
         pub(crate) _params: ZeroOrMany<FnParamWithComma, FnParamWithCloseParenthesis>,
     }
 
     #[derive(NazmcParse)]
     pub(crate) struct FnParamWithComma {
-        _fn_param: ASTNode<FnParam>,
-        _comma: ASTNode<CommaSymbol>,
+        _fn_param: SyntaxNode<FnParam>,
+        _comma: SyntaxNode<CommaSymbol>,
     }
 
     #[derive(NazmcParse)]
     pub(crate) struct FnParamWithCloseParenthesis {
         _fn_param: Optional<FnParam>,
-        _close_paren: ASTNode<CloseParenthesisSymbol>,
+        _close_paren: SyntaxNode<CloseParenthesisSymbol>,
     }
 
     #[derive(NazmcParse)]
     pub(crate) struct FnParam {
-        pub(crate) _name: ASTNode<Id>,
+        pub(crate) _name: SyntaxNode<Id>,
         pub(crate) _colon: ParseResult<ColonSymbol>,
         pub(crate) _type: ParseResult<Id>,
     }
@@ -653,7 +653,7 @@ mod tests {
         let op = parse_result.unwrap().tree;
         assert!(matches!(
             op,
-            TermBinOp::Plus(ASTNode {
+            TermBinOp::Plus(SyntaxNode {
                 is_broken: false,
                 ..
             })
@@ -664,7 +664,7 @@ mod tests {
         let op = parse_result.unwrap().tree;
         assert!(matches!(
             op,
-            TermBinOp::Minus(ASTNode {
+            TermBinOp::Minus(SyntaxNode {
                 is_broken: false,
                 ..
             })
@@ -675,7 +675,7 @@ mod tests {
         let op = parse_result.unwrap().tree;
         assert!(matches!(
             op,
-            TermBinOp::Minus(ASTNode {
+            TermBinOp::Minus(SyntaxNode {
                 is_broken: false,
                 ..
             })
@@ -686,7 +686,7 @@ mod tests {
         let op = parse_result.unwrap().tree;
         assert!(matches!(
             op,
-            TermBinOp::Plus(ASTNode {
+            TermBinOp::Plus(SyntaxNode {
                 is_broken: false,
                 ..
             })

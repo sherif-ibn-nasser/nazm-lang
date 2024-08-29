@@ -1,7 +1,7 @@
 use nazmc_diagnostics::span::Span;
 
 use crate::{
-    parser::{ASTNode, NazmcParse, ParseResult, TokensIter},
+    parser::{NazmcParse, ParseResult, SyntaxNode, TokensIter},
     KeywordType, SymbolType, Token, TokenType,
 };
 
@@ -19,7 +19,7 @@ impl NazmcParse for ParseResult<Id> {
                 span,
                 typ: TokenType::Id,
             }) => {
-                let ok = ParseResult::Parsed(ASTNode {
+                let ok = ParseResult::Parsed(SyntaxNode {
                     span: *span,
                     is_broken: false,
                     tree: Id {
@@ -50,7 +50,7 @@ macro_rules! create_keyword_parser {
 
                     match iter.recent() {
                         Some(Token { span, typ: TokenType::Keyword(KeywordType::$keyword), .. }) => {
-                            let ok = ParseResult::Parsed(ASTNode {
+                            let ok = ParseResult::Parsed(SyntaxNode {
                                 span: *span,
                                 is_broken: false,
                                 tree: [<$keyword Keyword>],
@@ -83,7 +83,7 @@ macro_rules! create_symbol_parser {
                     match iter.recent() {
                         Some(Token { span, typ: TokenType::Symbol(SymbolType::$symbol), .. }) =>
                         {
-                            let ok = ParseResult::Parsed(ASTNode {
+                            let ok = ParseResult::Parsed(SyntaxNode {
                                 span: *span,
                                 is_broken: false,
                                 tree: [<$symbol Symbol>],
