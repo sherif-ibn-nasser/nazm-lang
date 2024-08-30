@@ -1,6 +1,6 @@
 use nazmc_diagnostics::span::Span;
 
-use crate::{Token, TokenType};
+use crate::{Token, TokenKind};
 
 pub(crate) struct TokensIter<'a> {
     pub(crate) peek_idx: usize,
@@ -59,8 +59,8 @@ impl<'a> TokensIter<'a> {
 
     pub(crate) fn next_non_space_or_comment(&mut self) -> Option<&Token<'a>> {
         while let Some(Token {
-            typ:
-                TokenType::EOL | TokenType::DelimitedComment | TokenType::LineComment | TokenType::Space,
+            kind:
+                TokenKind::EOL | TokenKind::DelimitedComment | TokenKind::LineComment | TokenKind::Space,
             ..
         }) = self.next()
         {}

@@ -33,30 +33,30 @@ fn main() {
 
     let mut bad_tokens = vec![];
 
-    for Token { span, val, typ } in tokens {
-        let color = match typ {
-            TokenType::LineComment | TokenType::DelimitedComment => XtermColors::BrightTurquoise,
-            TokenType::Symbol(_) => XtermColors::UserBrightYellow,
-            TokenType::Id => XtermColors::LightAnakiwaBlue,
-            TokenType::Keyword(_) | TokenType::Literal(LiteralTokenType::Bool(_)) => {
+    for Token { span, val, kind } in tokens {
+        let color = match kind {
+            TokenKind::LineComment | TokenKind::DelimitedComment => XtermColors::BrightTurquoise,
+            TokenKind::Symbol(_) => XtermColors::UserBrightYellow,
+            TokenKind::Id => XtermColors::LightAnakiwaBlue,
+            TokenKind::Keyword(_) | TokenKind::Literal(LiteralKind::Bool(_)) => {
                 XtermColors::FlushOrange
             }
-            TokenType::Literal(LiteralTokenType::Str(_) | LiteralTokenType::Char(_)) => {
+            TokenKind::Literal(LiteralKind::Str(_) | LiteralKind::Char(_)) => {
                 XtermColors::PinkSalmon
             }
-            TokenType::Literal(_) => XtermColors::ChelseaCucumber,
+            TokenKind::Literal(_) => XtermColors::ChelseaCucumber,
             _ => XtermColors::UserWhite,
         };
 
         let mut val = format!("{}", val.color(color));
 
-        if matches!(typ, TokenType::Keyword(_) | TokenType::Symbol(_)) {
+        if matches!(kind, TokenKind::Keyword(_) | TokenKind::Symbol(_)) {
             val = format!("{}", val.bold());
         }
 
         print!("{}", val);
 
-        if let TokenType::Bad(errs) = typ {
+        if let TokenKind::Bad(errs) = kind {
             bad_tokens.push((val, span, errs));
         }
     }

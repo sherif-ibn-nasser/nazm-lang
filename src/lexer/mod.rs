@@ -3,7 +3,7 @@ mod lexing_methods;
 mod token;
 
 use documented::DocumentedVariants;
-use error::{LexerError, LexerErrorType};
+use error::{LexerError, LexerErrorKind};
 use itertools::Itertools;
 use nazmc_diagnostics::{
     span::{Span, SpanCursor},
@@ -32,15 +32,15 @@ impl<'a> Iterator for LexerIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.cursor.stopped_at.0;
         let start_byte = self.stopped_at_bidx;
-        let typ = self.next_token_type();
-        if let TokenType::EOF = typ {
+        let kind = self.next_token_type();
+        if let TokenKind::EOF = kind {
             return None;
         }
         let end = self.cursor.stopped_at.0;
         let end_byte = self.stopped_at_bidx;
         let val = &self.content[start_byte..end_byte];
         let span = Span { start, end };
-        Some(Token { val, span, typ })
+        Some(Token { val, span, kind })
     }
 }
 
@@ -68,24 +68,24 @@ impl<'a> LexerIter<'a> {
         (tokens, self.file_lines, self.diagnostics)
     }
 
-    fn next_token_type(&mut self) -> TokenType {
+    fn next_token_type(&mut self) -> TokenKind {
         match self.cursor.stopped_at.1 {
             '/' => self.next_token_with_slash(),
             '،' => {
                 self.next_cursor();
-                TokenType::Symbol(SymbolType::Comma)
+                TokenKind::Symbol(SymbolKind::Comma)
             }
             '؛' => {
                 self.next_cursor();
-                TokenType::Symbol(SymbolType::Semicolon)
+                TokenKind::Symbol(SymbolKind::Semicolon)
             }
             '؟' => {
                 self.next_cursor();
-                TokenType::Symbol(SymbolType::QuestionMark)
+                TokenKind::Symbol(SymbolKind::QuestionMark)
             }
             '\n' => {
                 self.next_cursor();
-                TokenType::EOL
+                TokenKind::EOL
             }
             '0'..='9' => self.next_num_token(),
             '\'' | '\"' => self.next_str_or_char_token(),
@@ -94,16 +94,16 @@ impl<'a> LexerIter<'a> {
                     .next_cursor()
                     .is_some_and(|(_, ch)| ch.is_ascii_whitespace() && ch != '\n')
                 {} // Skip whitespaces
-                TokenType::Space
+                TokenKind::Space
             }
             _ => {
                 if self.stopped_at_bidx == self.content.len() {
-                    return TokenType::EOF;
+                    return TokenKind::EOF;
                 }
 
                 let text = &self.content[self.stopped_at_bidx..];
 
-                for symbol in SymbolType::iter() {
+                for symbol in SymbolKind::iter() {
                     if symbol
                         .get_variant_docs()
                         .is_ok_and(|val| text.starts_with(val))
@@ -112,7 +112,7 @@ impl<'a> LexerIter<'a> {
                             // The multibyte symbols are checked above
                             self.next_cursor();
                         }
-                        return TokenType::Symbol(symbol);
+                        return TokenKind::Symbol(symbol);
                     }
                 }
 
@@ -158,11 +158,11 @@ impl<'a> LexerIter<'a> {
         }
     }
 
-    fn next_token_with_slash(&mut self) -> TokenType {
+    fn next_token_with_slash(&mut self) -> TokenKind {
         match self.next_cursor() {
             Some((_, '=')) => {
                 self.next_cursor();
-                TokenType::Symbol(SymbolType::SlashEqual)
+                TokenKind::Symbol(SymbolKind::SlashEqual)
             }
             Some((_, '/')) => {
                 let mut errs = vec![];
@@ -174,9 +174,9 @@ impl<'a> LexerIter<'a> {
                 }
 
                 if errs.is_empty() {
-                    TokenType::LineComment
+                    TokenKind::LineComment
                 } else {
-                    TokenType::Bad(errs)
+                    TokenKind::Bad(errs)
                 }
             }
             Some((_, '*')) => {
@@ -201,29 +201,29 @@ impl<'a> LexerIter<'a> {
 
                 if opened_delimted_comments == 0 {
                     if errs.is_empty() {
-                        TokenType::DelimitedComment
+                        TokenKind::DelimitedComment
                     } else {
-                        TokenType::Bad(errs)
+                        TokenKind::Bad(errs)
                     }
                 } else {
-                    TokenType::Bad(vec![LexerError {
+                    TokenKind::Bad(vec![LexerError {
                         col: self.cursor.stopped_at.0.col,
                         len: 1,
-                        typ: LexerErrorType::UnclosedDelimitedComment,
+                        kind: LexerErrorKind::UnclosedDelimitedComment,
                     }])
                 }
             }
-            _ => TokenType::Symbol(SymbolType::Slash),
+            _ => TokenKind::Symbol(SymbolKind::Slash),
         }
     }
 
-    fn next_id_or_keyword(&mut self) -> TokenType {
+    fn next_id_or_keyword(&mut self) -> TokenKind {
         if !self.cursor.stopped_at.1.is_alphabetic() {
             self.next_cursor();
-            return TokenType::Bad(vec![LexerError {
+            return TokenKind::Bad(vec![LexerError {
                 col: self.cursor.stopped_at.0.col,
                 len: 1,
-                typ: LexerErrorType::UnknownToken,
+                kind: LexerErrorKind::UnknownToken,
             }]);
         }
 
@@ -239,18 +239,18 @@ impl<'a> LexerIter<'a> {
         let id = &self.content[start..end];
 
         if id == "مؤكد" {
-            return TokenType::Literal(LiteralTokenType::Bool(true));
+            return TokenKind::Literal(LiteralKind::Bool(true));
         } else if id == "محال" {
-            return TokenType::Literal(LiteralTokenType::Bool(false));
+            return TokenKind::Literal(LiteralKind::Bool(false));
         }
 
-        for keyword_typ in KeywordType::iter() {
+        for keyword_typ in KeywordKind::iter() {
             if keyword_typ.get_variant_docs().is_ok_and(|val| id == val) {
-                return TokenType::Keyword(keyword_typ);
+                return TokenKind::Keyword(keyword_typ);
             }
         }
 
-        TokenType::Id
+        TokenKind::Id
     }
 
     #[inline]
@@ -261,7 +261,7 @@ impl<'a> LexerIter<'a> {
             Err(LexerError {
                 col: start.col,
                 len: 1,
-                typ: LexerErrorType::KufrOrInvalidChar,
+                kind: LexerErrorKind::KufrOrInvalidChar,
             })
         } else {
             Ok(Some(ch))
@@ -358,8 +358,8 @@ fn is_kufr_or_unsupported_character(c: char) -> bool {
 mod tests {
     use std::vec;
 
-    use super::{KeywordType, LexerIter, SymbolType};
-    use crate::{lexer::TokenType, Token};
+    use super::{KeywordKind, LexerIter, SymbolKind};
+    use crate::{lexer::TokenKind, Token};
     use documented::DocumentedVariants;
     use itertools::Itertools;
     use nazmc_diagnostics::span::{Span, SpanCursor};
@@ -411,9 +411,9 @@ mod tests {
 
     #[test]
     fn test_symbols_lexing() {
-        for symbol in SymbolType::iter() {
+        for symbol in SymbolKind::iter() {
             let symbol_val = symbol.get_variant_docs().unwrap();
-            let Token { span, val, typ } = LexerIter::new(symbol_val).next().unwrap();
+            let Token { span, val, kind } = LexerIter::new(symbol_val).next().unwrap();
             assert_eq!(
                 span,
                 Span {
@@ -425,20 +425,20 @@ mod tests {
                 }
             );
             assert_eq!(val, symbol_val);
-            assert_eq!(typ, TokenType::Symbol(symbol));
+            assert_eq!(kind, TokenKind::Symbol(symbol));
         }
 
         let mut symbols_line = String::new();
-        for symbol in SymbolType::iter() {
+        for symbol in SymbolKind::iter() {
             let symbol_val = symbol.get_variant_docs().unwrap();
             symbols_line.push_str(symbol_val);
         }
 
         let tokens = LexerIter::new(&symbols_line);
-        let mut symbols_iter = SymbolType::iter();
+        let mut symbols_iter = SymbolKind::iter();
         let mut columns = 0;
 
-        for Token { span, val, typ } in tokens {
+        for Token { span, val, kind } in tokens {
             let symbol = symbols_iter.next().unwrap();
             let symbol_val = symbol.get_variant_docs().unwrap();
 
@@ -462,21 +462,21 @@ mod tests {
             columns += symbol_val.chars().count();
 
             assert_eq!(val, symbol_val);
-            assert_eq!(typ, TokenType::Symbol(symbol));
+            assert_eq!(kind, TokenKind::Symbol(symbol));
         }
 
         let mut symbols_line = String::new();
-        for symbol in SymbolType::iter() {
+        for symbol in SymbolKind::iter() {
             let symbol_val = symbol.get_variant_docs().unwrap();
             symbols_line.push_str(symbol_val);
             symbols_line.push('\n');
         }
 
         let mut tokens = LexerIter::new(&symbols_line);
-        let mut symbols_iter = SymbolType::iter();
+        let mut symbols_iter = SymbolKind::iter();
         let mut lines = 0;
 
-        while let Some(Token { span, val, typ }) = tokens.next() {
+        while let Some(Token { span, val, kind }) = tokens.next() {
             let symbol = symbols_iter.next().unwrap();
             let symbol_val = symbol.get_variant_docs().unwrap();
 
@@ -498,9 +498,9 @@ mod tests {
             );
 
             assert_eq!(val, symbol_val);
-            assert_eq!(typ, TokenType::Symbol(symbol));
+            assert_eq!(kind, TokenKind::Symbol(symbol));
 
-            let Token { span, val, typ } = tokens.next().unwrap();
+            let Token { span, val, kind } = tokens.next().unwrap();
 
             assert_eq!(
                 span,
@@ -519,16 +519,16 @@ mod tests {
             );
 
             assert_eq!(val, "\n");
-            assert_eq!(typ, TokenType::EOL);
+            assert_eq!(kind, TokenKind::EOL);
             lines += 1;
         }
     }
 
     #[test]
     fn test_keywords_lexing() {
-        for keyword in KeywordType::iter() {
+        for keyword in KeywordKind::iter() {
             let keyword_val = keyword.get_variant_docs().unwrap();
-            let Token { span, val, typ } = LexerIter::new(keyword_val).next().unwrap();
+            let Token { span, val, kind } = LexerIter::new(keyword_val).next().unwrap();
             assert_eq!(
                 span,
                 Span {
@@ -540,7 +540,7 @@ mod tests {
                 }
             );
             assert_eq!(val, keyword_val);
-            assert_eq!(typ, TokenType::Keyword(keyword));
+            assert_eq!(kind, TokenKind::Keyword(keyword));
         }
     }
 }

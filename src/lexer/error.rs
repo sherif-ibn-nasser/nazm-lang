@@ -1,4 +1,4 @@
-use super::{Base, NumType};
+use super::{Base, NumKind};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct LexerError {
@@ -6,12 +6,12 @@ pub struct LexerError {
     pub col: usize,
     /// The length for marking (in characters)
     pub len: usize,
-    /// The type of error
-    pub typ: LexerErrorType,
+    /// The kind of error
+    pub kind: LexerErrorKind,
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum LexerErrorType {
+pub enum LexerErrorKind {
     UnknownToken,
     UnclosedStr,
     UnclosedChar,
@@ -29,5 +29,5 @@ pub enum LexerErrorType {
     InvalidNumSuffix,
     InvalidFloatSuffix,
     InvalidIntSuffixForBase(Base),
-    NumIsOutOfRange(NumType),
+    NumIsOutOfRange(NumKind),
 }

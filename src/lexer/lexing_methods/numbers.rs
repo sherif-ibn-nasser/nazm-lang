@@ -3,7 +3,7 @@ use error::*;
 use crate::lexer::*;
 
 impl<'a> LexerIter<'a> {
-    pub(crate) fn next_num_token(&mut self) -> TokenType {
+    pub(crate) fn next_num_token(&mut self) -> TokenKind {
         let prefix = &self.content[self.stopped_at_bidx..];
 
         if prefix.starts_with("2#") {
@@ -43,10 +43,10 @@ impl<'a> LexerIter<'a> {
         if self.cursor.stopped_at.1 == '#' {
             let digits_len = self.cursor.stopped_at.0.col - start_col;
             self.next_hex_num_token(); // Fabricate and skip any hex digits and any suffixes
-            return TokenType::Bad(vec![LexerError {
+            return TokenKind::Bad(vec![LexerError {
                 col: start_col,
                 len: digits_len,
-                typ: LexerErrorType::InvalidIntBasePrefix,
+                kind: LexerErrorKind::InvalidIntBasePrefix,
             }]);
         }
 
@@ -60,17 +60,17 @@ impl<'a> LexerIter<'a> {
                     // Maybe an int or maybe a float depending on the suffix
                     let int_token =
                         to_int_token(&digits, suffix_str, start_col, digits_len, Base::Dec);
-                    if !matches!(int_token, TokenType::Bad(_)) {
+                    if !matches!(int_token, TokenKind::Bad(_)) {
                         return int_token;
                     }
                     let float_token = to_float_token(&digits, suffix_str, start_col, digits_len);
-                    if let TokenType::Bad(mut errs) = float_token {
-                        errs[0].typ = LexerErrorType::InvalidNumSuffix;
-                        return TokenType::Bad(errs);
+                    if let TokenKind::Bad(mut errs) = float_token {
+                        errs[0].kind = LexerErrorKind::InvalidNumSuffix;
+                        return TokenKind::Bad(errs);
                     }
                     return float_token;
                 }
-                Err(err) => TokenType::Bad(vec![err]),
+                Err(err) => TokenKind::Bad(vec![err]),
             };
         }
 
@@ -123,10 +123,10 @@ impl<'a> LexerIter<'a> {
                     }
                 }
                 _ => {
-                    return TokenType::Bad(vec![LexerError {
+                    return TokenKind::Bad(vec![LexerError {
                         col: start_col,
                         len: 0, // Mark the number instead
-                        typ: LexerErrorType::MissingDigitsAfterExponent,
+                        kind: LexerErrorKind::MissingDigitsAfterExponent,
                     }]);
                 }
             }
@@ -136,7 +136,7 @@ impl<'a> LexerIter<'a> {
 
         match self.next_valid_num_suffix() {
             Ok(suffix_str) => to_float_token(&digits, suffix_str, start_col, digits_len),
-            Err(err) => TokenType::Bad(vec![err]),
+            Err(err) => TokenKind::Bad(vec![err]),
         }
     }
 
@@ -161,7 +161,7 @@ impl<'a> LexerIter<'a> {
         digits
     }
 
-    fn next_num_sys_token(&mut self, base: Base, match_digit: impl Fn(u8) -> bool) -> TokenType {
+    fn next_num_sys_token(&mut self, base: Base, match_digit: impl Fn(u8) -> bool) -> TokenKind {
         let prefix_end_col = self.cursor.stopped_at.0.col;
 
         let digits = self.next_digits_array();
@@ -183,13 +183,13 @@ impl<'a> LexerIter<'a> {
         match suffix {
             Ok(suffix_str) => to_int_token(&digits, suffix_str, prefix_end_col, digits_len, base),
             Err(mut err) => {
-                err.typ = LexerErrorType::InvalidIntSuffixForBase(base);
-                TokenType::Bad(vec![err])
+                err.kind = LexerErrorKind::InvalidIntSuffixForBase(base);
+                TokenKind::Bad(vec![err])
             }
         }
     }
 
-    fn next_hex_num_token(&mut self) -> TokenType {
+    fn next_hex_num_token(&mut self) -> TokenKind {
         let prefix_end_col = self.cursor.stopped_at.0.col;
         let stopped_char = self.cursor.stopped_at.1;
         let mut digits = String::new();
@@ -217,8 +217,8 @@ impl<'a> LexerIter<'a> {
                 to_int_token(&digits, suffix_str, prefix_end_col, digits_len, Base::Hex)
             }
             Err(mut err) => {
-                err.typ = LexerErrorType::InvalidIntSuffixForBase(Base::Hex);
-                TokenType::Bad(vec![err])
+                err.kind = LexerErrorKind::InvalidIntSuffixForBase(Base::Hex);
+                TokenKind::Bad(vec![err])
             }
         }
     }
@@ -248,7 +248,7 @@ impl<'a> LexerIter<'a> {
             _ => Err(LexerError {
                 col: start_col,
                 len: end_col - start_col,
-                typ: LexerErrorType::InvalidNumSuffix,
+                kind: LexerErrorKind::InvalidNumSuffix,
             }),
         }
     }
@@ -260,150 +260,150 @@ fn to_int_token(
     start_col: usize,
     len: usize,
     base: Base,
-) -> TokenType {
+) -> TokenKind {
     let radix = base.clone() as u32;
 
     if suffix_str.is_empty() {
         return match u64::from_str_radix(&digits, radix) {
-            Ok(num) => num_lit_token(NumType::UnspecifiedInt(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::UnspecifiedInt(0)),
+            Ok(num) => num_lit_token(NumKind::UnspecifiedInt(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::UnspecifiedInt(0)),
         };
     }
 
     if suffix_str == "ص" {
         return match isize::from_str_radix(&digits, radix) {
-            Ok(num) => num_lit_token(NumType::I(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::I(0)),
+            Ok(num) => num_lit_token(NumKind::I(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::I(0)),
         };
     }
 
     if suffix_str == "ص1" {
         return match i8::from_str_radix(&digits, radix) {
-            Ok(num) => num_lit_token(NumType::I1(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::I1(0)),
+            Ok(num) => num_lit_token(NumKind::I1(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::I1(0)),
         };
     }
 
     if suffix_str == "ص2" {
         return match i16::from_str_radix(&digits, radix) {
-            Ok(num) => num_lit_token(NumType::I2(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::I2(0)),
+            Ok(num) => num_lit_token(NumKind::I2(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::I2(0)),
         };
     }
 
     if suffix_str == "ص4" {
         return match i32::from_str_radix(&digits, radix) {
-            Ok(num) => num_lit_token(NumType::I4(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::I4(0)),
+            Ok(num) => num_lit_token(NumKind::I4(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::I4(0)),
         };
     }
 
     if suffix_str == "ص8" {
         return match i64::from_str_radix(&digits, radix) {
-            Ok(num) => num_lit_token(NumType::I8(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::I8(0)),
+            Ok(num) => num_lit_token(NumKind::I8(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::I8(0)),
         };
     }
 
     if suffix_str == "م" {
         return match usize::from_str_radix(&digits, radix) {
-            Ok(num) => num_lit_token(NumType::U(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::U(0)),
+            Ok(num) => num_lit_token(NumKind::U(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::U(0)),
         };
     }
 
     if suffix_str == "م1" {
         return match u8::from_str_radix(&digits, radix) {
-            Ok(num) => num_lit_token(NumType::U1(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::U1(0)),
+            Ok(num) => num_lit_token(NumKind::U1(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::U1(0)),
         };
     }
 
     if suffix_str == "م2" {
         return match u16::from_str_radix(&digits, radix) {
-            Ok(num) => num_lit_token(NumType::U2(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::U2(0)),
+            Ok(num) => num_lit_token(NumKind::U2(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::U2(0)),
         };
     }
 
     if suffix_str == "م4" {
         return match u32::from_str_radix(&digits, radix) {
-            Ok(num) => num_lit_token(NumType::U4(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::U4(0)),
+            Ok(num) => num_lit_token(NumKind::U4(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::U4(0)),
         };
     }
 
     if suffix_str == "م8" {
         return match u64::from_str_radix(&digits, radix) {
-            Ok(num) => num_lit_token(NumType::U8(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::U8(0)),
+            Ok(num) => num_lit_token(NumKind::U8(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::U8(0)),
         };
     }
 
-    TokenType::Bad(vec![LexerError {
+    TokenKind::Bad(vec![LexerError {
         col: start_col + len,
         len: suffix_str.len(),
-        typ: LexerErrorType::InvalidIntSuffixForBase(base),
+        kind: LexerErrorKind::InvalidIntSuffixForBase(base),
     }])
 }
 
-fn to_float_token(digits: &str, suffix_str: &str, start_col: usize, len: usize) -> TokenType {
+fn to_float_token(digits: &str, suffix_str: &str, start_col: usize, len: usize) -> TokenKind {
     if suffix_str.is_empty() {
         return match digits.parse() {
-            Ok(num) => num_lit_token(NumType::UnspecifiedFloat(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::UnspecifiedFloat(0.0)),
+            Ok(num) => num_lit_token(NumKind::UnspecifiedFloat(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::UnspecifiedFloat(0.0)),
         };
     }
 
     if suffix_str == "ع4" {
         return match digits.parse() {
-            Ok(num) => num_lit_token(NumType::F4(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::F4(0.0)),
+            Ok(num) => num_lit_token(NumKind::F4(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::F4(0.0)),
         };
     }
 
     if suffix_str == "ع8" {
         return match digits.parse() {
-            Ok(num) => num_lit_token(NumType::F8(num)),
-            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumType::F8(0.0)),
+            Ok(num) => num_lit_token(NumKind::F8(num)),
+            Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::F8(0.0)),
         };
     }
 
-    TokenType::Bad(vec![LexerError {
+    TokenKind::Bad(vec![LexerError {
         col: start_col + len,
         len: suffix_str.len(),
-        typ: LexerErrorType::InvalidFloatSuffix,
+        kind: LexerErrorKind::InvalidFloatSuffix,
     }])
 }
 
 #[inline]
-fn missing_digits_after_base_prefix_bad_token(col: usize) -> TokenType {
-    TokenType::Bad(vec![LexerError {
+fn missing_digits_after_base_prefix_bad_token(col: usize) -> TokenKind {
+    TokenKind::Bad(vec![LexerError {
         col: col,
         len: 0, // Mark the prefix instead
-        typ: LexerErrorType::MissingDigitsAfterBasePrefix,
+        kind: LexerErrorKind::MissingDigitsAfterBasePrefix,
     }])
 }
 
 #[inline]
-fn invalid_digit_for_base_prefix_bad_token(base: Base, col: usize) -> TokenType {
-    TokenType::Bad(vec![LexerError {
+fn invalid_digit_for_base_prefix_bad_token(base: Base, col: usize) -> TokenKind {
+    TokenKind::Bad(vec![LexerError {
         col: col,
         len: 1, // The first digit
-        typ: LexerErrorType::InvalidDigitForBase(base),
+        kind: LexerErrorKind::InvalidDigitForBase(base),
     }])
 }
 
 #[inline]
-fn num_is_out_of_range_bad_token(col: usize, len: usize, num_type: NumType) -> TokenType {
-    TokenType::Bad(vec![LexerError {
+fn num_is_out_of_range_bad_token(col: usize, len: usize, num_type: NumKind) -> TokenKind {
+    TokenKind::Bad(vec![LexerError {
         col: col,
         len: len,
-        typ: LexerErrorType::NumIsOutOfRange(num_type),
+        kind: LexerErrorKind::NumIsOutOfRange(num_type),
     }])
 }
 
 #[inline]
-fn num_lit_token(num_type: NumType) -> TokenType {
-    TokenType::Literal(LiteralTokenType::Num(num_type))
+fn num_lit_token(num_type: NumKind) -> TokenKind {
+    TokenKind::Literal(LiteralKind::Num(num_type))
 }

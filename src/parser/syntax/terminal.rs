@@ -1,6 +1,6 @@
 use crate::{
     parser::{NazmcParse, ParseResult, SyntaxNode, TokensIter},
-    KeywordType, SymbolType, Token, TokenType,
+    KeywordKind, SymbolKind, Token, TokenKind,
 };
 
 use paste::paste;
@@ -15,7 +15,7 @@ impl NazmcParse for ParseResult<Id> {
             Some(Token {
                 val,
                 span,
-                typ: TokenType::Id,
+                kind: TokenKind::Id,
             }) => {
                 let ok = ParseResult::Parsed(SyntaxNode {
                     span: *span,
@@ -29,7 +29,7 @@ impl NazmcParse for ParseResult<Id> {
             }
             Some(token) => ParseResult::Unexpected {
                 span: token.span,
-                found: token.typ.clone(),
+                found: token.kind.clone(),
                 is_start_failure: true,
             },
             None => ParseResult::unexpected_eof(iter.peek_start_span()),
@@ -47,7 +47,7 @@ macro_rules! create_keyword_parser {
                 fn parse(iter: &mut TokensIter) -> Self {
 
                     match iter.recent() {
-                        Some(Token { span, typ: TokenType::Keyword(KeywordType::$keyword), .. }) => {
+                        Some(Token { span, kind: TokenKind::Keyword(KeywordKind::$keyword), .. }) => {
                             let ok = ParseResult::Parsed(SyntaxNode {
                                 span: *span,
                                 is_broken: false,
@@ -58,7 +58,7 @@ macro_rules! create_keyword_parser {
                         }
                         Some(token) => ParseResult::Unexpected {
                             span: token.span,
-                            found: token.typ.clone(),
+                            found: token.kind.clone(),
                             is_start_failure: true,
                         },
                         None => ParseResult::unexpected_eof(iter.peek_start_span()),
@@ -79,7 +79,7 @@ macro_rules! create_symbol_parser {
                 fn parse(iter: &mut TokensIter) -> Self {
 
                     match iter.recent() {
-                        Some(Token { span, typ: TokenType::Symbol(SymbolType::$symbol), .. }) =>
+                        Some(Token { span, kind: TokenKind::Symbol(SymbolKind::$symbol), .. }) =>
                         {
                             let ok = ParseResult::Parsed(SyntaxNode {
                                 span: *span,
@@ -91,7 +91,7 @@ macro_rules! create_symbol_parser {
                         }
                         Some(token) => ParseResult::Unexpected {
                             span: token.span,
-                            found: token.typ.clone(),
+                            found: token.kind.clone(),
                             is_start_failure: true,
                         },
                         None => ParseResult::unexpected_eof(iter.peek_start_span()),
@@ -164,7 +164,7 @@ create_symbol_parser!(Equal);
 mod tests {
     use crate::{
         parser::{IsParsed, NazmcParse, ParseResult, TokensIter},
-        LexerIter, TokenType,
+        LexerIter, TokenKind,
     };
 
     use super::{
@@ -217,7 +217,7 @@ mod tests {
         assert!(matches!(
             _close_paren,
             ParseResult::Unexpected {
-                found: TokenType::Id,
+                found: TokenKind::Id,
                 ..
             }
         ));

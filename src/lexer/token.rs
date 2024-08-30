@@ -7,34 +7,34 @@ use strum::EnumIter;
 pub struct Token<'a> {
     pub val: &'a str,
     pub span: Span,
-    pub typ: TokenType,
+    pub kind: TokenKind,
 }
 
 #[derive(Clone, PartialEq, Debug, Default)]
-pub enum TokenType {
+pub enum TokenKind {
     #[default]
     EOF,
     EOL,
     Space,
     LineComment,
     DelimitedComment,
-    Literal(LiteralTokenType),
+    Literal(LiteralKind),
     Id,
-    Symbol(SymbolType),
-    Keyword(KeywordType),
+    Symbol(SymbolKind),
+    Keyword(KeywordKind),
     Bad(Vec<LexerError>),
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum LiteralTokenType {
+pub enum LiteralKind {
     Str(String),
     Char(char),
     Bool(bool),
-    Num(NumType),
+    Num(NumKind),
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum NumType {
+pub enum NumKind {
     F4(f32),
     F8(f64),
     I(isize),
@@ -60,7 +60,7 @@ pub enum Base {
 }
 
 #[derive(Clone, PartialEq, Debug, DocumentedVariants, DocumentedFields, EnumIter)]
-pub enum SymbolType {
+pub enum SymbolKind {
     /// <..<
     LessDotDotLess,
     /// <..
@@ -170,7 +170,7 @@ pub enum SymbolType {
 }
 
 #[derive(DocumentedVariants, Debug, Clone, PartialEq, EnumIter)]
-pub enum KeywordType {
+pub enum KeywordKind {
     /// دالة
     Fn,
     /// احجز

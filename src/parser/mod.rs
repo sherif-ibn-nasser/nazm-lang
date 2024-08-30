@@ -8,7 +8,7 @@ use nazmc_parse_derive::NazmcParse;
 use syntax::{CloseParenthesisSymbol, FnKeyword, Id, OpenParenthesisSymbol};
 use tokens_iter::TokensIter;
 
-use crate::{Token, TokenType};
+use crate::{Token, TokenKind};
 
 pub(crate) mod syntax;
 
@@ -45,7 +45,7 @@ where
     Parsed(SyntaxNode<Tree>),
     Unexpected {
         span: Span,
-        found: TokenType,
+        found: TokenKind,
         is_start_failure: bool,
     },
 }
@@ -264,7 +264,7 @@ where
     pub(crate) fn unexpected_eof(span: Span) -> Self {
         Self::Unexpected {
             span,
-            found: TokenType::EOF,
+            found: TokenKind::EOF,
             is_start_failure: true,
         }
     }

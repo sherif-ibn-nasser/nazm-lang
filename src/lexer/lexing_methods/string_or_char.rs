@@ -3,7 +3,7 @@ use error::*;
 use crate::lexer::*;
 
 impl<'a> LexerIter<'a> {
-    pub(crate) fn next_str_or_char_token(&mut self) -> TokenType {
+    pub(crate) fn next_str_or_char_token(&mut self) -> TokenKind {
         let (start, quote) = self.cursor.stopped_at;
 
         let is_char = quote == '\'';
@@ -15,11 +15,11 @@ impl<'a> LexerIter<'a> {
         loop {
             match self.next_valid_nazm_rust_char_in_str(quote) {
                 Err(mut err) => {
-                    if err.typ == LexerErrorType::UnclosedStr {
+                    if err.kind == LexerErrorKind::UnclosedStr {
                         if is_char {
-                            err.typ = LexerErrorType::UnclosedChar;
+                            err.kind = LexerErrorKind::UnclosedChar;
                         }
-                        return TokenType::Bad(vec![err]); // Return unclosed delimiter errors early before validation of typed chars
+                        return TokenKind::Bad(vec![err]); // Return unclosed delimiter errors early before validation of typed chars
                     }
 
                     errs.push(err);
@@ -36,38 +36,38 @@ impl<'a> LexerIter<'a> {
 
         if !is_char {
             if !errs.is_empty() {
-                return TokenType::Bad(errs);
+                return TokenKind::Bad(errs);
             }
 
-            return TokenType::Literal(LiteralTokenType::Str(rust_str_lit));
+            return TokenKind::Literal(LiteralKind::Str(rust_str_lit));
         }
 
         let mut iter = rust_str_lit.chars();
 
         let ch = match iter.next() {
             None => {
-                return TokenType::Bad(vec![LexerError {
+                return TokenKind::Bad(vec![LexerError {
                     col: start.col,
                     len: 1,
-                    typ: LexerErrorType::ZeroChars,
+                    kind: LexerErrorKind::ZeroChars,
                 }])
             }
             Some(ch) => ch,
         };
 
         if iter.next().is_some() {
-            return TokenType::Bad(vec![LexerError {
+            return TokenKind::Bad(vec![LexerError {
                 col: start.col,
                 len: 1,
-                typ: LexerErrorType::ManyChars,
+                kind: LexerErrorKind::ManyChars,
             }]);
         }
 
         if !errs.is_empty() {
-            return TokenType::Bad(errs);
+            return TokenKind::Bad(errs);
         }
 
-        return TokenType::Literal(LiteralTokenType::Char(ch));
+        return TokenKind::Literal(LiteralKind::Char(ch));
     }
 
     fn next_valid_nazm_rust_char_in_str(
@@ -112,7 +112,7 @@ impl<'a> LexerIter<'a> {
             return Err(LexerError {
                 col: start.col + 1, // To start marking after `ي`
                 len: code_point_str.len(),
-                typ: LexerErrorType::UnicodeCodePointHexDigitOnly,
+                kind: LexerErrorKind::UnicodeCodePointHexDigitOnly,
             });
         }
 
@@ -123,7 +123,7 @@ impl<'a> LexerIter<'a> {
             None => Err(LexerError {
                 col: start.col + 1, // To start marking after `ي`
                 len: 4,             // The 4 digits
-                typ: LexerErrorType::InvalidUnicodeCodePoint,
+                kind: LexerErrorKind::InvalidUnicodeCodePoint,
             }),
         }
     }
@@ -133,7 +133,7 @@ impl<'a> LexerIter<'a> {
         Err(LexerError {
             col: self.cursor.stopped_at.0.col,
             len: 1,
-            typ: LexerErrorType::UnclosedStr,
+            kind: LexerErrorKind::UnclosedStr,
         })
     }
 
@@ -147,7 +147,7 @@ impl<'a> LexerIter<'a> {
             Err(LexerError {
                 col: start.col + 1, // To start marking after `ي`
                 len: 4,             // The 4 digits
-                typ: LexerErrorType::KufrOrInvalidChar,
+                kind: LexerErrorKind::KufrOrInvalidChar,
             })
         } else {
             Ok(Some(ch))
@@ -162,7 +162,7 @@ impl<'a> LexerIter<'a> {
             None => Err(LexerError {
                 col: start.col,
                 len: 1,
-                typ: LexerErrorType::UnknownEscapeSequence,
+                kind: LexerErrorKind::UnknownEscapeSequence,
             }),
             some => Ok(some),
         }
