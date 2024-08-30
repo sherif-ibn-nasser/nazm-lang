@@ -583,24 +583,36 @@ mod tests {
     pub(crate) struct SimpleFn {
         pub(crate) _fn: SyntaxNode<FnKeyword>,
         pub(crate) _id: ParseResult<Id>,
-        pub(crate) _params_decl: ParseResult<FnParams>,
+        pub(crate) _params_decl: ParseResult<FnParamsDecl>,
     }
 
     #[derive(NazmcParse)]
-    pub(crate) struct FnParams {
+    pub(crate) struct FnParamsDecl {
         pub(crate) _open_paren: SyntaxNode<OpenParenthesisSymbol>,
-        pub(crate) _params: ZeroOrMany<FnParamWithComma, FnParamWithCloseParenthesis>,
+        pub(crate) _fn_param_close: ParseResult<CloseFnParamsDecl>,
     }
 
     #[derive(NazmcParse)]
-    pub(crate) struct FnParamWithComma {
-        _fn_param: SyntaxNode<FnParam>,
+    pub(crate) enum CloseFnParamsDecl {
+        NoParams(CloseParenthesisSymbol),
+        WithParams(Box<FnDeclWithParams>),
+    }
+
+    #[derive(NazmcParse)]
+    pub(crate) struct FnDeclWithParams {
+        pub(crate) _first_param: ParseResult<FnParam>,
+        pub(crate) _params: ZeroOrMany<CommaWithFnParam, CommaWithCloseParenthesis>,
+    }
+
+    #[derive(NazmcParse)]
+    pub(crate) struct CommaWithFnParam {
         _comma: SyntaxNode<CommaSymbol>,
+        _fn_param: SyntaxNode<FnParam>,
     }
 
     #[derive(NazmcParse)]
-    pub(crate) struct FnParamWithCloseParenthesis {
-        _fn_param: Optional<FnParam>,
+    pub(crate) struct CommaWithCloseParenthesis {
+        _comma: Optional<CommaSymbol>,
         _close_paren: SyntaxNode<CloseParenthesisSymbol>,
     }
 
@@ -631,15 +643,25 @@ mod tests {
         assert!(params_decl.is_broken);
         assert!(!params_decl.tree._open_paren.is_broken);
 
-        let params = params_decl.tree._params;
-        assert!(params.terminator.is_parsed_and_valid()); // It found the close paren
+        let close_params_decl = params_decl.tree._fn_param_close.unwrap();
 
-        for item in params.items {
+        assert!(close_params_decl.is_broken);
+
+        let CloseFnParamsDecl::WithParams(with_params) = close_params_decl.tree else {
+            panic!()
+        };
+
+        assert!(with_params._first_param.is_unexpected());
+        println!("{:?}", with_params._first_param);
+
+        println!("-----");
+        for item in with_params._params.items {
             println!("{:?}", item)
         }
 
         println!("-----");
-        println!("{:?}", params.terminator);
+        println!("{:?}", with_params._params.terminator);
+        assert!(with_params._params.terminator.is_parsed_and_valid());
     }
 
     #[test]
@@ -688,13 +710,14 @@ mod tests {
         assert!(!params_decl.is_broken);
         assert!(!params_decl.tree._open_paren.is_broken);
 
-        let params = params_decl.tree._params;
-        assert!(params.items.is_empty());
-        let terminator = params.terminator.unwrap();
+        let close_params_decl = params_decl.tree._fn_param_close.unwrap();
 
-        assert!(!terminator.is_broken);
-        assert!(terminator.tree._fn_param.is_none()); // No params
-        assert!(!terminator.tree._close_paren.is_broken);
+        assert!(!close_params_decl.is_broken);
+
+        assert!(matches!(
+            close_params_decl.tree,
+            CloseFnParamsDecl::NoParams(CloseParenthesisSymbol)
+        ));
     }
 
     #[test]
@@ -716,12 +739,21 @@ mod tests {
         assert!(!params_decl.is_broken);
         assert!(!params_decl.tree._open_paren.is_broken);
 
-        let params = params_decl.tree._params;
-        assert!(params.items.is_empty());
-        let terminator = params.terminator.unwrap();
+        let close_params_decl = params_decl.tree._fn_param_close.unwrap();
+
+        assert!(!close_params_decl.is_broken);
+
+        let CloseFnParamsDecl::WithParams(with_params) = close_params_decl.tree else {
+            panic!()
+        };
+
+        assert!(with_params._first_param.is_parsed_and_valid());
+        assert!(with_params._params.is_parsed_and_valid());
+        assert!(with_params._params.items.is_empty());
+        let terminator = with_params._params.terminator.unwrap();
 
         assert!(!terminator.is_broken);
-        assert!(terminator.tree._fn_param.is_some_and_valid()); // The first param
+        assert!(terminator.tree._comma.is_none());
         assert!(!terminator.tree._close_paren.is_broken);
     }
 
@@ -744,13 +776,21 @@ mod tests {
         assert!(!params_decl.is_broken);
         assert!(!params_decl.tree._open_paren.is_broken);
 
-        let params = params_decl.tree._params;
-        assert!(params.items.len() == 1); // One param with a comma found
-        assert!(params.items[0].is_parsed_and_valid());
-        let terminator = params.terminator.unwrap();
+        let close_params_decl = params_decl.tree._fn_param_close.unwrap();
+
+        assert!(!close_params_decl.is_broken);
+
+        let CloseFnParamsDecl::WithParams(with_params) = close_params_decl.tree else {
+            panic!()
+        };
+
+        assert!(with_params._first_param.is_parsed_and_valid());
+        assert!(with_params._params.is_parsed_and_valid());
+        assert!(with_params._params.items.is_empty());
+        let terminator = with_params._params.terminator.unwrap();
 
         assert!(!terminator.is_broken);
-        assert!(terminator.tree._fn_param.is_none()); // No params after the trailing comma
+        assert!(terminator.tree._comma.is_some_and_valid());
         assert!(!terminator.tree._close_paren.is_broken);
     }
 
@@ -773,13 +813,22 @@ mod tests {
         assert!(!params_decl.is_broken);
         assert!(!params_decl.tree._open_paren.is_broken);
 
-        let params = params_decl.tree._params;
-        assert!(params.items.len() == 1); // One param with a comma are found
-        assert!(params.items[0].is_parsed_and_valid());
-        let terminator = params.terminator.unwrap();
+        let close_params_decl = params_decl.tree._fn_param_close.unwrap();
+
+        assert!(!close_params_decl.is_broken);
+
+        let CloseFnParamsDecl::WithParams(with_params) = close_params_decl.tree else {
+            panic!()
+        };
+
+        assert!(with_params._first_param.is_parsed_and_valid());
+        assert!(with_params._params.is_parsed_and_valid());
+        assert!(with_params._params.items.len() == 1);
+        assert!(with_params._params.items[0].is_parsed_and_valid());
+        let terminator = with_params._params.terminator.unwrap();
 
         assert!(!terminator.is_broken);
-        assert!(terminator.tree._fn_param.is_some_and_valid()); // A param after the lat comma is found
+        assert!(terminator.tree._comma.is_none());
         assert!(!terminator.tree._close_paren.is_broken);
     }
 
@@ -802,14 +851,22 @@ mod tests {
         assert!(!params_decl.is_broken);
         assert!(!params_decl.tree._open_paren.is_broken);
 
-        let params = params_decl.tree._params;
-        assert!(params.items.len() == 2); // Two param with a comma are found
-        assert!(params.items[0].is_parsed_and_valid());
-        assert!(params.items[1].is_parsed_and_valid());
-        let terminator = params.terminator.unwrap();
+        let close_params_decl = params_decl.tree._fn_param_close.unwrap();
+
+        assert!(!close_params_decl.is_broken);
+
+        let CloseFnParamsDecl::WithParams(with_params) = close_params_decl.tree else {
+            panic!()
+        };
+
+        assert!(with_params._first_param.is_parsed_and_valid());
+        assert!(with_params._params.is_parsed_and_valid());
+        assert!(with_params._params.items.len() == 1);
+        assert!(with_params._params.items[0].is_parsed_and_valid());
+        let terminator = with_params._params.terminator.unwrap();
 
         assert!(!terminator.is_broken);
-        assert!(terminator.tree._fn_param.is_none()); // No params found after the trailing comma
+        assert!(terminator.tree._comma.is_some_and_valid());
         assert!(!terminator.tree._close_paren.is_broken);
     }
 }
