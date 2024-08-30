@@ -575,8 +575,8 @@ mod tests {
 
     #[derive(NazmcParse)]
     pub(crate) enum TermBinOp {
-        Plus(SyntaxNode<PlusSymbol>),
-        Minus(SyntaxNode<MinusSymbol>),
+        Plus(PlusSymbol),
+        Minus(Box<MinusSymbol>),
     }
 
     #[derive(NazmcParse)]
@@ -651,46 +651,22 @@ mod tests {
         let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
         assert!(parse_result.is_parsed_and_valid());
         let op = parse_result.unwrap().tree;
-        assert!(matches!(
-            op,
-            TermBinOp::Plus(SyntaxNode {
-                is_broken: false,
-                ..
-            })
-        ));
+        assert!(matches!(op, TermBinOp::Plus(_)));
 
         let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
         assert!(parse_result.is_parsed_and_valid());
         let op = parse_result.unwrap().tree;
-        assert!(matches!(
-            op,
-            TermBinOp::Minus(SyntaxNode {
-                is_broken: false,
-                ..
-            })
-        ));
+        assert!(matches!(op, TermBinOp::Minus(_)));
 
         let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
         assert!(parse_result.is_parsed_and_valid());
         let op = parse_result.unwrap().tree;
-        assert!(matches!(
-            op,
-            TermBinOp::Minus(SyntaxNode {
-                is_broken: false,
-                ..
-            })
-        ));
+        assert!(matches!(op, TermBinOp::Minus(_)));
 
         let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
         assert!(parse_result.is_parsed_and_valid());
         let op = parse_result.unwrap().tree;
-        assert!(matches!(
-            op,
-            TermBinOp::Plus(SyntaxNode {
-                is_broken: false,
-                ..
-            })
-        ));
+        assert!(matches!(op, TermBinOp::Plus(_)));
     }
 
     #[test]

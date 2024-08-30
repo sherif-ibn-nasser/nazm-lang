@@ -51,7 +51,7 @@ fn derive_for_enum(enum_name: &Ident, data_enum: DataEnum) -> TokenStream2 {
     let emit_err = |span: &Span2| {
         emit_error!(
             span,
-            "Variant must be a tuple with a one field of the type SyntaxNode<_> or boxed where ParseResult<_>: NazmcParse"
+            "Variant must be a tuple with a one field _ or Box<_> where ParseResult<_>: NazmcParse"
         )
     };
 
@@ -76,13 +76,19 @@ fn derive_for_enum(enum_name: &Ident, data_enum: DataEnum) -> TokenStream2 {
         let ty_extracted = extract_segment_and_generic_args(ty);
 
         if ty_extracted.is_none() {
-            emit_err(&ty.span());
+            if let Type::Path(TypePath { qself: None, path }) = ty {
+                if let Some(_) = path.get_ident() {
+                    types.push((ty, false)); // Value is not boxed
+                } else {
+                    emit_err(&ty.span());
+                }
+            }
             continue;
         }
 
         let (segment, args) = ty_extracted.unwrap();
 
-        if args.len() != 1 || segment != "SyntaxNode" && segment != "Box" {
+        if segment != "Box" {
             emit_err(&ty.span());
             continue;
         }
@@ -92,31 +98,7 @@ fn derive_for_enum(enum_name: &Ident, data_enum: DataEnum) -> TokenStream2 {
             continue;
         };
 
-        if segment == "SyntaxNode" {
-            types.push((ty, false)); // Value is not boxed
-            continue;
-        }
-
-        let ty_extracted = extract_segment_and_generic_args(ty);
-
-        if ty_extracted.is_none() {
-            emit_err(&ty.span());
-            continue;
-        }
-
-        let (segment, args) = ty_extracted.unwrap();
-
-        if args.len() != 1 || segment != "SyntaxNode" {
-            emit_err(&ty.span());
-            continue;
-        }
-
-        let GenericArgument::Type(ty) = &args[0] else {
-            emit_err(&ty.span());
-            continue;
-        };
-
-        types.push((ty, true)); // Value is not boxed
+        types.push((ty, true)); // Value is boxed
     }
 
     // Errors occured in fields
@@ -137,18 +119,18 @@ fn derive_for_enum(enum_name: &Ident, data_enum: DataEnum) -> TokenStream2 {
     for (i, (variant, (ty, is_boxed))) in iter {
         let variant_name = &variant.ident;
         let return_tree_stm = if *is_boxed {
-            quote! { Box::new(tree) }
+            quote! { Box::new(node.tree) }
         } else {
-            quote! { tree }
+            quote! { node.tree }
         };
 
         let variant_stm = if i < last_variant_idx {
             quote! {
-                if let ParseResult::Parsed(tree) = <ParseResult<#ty>>::parse(iter) {
+                if let ParseResult::Parsed(node) = <ParseResult<#ty>>::parse(iter) {
                     return ParseResult::Parsed(
                         SyntaxNode {
-                            span: tree.span,
-                            is_broken: tree.is_broken,
+                            span: node.span,
+                            is_broken: node.is_broken,
                             tree: #enum_name::#variant_name(#return_tree_stm),
                         }
                     );
@@ -159,11 +141,11 @@ fn derive_for_enum(enum_name: &Ident, data_enum: DataEnum) -> TokenStream2 {
         } else {
             quote! {
                 match <ParseResult<#ty>>::parse(iter) {
-                    ParseResult::Parsed(tree) => {
+                    ParseResult::Parsed(node) => {
                         return ParseResult::Parsed(
                             SyntaxNode {
-                                span: tree.span,
-                                is_broken: tree.is_broken,
+                                span: node.span,
+                                is_broken: node.is_broken,
                                 tree: #enum_name::#variant_name(#return_tree_stm),
                             }
                         );
