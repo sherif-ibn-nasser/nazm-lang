@@ -6,7 +6,7 @@ use lexer::*;
 use nazmc_parse_derive::NazmcParse;
 use owo_colors::{OwoColorize, XtermColors};
 use parser::{
-    ast::{CloseParenthesisSymbol, FnKeyword, Id, OpenParenthesisSymbol},
+    syntax::{CloseParenthesisSymbol, FnKeyword, Id, OpenParenthesisSymbol},
     tokens_iter::TokensIter,
     NazmcParse, ParseResult, SyntaxNode,
 };

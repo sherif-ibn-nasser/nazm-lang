@@ -1,16 +1,16 @@
 use std::fmt::Debug;
 
-use ast::{CloseParenthesisSymbol, FnKeyword, Id, OpenParenthesisSymbol};
 /// This module defines the core components and traits required for parsing an Abstract Syntax Tree (AST)
 /// in the Nazmc language parser. It provides the foundational structures and parsing logic for different
 /// AST node types, ensuring that the syntax is correctly interpreted and processed.
 use nazmc_diagnostics::span::Span;
 use nazmc_parse_derive::NazmcParse;
+use syntax::{CloseParenthesisSymbol, FnKeyword, Id, OpenParenthesisSymbol};
 use tokens_iter::TokensIter;
 
 use crate::{Token, TokenType};
 
-pub(crate) mod ast;
+pub(crate) mod syntax;
 
 pub(crate) mod tokens_iter;
 
@@ -567,7 +567,7 @@ where
 #[cfg(test)]
 mod tests {
 
-    use ast::*;
+    use syntax::*;
 
     use crate::LexerIter;
 

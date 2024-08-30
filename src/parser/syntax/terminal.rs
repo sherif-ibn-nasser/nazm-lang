@@ -1,5 +1,3 @@
-use nazmc_diagnostics::span::Span;
-
 use crate::{
     parser::{NazmcParse, ParseResult, SyntaxNode, TokensIter},
     KeywordType, SymbolType, Token, TokenType,
