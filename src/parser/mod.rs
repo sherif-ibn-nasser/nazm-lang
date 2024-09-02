@@ -586,8 +586,124 @@ mod tests {
         pub(crate) _params_decl: ParseResult<FnParamsDecl>,
     }
 
-    #[derive(NazmcParse)]
     pub(crate) struct FnParamsDecl {
+        pub(crate) _open_paren: SyntaxNode<OpenParenthesisSymbol>,
+        pub(crate) _params: Optional<FnParams>,
+        pub(crate) _close_paren: ParseResult<CloseParenthesisSymbol>,
+    }
+
+    impl NazmcParse for ParseResult<FnParamsDecl> {
+        fn parse(iter: &mut TokensIter) -> Self {
+            let parse_result = ParseResult::<FnParamsDeclImpl>::parse(iter);
+
+            let decl_impl_node = match parse_result {
+                ParseResult::Parsed(decl_impl) => decl_impl,
+                ParseResult::Unexpected {
+                    span,
+                    found,
+                    is_start_failure,
+                } => {
+                    return ParseResult::Unexpected {
+                        span,
+                        found,
+                        is_start_failure,
+                    }
+                }
+            };
+
+            let is_broken = decl_impl_node.is_broken;
+            let span = decl_impl_node.span;
+            let open_paren = decl_impl_node.tree._open_paren;
+
+            // The unexpected case is unreachable as it will be include in WithParams case, so we can safely unwrap it
+            let close = decl_impl_node.tree._fn_param_close.unwrap();
+
+            let fn_decl_with_params = match close.tree {
+                CloseFnParamsDecl::NoParams(close_paren) => {
+                    return ParseResult::Parsed(SyntaxNode {
+                        span,
+                        is_broken,
+                        tree: FnParamsDecl {
+                            _open_paren: open_paren,
+                            _params: Optional::None,
+                            _close_paren: ParseResult::Parsed(SyntaxNode {
+                                span: close.span,
+                                is_broken: close.is_broken,
+                                tree: close_paren,
+                            }),
+                        },
+                    })
+                }
+                CloseFnParamsDecl::WithParams(fn_decl_with_params) => fn_decl_with_params,
+            };
+
+            let first_param = fn_decl_with_params._first_param;
+            let rest_params = fn_decl_with_params._params.items;
+            let (trailing_comma, close_paren) = match fn_decl_with_params._params.terminator {
+                ParseResult::Parsed(node) => (
+                    node.tree._comma,
+                    ParseResult::Parsed(node.tree._close_paren),
+                ),
+                ParseResult::Unexpected {
+                    span,
+                    found,
+                    is_start_failure,
+                } => (
+                    Optional::None,
+                    ParseResult::Unexpected {
+                        span,
+                        found,
+                        is_start_failure,
+                    },
+                ),
+            };
+
+            let mut params_span = first_param.span().unwrap();
+
+            if let Optional::Some(comma_node) = &trailing_comma {
+                params_span = params_span.merged_with(&comma_node.span)
+            } else if let Option::Some(last_param) = rest_params.last() {
+                params_span = params_span.merged_with(&last_param.span().unwrap())
+            }
+
+            let params = SyntaxNode {
+                span: params_span,
+                is_broken: !first_param.is_parsed_and_valid()
+                    || rest_params.iter().any(|p| !p.is_parsed_and_valid())
+                    || !trailing_comma.is_parsed_and_valid(),
+                tree: FnParams {
+                    _first_param: first_param,
+                    _rest_params: rest_params,
+                    _trailing_comma: trailing_comma,
+                },
+            };
+
+            ParseResult::Parsed(SyntaxNode {
+                span,
+                is_broken,
+                tree: FnParamsDecl {
+                    _open_paren: open_paren,
+                    _params: Optional::Some(params),
+                    _close_paren: close_paren,
+                },
+            })
+        }
+    }
+
+    pub(crate) struct FnParams {
+        pub(crate) _first_param: ParseResult<FnParam>,
+        pub(crate) _rest_params: Vec<ParseResult<CommaWithFnParam>>,
+        pub(crate) _trailing_comma: Optional<CommaSymbol>,
+    }
+
+    impl NazmcParse for ParseResult<FnParams> {
+        fn parse(_iter: &mut TokensIter) -> Self {
+            unreachable!() // Just  added to usee it as Optional
+        }
+    }
+
+    #[derive(NazmcParse)]
+    pub(crate) struct FnParamsDeclImpl {
         pub(crate) _open_paren: SyntaxNode<OpenParenthesisSymbol>,
         pub(crate) _fn_param_close: ParseResult<CloseFnParamsDecl>,
     }
@@ -631,10 +747,7 @@ mod tests {
         tokens_iter.next(); // Init recent
 
         let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
-
-        let ParseResult::Parsed(fn_node) = parse_result else {
-            panic!();
-        };
+        let fn_node = parse_result.unwrap();
 
         assert!(fn_node.is_broken);
         assert!(!fn_node.tree._fn.is_broken);
@@ -642,26 +755,18 @@ mod tests {
         let params_decl = fn_node.tree._params_decl.unwrap();
         assert!(params_decl.is_broken);
         assert!(!params_decl.tree._open_paren.is_broken);
+        assert!(params_decl.tree._close_paren.is_parsed_and_valid());
 
-        let close_params_decl = params_decl.tree._fn_param_close.unwrap();
+        assert!(params_decl.tree._params.is_some_and_broken());
+        let params = params_decl.tree._params.unwrap().tree;
 
-        assert!(close_params_decl.is_broken);
+        assert!(params._first_param.is_unexpected());
+        println!("{:?}\n----------", params._first_param);
+        assert!(params._trailing_comma.is_some_and_valid());
 
-        let CloseFnParamsDecl::WithParams(with_params) = close_params_decl.tree else {
-            panic!()
-        };
-
-        assert!(with_params._first_param.is_unexpected());
-        println!("{:?}", with_params._first_param);
-
-        println!("-----");
-        for item in with_params._params.items {
-            println!("{:?}", item)
+        for param in params._rest_params {
+            println!("{:?}", param)
         }
-
-        println!("-----");
-        println!("{:?}", with_params._params.terminator);
-        assert!(with_params._params.terminator.is_parsed_and_valid());
     }
 
     #[test]
@@ -709,15 +814,9 @@ mod tests {
         let params_decl = fn_node.tree._params_decl.unwrap();
         assert!(!params_decl.is_broken);
         assert!(!params_decl.tree._open_paren.is_broken);
+        assert!(params_decl.tree._close_paren.is_parsed_and_valid());
 
-        let close_params_decl = params_decl.tree._fn_param_close.unwrap();
-
-        assert!(!close_params_decl.is_broken);
-
-        assert!(matches!(
-            close_params_decl.tree,
-            CloseFnParamsDecl::NoParams(CloseParenthesisSymbol)
-        ));
+        assert!(params_decl.tree._params.is_none());
     }
 
     #[test]
@@ -738,23 +837,14 @@ mod tests {
         let params_decl = fn_node.tree._params_decl.unwrap();
         assert!(!params_decl.is_broken);
         assert!(!params_decl.tree._open_paren.is_broken);
+        assert!(params_decl.tree._close_paren.is_parsed_and_valid());
 
-        let close_params_decl = params_decl.tree._fn_param_close.unwrap();
+        assert!(params_decl.tree._params.is_some_and_valid());
+        let params = params_decl.tree._params.unwrap().tree;
 
-        assert!(!close_params_decl.is_broken);
-
-        let CloseFnParamsDecl::WithParams(with_params) = close_params_decl.tree else {
-            panic!()
-        };
-
-        assert!(with_params._first_param.is_parsed_and_valid());
-        assert!(with_params._params.is_parsed_and_valid());
-        assert!(with_params._params.items.is_empty());
-        let terminator = with_params._params.terminator.unwrap();
-
-        assert!(!terminator.is_broken);
-        assert!(terminator.tree._comma.is_none());
-        assert!(!terminator.tree._close_paren.is_broken);
+        assert!(params._first_param.is_parsed_and_valid());
+        assert!(params._rest_params.is_empty());
+        assert!(params._trailing_comma.is_none());
     }
 
     #[test]
@@ -775,23 +865,14 @@ mod tests {
         let params_decl = fn_node.tree._params_decl.unwrap();
         assert!(!params_decl.is_broken);
         assert!(!params_decl.tree._open_paren.is_broken);
+        assert!(params_decl.tree._close_paren.is_parsed_and_valid());
 
-        let close_params_decl = params_decl.tree._fn_param_close.unwrap();
+        assert!(params_decl.tree._params.is_some_and_valid());
+        let params = params_decl.tree._params.unwrap().tree;
 
-        assert!(!close_params_decl.is_broken);
-
-        let CloseFnParamsDecl::WithParams(with_params) = close_params_decl.tree else {
-            panic!()
-        };
-
-        assert!(with_params._first_param.is_parsed_and_valid());
-        assert!(with_params._params.is_parsed_and_valid());
-        assert!(with_params._params.items.is_empty());
-        let terminator = with_params._params.terminator.unwrap();
-
-        assert!(!terminator.is_broken);
-        assert!(terminator.tree._comma.is_some_and_valid());
-        assert!(!terminator.tree._close_paren.is_broken);
+        assert!(params._first_param.is_parsed_and_valid());
+        assert!(params._rest_params.is_empty());
+        assert!(params._trailing_comma.is_some_and_valid());
     }
 
     #[test]
@@ -812,24 +893,15 @@ mod tests {
         let params_decl = fn_node.tree._params_decl.unwrap();
         assert!(!params_decl.is_broken);
         assert!(!params_decl.tree._open_paren.is_broken);
+        assert!(params_decl.tree._close_paren.is_parsed_and_valid());
 
-        let close_params_decl = params_decl.tree._fn_param_close.unwrap();
+        assert!(params_decl.tree._params.is_some_and_valid());
+        let params = params_decl.tree._params.unwrap().tree;
 
-        assert!(!close_params_decl.is_broken);
-
-        let CloseFnParamsDecl::WithParams(with_params) = close_params_decl.tree else {
-            panic!()
-        };
-
-        assert!(with_params._first_param.is_parsed_and_valid());
-        assert!(with_params._params.is_parsed_and_valid());
-        assert!(with_params._params.items.len() == 1);
-        assert!(with_params._params.items[0].is_parsed_and_valid());
-        let terminator = with_params._params.terminator.unwrap();
-
-        assert!(!terminator.is_broken);
-        assert!(terminator.tree._comma.is_none());
-        assert!(!terminator.tree._close_paren.is_broken);
+        assert!(params._first_param.is_parsed_and_valid());
+        assert!(params._rest_params.len() == 1);
+        assert!(params._rest_params[0].is_parsed_and_valid());
+        assert!(params._trailing_comma.is_none());
     }
 
     #[test]
@@ -850,23 +922,14 @@ mod tests {
         let params_decl = fn_node.tree._params_decl.unwrap();
         assert!(!params_decl.is_broken);
         assert!(!params_decl.tree._open_paren.is_broken);
+        assert!(params_decl.tree._close_paren.is_parsed_and_valid());
 
-        let close_params_decl = params_decl.tree._fn_param_close.unwrap();
+        assert!(params_decl.tree._params.is_some_and_valid());
+        let params = params_decl.tree._params.unwrap().tree;
 
-        assert!(!close_params_decl.is_broken);
-
-        let CloseFnParamsDecl::WithParams(with_params) = close_params_decl.tree else {
-            panic!()
-        };
-
-        assert!(with_params._first_param.is_parsed_and_valid());
-        assert!(with_params._params.is_parsed_and_valid());
-        assert!(with_params._params.items.len() == 1);
-        assert!(with_params._params.items[0].is_parsed_and_valid());
-        let terminator = with_params._params.terminator.unwrap();
-
-        assert!(!terminator.is_broken);
-        assert!(terminator.tree._comma.is_some_and_valid());
-        assert!(!terminator.tree._close_paren.is_broken);
+        assert!(params._first_param.is_parsed_and_valid());
+        assert!(params._rest_params.len() == 1);
+        assert!(params._rest_params[0].is_parsed_and_valid());
+        assert!(params._trailing_comma.is_some_and_valid());
     }
 }
