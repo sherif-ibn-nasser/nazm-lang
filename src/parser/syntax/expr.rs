@@ -5,8 +5,8 @@ use super::*;
 #[derive(NazmcParse)]
 /// The wrapper for all valid expressions syntax in the language
 pub(crate) struct Expr {
-    pub(crate) _left: SyntaxNode<AtomicExpr>,
-    pub(crate) _bin: Vec<SyntaxNode<BinExpr>>,
+    pub(crate) left: SyntaxNode<UnaryExpr>,
+    pub(crate) bin: Vec<SyntaxNode<BinExpr>>,
 }
 
 #[derive(NazmcParse)]
@@ -15,46 +15,41 @@ pub(crate) struct Expr {
 /// The precedence parsing will be when constructiong the HIR by the shunting-yard algorithm
 /// as we want it here to be simple
 pub(crate) struct BinExpr {
-    pub(crate) _op: SyntaxNode<BinOp>,
-    pub(crate) _right: ParseResult<AtomicExpr>,
+    pub(crate) op: SyntaxNode<BinOp>,
+    pub(crate) right: ParseResult<UnaryExpr>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct UnaryExpr {
+    pub(crate) ops: Vec<SyntaxNode<UnaryOp>>,
+    pub(crate) expr: ParseResult<AtomicExpr>,
 }
 
 #[derive(NazmcParse)]
 /// It's the atom in constructing an expression
 pub(crate) enum AtomicExpr {
-    Unary(UnaryExpr),
-    Paren(ParenExpr),
-    Id(IdExpr),
+    Paren(Box<ParenExpr>),
+    Tuple(Box<TupleExpr>),
+    Id(Box<IdExpr>),
     Literal(LiteralExpr),
 }
 
 #[derive(NazmcParse)]
-pub(crate) struct UnaryExpr {
-    pub(crate) _op: SyntaxNode<UnaryOp>,
-    pub(crate) _expr: Box<ParseResult<AtomicExpr>>,
-}
-
-#[derive(NazmcParse)]
 pub(crate) struct ParenExpr {
-    pub(crate) _open_paren: SyntaxNode<OpenParenthesisSymbol>,
-    pub(crate) _expr: Box<ParseResult<Expr>>,
-    pub(crate) _close_paren: ParseResult<CloseParenthesisSymbol>,
+    pub(crate) open_paren: SyntaxNode<OpenParenthesisSymbol>,
+    pub(crate) expr: ParseResult<Expr>,
+    pub(crate) close_paren: ParseResult<CloseParenthesisSymbol>,
 }
 
 #[derive(NazmcParse)]
 pub(crate) struct IdExpr {
-    pub(crate) _id: SyntaxNode<Id>,
-    pub(crate) _fn_call: Optional<FnCall>,
-}
-
-#[derive(NazmcParse)]
-pub(crate) struct FnCall {
-    _open_paren: SyntaxNode<OpenParenthesisSymbol>,
+    pub(crate) id: SyntaxNode<Id>,
+    pub(crate) fn_call: Optional<FnCallExpr>,
 }
 
 /// This has a hand-written parse method and it is like the other treminal tokens
 pub(crate) struct LiteralExpr {
-    literal_kind: LiteralKind,
+    kind: LiteralKind,
 }
 
 /// The parse method is written by hand to avoid backtracking
@@ -100,7 +95,7 @@ impl NazmcParse for ParseResult<LiteralExpr> {
                     span: *span,
                     is_broken: false,
                     tree: LiteralExpr {
-                        literal_kind: literal_kind.clone(),
+                        kind: literal_kind.clone(),
                     },
                 });
                 iter.next_non_space_or_comment();
