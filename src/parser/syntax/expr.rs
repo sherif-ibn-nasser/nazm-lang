@@ -1,4 +1,4 @@
-use crate::{parser::*, LiteralKind, SymbolKind};
+use crate::{parser::*, KeywordKind, LiteralKind, SymbolKind};
 
 use super::*;
 
@@ -45,6 +45,14 @@ pub(crate) struct ParenExpr {
 pub(crate) struct IdExpr {
     pub(crate) id: SyntaxNode<Id>,
     pub(crate) fn_call: Optional<FnCallExpr>,
+    pub(crate) indecies: Vec<SyntaxNode<IdxExpr>>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct IdxExpr {
+    pub(crate) open_bracket: SyntaxNode<OpenSquareBracketSymbol>,
+    pub(crate) expr: ParseResult<Expr>,
+    pub(crate) close_bracket: ParseResult<CloseSquareBracketSymbol>,
 }
 
 /// This has a hand-written parse method and it is like the other treminal tokens
@@ -73,14 +81,24 @@ pub(crate) enum BinOp {
     Div(SlashSymbol),
     Mod(ModuloSymbol),
     Pow(PowerSymbol),
+    OpenOpenRange(LessDotDotLessSymbol),
+    CloseOpenRange(DotDotLessSymbol),
+    OpenCLoseRange(LessDotDotSymbol),
+    CloseCLoseRange(DotDotSymbol),
 }
 
 /// The parse method is written by hand to avoid backtracking
+///
+/// Note that there is no unary plus operator
 pub(crate) enum UnaryOp {
-    Plus(PlusSymbol),
     Minus(MinusSymbol),
     LNot(ExclamationMarkSymbol),
     BNot(BitNotSymbol),
+    Deref(StarSymbol),
+    Borrow(BitAndSymbol),
+    BorrowMut(BitAndSymbol, MutKeyword),
+    BorrowLAnd(LogicalAndSymbol),
+    BorrowLAndMut(LogicalAndSymbol, MutKeyword),
 }
 
 impl NazmcParse for ParseResult<LiteralExpr> {
@@ -143,6 +161,10 @@ impl NazmcParse for ParseResult<BinOp> {
                     SymbolKind::Slash => BinOp::Div(SlashSymbol),
                     SymbolKind::Modulo => BinOp::Mod(ModuloSymbol),
                     SymbolKind::Power => BinOp::Pow(PowerSymbol),
+                    SymbolKind::LessDotDotLess => BinOp::OpenOpenRange(LessDotDotLessSymbol),
+                    SymbolKind::DotDotLess => BinOp::CloseOpenRange(DotDotLessSymbol),
+                    SymbolKind::LessDotDot => BinOp::OpenCLoseRange(LessDotDotSymbol),
+                    SymbolKind::DotDot => BinOp::CloseCLoseRange(DotDotSymbol),
                     _ => {
                         return ParseResult::Unexpected {
                             span: *span,
@@ -175,19 +197,51 @@ impl NazmcParse for ParseResult<UnaryOp> {
         match iter.recent() {
             Some(
                 token @ Token {
-                    val,
+                    val: _,
                     span,
                     kind: TokenKind::Symbol(symbol_kind),
                 },
             ) => {
+                let mut span = *span;
+
                 let tree_kind = match symbol_kind {
-                    SymbolKind::Plus => UnaryOp::Plus(PlusSymbol),
                     SymbolKind::Minus => UnaryOp::Minus(MinusSymbol),
                     SymbolKind::ExclamationMark => UnaryOp::LNot(ExclamationMarkSymbol),
                     SymbolKind::BitNot => UnaryOp::BNot(BitNotSymbol),
+                    SymbolKind::Star => UnaryOp::Deref(StarSymbol),
+                    SymbolKind::BitAnd => {
+                        let peek_idx = iter.peek_idx;
+                        if let Some(Token {
+                            span: mut_keyword_span,
+                            kind: TokenKind::Keyword(KeywordKind::Mut),
+                            ..
+                        }) = iter.next_non_space_or_comment()
+                        {
+                            span = span.merged_with(mut_keyword_span);
+                            UnaryOp::Borrow(BitAndSymbol)
+                        } else {
+                            iter.peek_idx = peek_idx;
+                            UnaryOp::BorrowMut(BitAndSymbol, MutKeyword)
+                        }
+                    }
+                    SymbolKind::LogicalAnd => {
+                        let peek_idx = iter.peek_idx;
+                        if let Some(Token {
+                            span: mut_keyword_span,
+                            kind: TokenKind::Keyword(KeywordKind::Mut),
+                            ..
+                        }) = iter.next_non_space_or_comment()
+                        {
+                            span = span.merged_with(mut_keyword_span);
+                            UnaryOp::BorrowLAnd(LogicalAndSymbol)
+                        } else {
+                            iter.peek_idx = peek_idx;
+                            UnaryOp::BorrowLAndMut(LogicalAndSymbol, MutKeyword)
+                        }
+                    }
                     _ => {
                         return ParseResult::Unexpected {
-                            span: *span,
+                            span,
                             found: token.kind.clone(),
                             is_start_failure: true,
                         };
@@ -195,7 +249,7 @@ impl NazmcParse for ParseResult<UnaryOp> {
                 };
 
                 let ok = ParseResult::Parsed(SyntaxNode {
-                    span: *span,
+                    span,
                     is_broken: false,
                     tree: tree_kind,
                 });
