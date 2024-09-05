@@ -2,18 +2,19 @@ use crate::{parser::*, KeywordKind, LiteralKind, SymbolKind};
 
 use super::*;
 
-#[derive(NazmcParse)]
 /// The wrapper for all valid expressions syntax in the language
+#[derive(NazmcParse)]
 pub(crate) struct Expr {
     pub(crate) left: SyntaxNode<UnaryExpr>,
     pub(crate) bin: Vec<SyntaxNode<BinExpr>>,
 }
 
-#[derive(NazmcParse)]
 /// This will parse the valid syntax of binary operators and will not parse their precedences
 ///
 /// The precedence parsing will be when constructiong the HIR by the shunting-yard algorithm
 /// as we want it here to be simple
+///
+#[derive(NazmcParse)]
 pub(crate) struct BinExpr {
     pub(crate) op: SyntaxNode<BinOp>,
     pub(crate) right: ParseResult<UnaryExpr>,
@@ -23,6 +24,13 @@ pub(crate) struct BinExpr {
 pub(crate) struct UnaryExpr {
     pub(crate) ops: Vec<SyntaxNode<UnaryOp>>,
     pub(crate) expr: ParseResult<AtomicExpr>,
+    pub(crate) inner_access: Vec<SyntaxNode<InnerAccessExpr>>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct InnerAccessExpr {
+    pub(crate) dot: SyntaxNode<DotSymbol>,
+    pub(crate) inner: ParseResult<IdExpr>,
 }
 
 #[derive(NazmcParse)]
@@ -95,19 +103,17 @@ pub(crate) enum UnaryOp {
     LNot(ExclamationMarkSymbol),
     BNot(BitNotSymbol),
     Deref(StarSymbol),
-    Borrow(BitAndSymbol),
-    BorrowMut(BitAndSymbol, MutKeyword),
-    BorrowLAnd(LogicalAndSymbol),
-    BorrowLAndMut(LogicalAndSymbol, MutKeyword),
+    Borrow(HashSymbol),
+    BorrowMut(HashSymbol, MutKeyword),
 }
 
 impl NazmcParse for ParseResult<LiteralExpr> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(Token {
-                val,
                 span,
                 kind: TokenKind::Literal(literal_kind),
+                ..
             }) => {
                 let ok = ParseResult::Parsed(SyntaxNode {
                     span: *span,
@@ -134,9 +140,9 @@ impl NazmcParse for ParseResult<BinOp> {
         match iter.recent() {
             Some(
                 token @ Token {
-                    val,
                     span,
                     kind: TokenKind::Symbol(symbol_kind),
+                    ..
                 },
             ) => {
                 let tree_kind = match symbol_kind {
@@ -209,7 +215,7 @@ impl NazmcParse for ParseResult<UnaryOp> {
                     SymbolKind::ExclamationMark => UnaryOp::LNot(ExclamationMarkSymbol),
                     SymbolKind::BitNot => UnaryOp::BNot(BitNotSymbol),
                     SymbolKind::Star => UnaryOp::Deref(StarSymbol),
-                    SymbolKind::BitAnd => {
+                    SymbolKind::Hash => {
                         let peek_idx = iter.peek_idx;
                         if let Some(Token {
                             span: mut_keyword_span,
@@ -218,25 +224,10 @@ impl NazmcParse for ParseResult<UnaryOp> {
                         }) = iter.next_non_space_or_comment()
                         {
                             span = span.merged_with(mut_keyword_span);
-                            UnaryOp::Borrow(BitAndSymbol)
+                            UnaryOp::Borrow(HashSymbol)
                         } else {
                             iter.peek_idx = peek_idx;
-                            UnaryOp::BorrowMut(BitAndSymbol, MutKeyword)
-                        }
-                    }
-                    SymbolKind::LogicalAnd => {
-                        let peek_idx = iter.peek_idx;
-                        if let Some(Token {
-                            span: mut_keyword_span,
-                            kind: TokenKind::Keyword(KeywordKind::Mut),
-                            ..
-                        }) = iter.next_non_space_or_comment()
-                        {
-                            span = span.merged_with(mut_keyword_span);
-                            UnaryOp::BorrowLAnd(LogicalAndSymbol)
-                        } else {
-                            iter.peek_idx = peek_idx;
-                            UnaryOp::BorrowLAndMut(LogicalAndSymbol, MutKeyword)
+                            UnaryOp::BorrowMut(HashSymbol, MutKeyword)
                         }
                     }
                     _ => {

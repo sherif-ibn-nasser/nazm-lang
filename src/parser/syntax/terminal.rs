@@ -159,6 +159,7 @@ create_symbol_parser!(Xor);
 create_symbol_parser!(ExclamationMark);
 create_symbol_parser!(Colon);
 create_symbol_parser!(Equal);
+create_symbol_parser!(Hash);
 
 #[cfg(test)]
 mod tests {
