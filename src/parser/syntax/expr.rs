@@ -40,6 +40,7 @@ pub(crate) enum AtomicExpr {
     Tuple(Box<TupleExpr>),
     Id(Box<IdExpr>),
     Literal(LiteralExpr),
+    On(OnKeyword),
 }
 
 #[derive(NazmcParse)]

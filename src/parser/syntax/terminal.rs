@@ -106,6 +106,7 @@ create_keyword_parser!(Fn);
 create_keyword_parser!(Let);
 create_keyword_parser!(Mut);
 create_keyword_parser!(Const);
+create_keyword_parser!(On);
 
 create_symbol_parser!(LessDotDotLess);
 create_symbol_parser!(LessDotDot);

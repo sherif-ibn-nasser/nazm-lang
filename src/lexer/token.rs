@@ -181,4 +181,6 @@ pub enum KeywordKind {
     Mut,
     /// ثابت
     Const,
+    /// على
+    On,
 }
