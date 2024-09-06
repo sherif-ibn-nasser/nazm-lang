@@ -44,8 +44,8 @@ pub(crate) enum AtomicExpr {
 
 #[derive(NazmcParse)]
 pub(crate) struct IdExpr {
-    pub(crate) id: SyntaxNode<Id>,
-    pub(crate) fn_call: Optional<ParenExpr>,
+    pub(crate) path: SyntaxNode<SimplePath>,
+    pub(crate) call: Optional<ParenExpr>,
     pub(crate) indecies: Vec<SyntaxNode<IdxExpr>>,
 }
 

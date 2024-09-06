@@ -1,16 +1,20 @@
 mod terminal;
 
+mod path;
+
 mod expr;
 
 mod typ;
 
 mod punctuated;
 
-pub(crate) use terminal::*;
-
 use super::*;
 
 use paste::paste;
+
+pub(crate) use terminal::*;
+
+use path::*;
 
 use punctuated::*;
 

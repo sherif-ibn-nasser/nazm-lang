@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(NazmcParse)]
 pub(crate) enum Type {
+    Path(SimplePath),
     Ptr(Box<PtrType>),
     Ref(Box<RefType>),
     Paren(Box<ParenType>),
