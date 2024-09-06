@@ -181,6 +181,12 @@ pub enum KeywordKind {
     Mut,
     /// ثابت
     Const,
+    /// تصنيف
+    Struct,
+    /// تصدير
+    Public,
+    /// تخصيص
+    Private,
     /// على
     On,
 }

@@ -2,6 +2,8 @@ mod terminal;
 
 mod expr;
 
+mod typ;
+
 mod punctuated;
 
 pub(crate) use terminal::*;
@@ -13,6 +15,8 @@ use paste::paste;
 use punctuated::*;
 
 use expr::*;
+
+use typ::*;
 
 generateTrailingCommaWithCloseDelimiter!(CloseParenthesisSymbol);
 
@@ -38,6 +42,12 @@ generateDelimitedPunctuated!(
     FnParam,
     CloseParenthesisSymbol
 );
+
+#[derive(NazmcParse)]
+pub(crate) enum VisModifier {
+    Public(PublicKeyword),
+    Private(PrivateKeyword),
+}
 
 #[derive(NazmcParse)]
 pub(crate) struct FnParam {
