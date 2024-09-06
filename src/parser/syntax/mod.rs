@@ -16,8 +16,6 @@ use expr::*;
 
 generateTrailingCommaWithCloseDelimiter!(CloseParenthesisSymbol);
 
-generateTrailingCommaWithCloseDelimiter!(BitOrSymbol);
-
 generateTrailingCommaWithCloseDelimiter!(CloseAngleBracketOrGreaterSymbol);
 
 generateTrailingCommaWithCloseDelimiter!(CloseCurlyBracesSymbol);
@@ -26,10 +24,9 @@ generatePunctuatedItem!(FnParam);
 
 generatePunctuatedItem!(Expr);
 
-generateDelimitedPunctuated!(TupleExpr, BitOrSymbol, Expr, BitOrSymbol);
-
+// Could be used for tuples, function calls and and nodrma paren expressions
 generateDelimitedPunctuated!(
-    FnCallExpr,
+    ParenExpr,
     OpenParenthesisSymbol,
     Expr,
     CloseParenthesisSymbol
