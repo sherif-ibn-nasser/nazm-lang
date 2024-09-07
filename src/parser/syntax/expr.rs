@@ -37,9 +37,23 @@ pub(crate) struct InnerAccessExpr {
 /// It's the atom in constructing an expression
 pub(crate) enum AtomicExpr {
     Paren(Box<ParenExpr>),
+    Struct(Box<StructExpr>),
     Id(Box<IdExpr>),
     Literal(LiteralExpr),
     On(OnKeyword),
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct StructExpr {
+    pub(crate) dot: SyntaxNode<DotSymbol>,
+    pub(crate) path: ParseResult<SimplePath>,
+    pub(crate) init: Optional<StructInit>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) enum StructInit {
+    Tuple(ParenExpr),
+    Fields(StructFieldsInitExpr),
 }
 
 #[derive(NazmcParse)]
