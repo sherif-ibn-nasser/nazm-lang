@@ -71,7 +71,7 @@ pub enum SymbolKind {
     ShrEqual,
     /// >>=
     ShlEqual,
-    /// **=
+    /// ^^=
     PowerEqual,
 
     /// <=
@@ -84,7 +84,7 @@ pub enum SymbolKind {
     Shl,
     /// *=
     StarEqual,
-    /// **
+    /// ^^
     Power,
     /// /=
     SlashEqual,

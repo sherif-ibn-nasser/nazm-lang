@@ -7,6 +7,7 @@ pub(crate) enum Type {
     Ref(Box<RefType>),
     Paren(Box<ParenType>),
     Slice(Box<SliceType>),
+    Tuple(Box<TupleType>),
 }
 
 #[derive(NazmcParse)]
