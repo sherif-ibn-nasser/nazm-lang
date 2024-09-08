@@ -1,5 +1,7 @@
 mod terminal;
 
+mod op;
+
 mod path;
 
 mod expr;
@@ -13,6 +15,8 @@ use super::*;
 use paste::paste;
 
 pub(crate) use terminal::*;
+
+use op::*;
 
 use path::*;
 

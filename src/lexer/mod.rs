@@ -83,6 +83,90 @@ impl<'a> LexerIter<'a> {
                 self.next_cursor();
                 TokenKind::Symbol(SymbolKind::QuestionMark)
             }
+            '(' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::OpenParenthesis)
+            }
+            ')' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::CloseParenthesis)
+            }
+            '{' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::OpenCurlyBraces)
+            }
+            '}' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::CloseCurlyBraces)
+            }
+            '[' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::OpenSquareBracket)
+            }
+            ']' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::CloseSquareBracket)
+            }
+            '.' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Dot)
+            }
+            '<' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::OpenAngleBracketOrLess)
+            }
+            '>' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::CloseAngleBracketOrGreater)
+            }
+            '*' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Star)
+            }
+            '+' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Plus)
+            }
+            '-' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Minus)
+            }
+            '|' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::BitOr)
+            }
+            '&' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::BitAnd)
+            }
+            '%' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Modulo)
+            }
+            '~' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::BitNot)
+            }
+            '^' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Xor)
+            }
+            '!' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::ExclamationMark)
+            }
+            ':' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Colon)
+            }
+            '=' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Equal)
+            }
+            '#' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Hash)
+            }
             '\n' => {
                 self.next_cursor();
                 TokenKind::EOL
@@ -102,19 +186,6 @@ impl<'a> LexerIter<'a> {
                 }
 
                 let text = &self.content[self.stopped_at_bidx..];
-
-                for symbol in SymbolKind::iter() {
-                    if symbol
-                        .get_variant_docs()
-                        .is_ok_and(|val| text.starts_with(val))
-                    {
-                        for _ in 0..symbol.get_variant_docs().unwrap().len() {
-                            // The multibyte symbols are checked above
-                            self.next_cursor();
-                        }
-                        return TokenKind::Symbol(symbol);
-                    }
-                }
 
                 self.next_id_or_keyword()
             }
@@ -160,10 +231,6 @@ impl<'a> LexerIter<'a> {
 
     fn next_token_with_slash(&mut self) -> TokenKind {
         match self.next_cursor() {
-            Some((_, '=')) => {
-                self.next_cursor();
-                TokenKind::Symbol(SymbolKind::SlashEqual)
-            }
             Some((_, '/')) => {
                 let mut errs = vec![];
                 while self.next_cursor_non_eol().is_some() {

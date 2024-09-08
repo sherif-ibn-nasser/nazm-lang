@@ -59,66 +59,8 @@ pub enum Base {
     Hex = 16,
 }
 
-#[derive(Clone, PartialEq, Debug, DocumentedVariants, DocumentedFields, EnumIter)]
+#[derive(Clone, PartialEq, Debug, DocumentedVariants, EnumIter)]
 pub enum SymbolKind {
-    /// <..<
-    LessDotDotLess,
-    /// <..
-    LessDotDot,
-    /// ..<
-    DotDotLess,
-    /// <<=
-    ShrEqual,
-    /// >>=
-    ShlEqual,
-    /// ^^=
-    PowerEqual,
-
-    /// <=
-    LessEqual,
-    /// <<
-    Shr,
-    /// >=
-    GreaterEqual,
-    /// >>
-    Shl,
-    /// *=
-    StarEqual,
-    /// ^^
-    Power,
-    /// /=
-    SlashEqual,
-    /// +=
-    PLusEqual,
-    /// ++
-    PlusPlus,
-    /// -=
-    MinusEqual,
-    /// --
-    MinusMinus,
-    /// |=
-    BitOrEqual,
-    /// ||
-    LogicalOr,
-    /// &=
-    BitAndEqual,
-    /// &&
-    LogicalAnd,
-    /// %=
-    ModuloEqual,
-    /// ~=
-    BitNotEqual,
-    /// ^=
-    XorEqual,
-    /// ==
-    EqualEqual,
-    /// !=
-    NotEqual,
-    /// ::
-    DoubleColons,
-    /// ..
-    DotDot,
-
     /// ،
     Comma,
     /// ؛
