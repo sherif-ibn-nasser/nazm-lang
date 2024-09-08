@@ -24,6 +24,7 @@ pub(crate) struct BinExpr {
 pub(crate) struct UnaryExpr {
     pub(crate) ops: Vec<SyntaxNode<UnaryOp>>,
     pub(crate) expr: ParseResult<AtomicExpr>,
+    pub(crate) indecies: Vec<SyntaxNode<IdxExpr>>,
     pub(crate) inner_access: Vec<SyntaxNode<InnerAccessExpr>>,
 }
 
@@ -31,16 +32,36 @@ pub(crate) struct UnaryExpr {
 pub(crate) struct InnerAccessExpr {
     pub(crate) dot: SyntaxNode<DotSymbol>,
     pub(crate) inner: ParseResult<IdExpr>,
+    pub(crate) indecies: Vec<SyntaxNode<IdxExpr>>,
 }
 
 #[derive(NazmcParse)]
 /// It's the atom in constructing an expression
 pub(crate) enum AtomicExpr {
+    SizedArray(Box<SizedArrayExpr>),
+    Array(Box<ArrayExpr>),
     Paren(Box<ParenExpr>),
     Struct(Box<StructExpr>),
     Id(Box<IdExpr>),
     Literal(LiteralExpr),
     On(OnKeyword),
+    If(Box<IfExpr>),
+    Switch(Box<SwitchExpr>),
+    Loop(Box<LoopExpr>),
+    While(Box<WhileExpr>),
+    DoWhile(Box<DoWhileExpr>),
+    BLock(Box<BlockExpr>),
+}
+
+#[derive(NazmcParse)]
+/// TODO: This might not have good error recovery if the bracket is not closed as we need to skip bad tokens between the two brackets
+pub(crate) struct SizedArrayExpr {
+    pub(crate) dot: SyntaxNode<DotSymbol>,
+    pub(crate) open_bracket: SyntaxNode<OpenSquareBracketSymbol>, // This will backtrack as it maybe a struct expression after the dot symbol
+    pub(crate) repeat: ParseResult<Expr>,
+    pub(crate) semi_colon: ParseResult<SemicolonSymbol>,
+    pub(crate) size: ParseResult<Expr>,
+    pub(crate) close_bracket: ParseResult<CloseSquareBracketSymbol>,
 }
 
 #[derive(NazmcParse)]
@@ -60,7 +81,6 @@ pub(crate) enum StructInit {
 pub(crate) struct IdExpr {
     pub(crate) path: SyntaxNode<SimplePath>,
     pub(crate) call: Optional<ParenExpr>,
-    pub(crate) indecies: Vec<SyntaxNode<IdxExpr>>,
 }
 
 #[derive(NazmcParse)]
@@ -102,3 +122,21 @@ impl NazmcParse for ParseResult<LiteralExpr> {
         }
     }
 }
+
+#[derive(NazmcParse)]
+pub(crate) struct IfExpr {}
+
+#[derive(NazmcParse)]
+pub(crate) struct SwitchExpr {}
+
+#[derive(NazmcParse)]
+pub(crate) struct LoopExpr {}
+
+#[derive(NazmcParse)]
+pub(crate) struct WhileExpr {}
+
+#[derive(NazmcParse)]
+pub(crate) struct DoWhileExpr {}
+
+#[derive(NazmcParse)]
+pub(crate) struct BlockExpr {}

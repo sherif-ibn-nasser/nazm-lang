@@ -10,6 +10,8 @@ mod typ;
 
 mod punctuated;
 
+mod stm;
+
 use super::*;
 
 use paste::paste;
@@ -25,6 +27,8 @@ use punctuated::*;
 use expr::*;
 
 use typ::*;
+
+use stm::*;
 
 #[derive(NazmcParse)]
 pub(crate) enum VisModifier {
@@ -65,6 +69,8 @@ generateTrailingCommaWithCloseDelimiter!(CloseAngleBracketOrGreaterSymbol);
 
 generateTrailingCommaWithCloseDelimiter!(CloseCurlyBracesSymbol);
 
+generateTrailingCommaWithCloseDelimiter!(CloseSquareBracketSymbol);
+
 generatePunctuatedItem!(Type);
 
 generatePunctuatedItem!(StructField);
@@ -102,6 +108,13 @@ generateDelimitedPunctuated!(
     OpenParenthesisSymbol,
     Expr,
     CloseParenthesisSymbol
+);
+
+generateDelimitedPunctuated!(
+    ArrayExpr,
+    OpenSquareBracketSymbol,
+    Expr,
+    CloseSquareBracketSymbol
 );
 
 generateDelimitedPunctuated!(
