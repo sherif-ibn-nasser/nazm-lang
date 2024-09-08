@@ -46,7 +46,7 @@ pub(crate) enum AtomicExpr {
     Literal(LiteralExpr),
     On(OnKeyword),
     If(Box<IfExpr>),
-    Switch(Box<SwitchExpr>),
+    When(Box<WhenExpr>),
     Loop(Box<LoopExpr>),
     While(Box<WhileExpr>),
     DoWhile(Box<DoWhileExpr>),
@@ -127,7 +127,7 @@ impl NazmcParse for ParseResult<LiteralExpr> {
 pub(crate) struct IfExpr {}
 
 #[derive(NazmcParse)]
-pub(crate) struct SwitchExpr {}
+pub(crate) struct WhenExpr {}
 
 #[derive(NazmcParse)]
 pub(crate) struct LoopExpr {}

@@ -131,4 +131,22 @@ pub enum KeywordKind {
     Private,
     /// على
     On,
+    /// لو
+    If,
+    /// وإلا
+    Else,
+    /// عندما
+    When,
+    /// تكرار
+    Loop,
+    /// طالما
+    While,
+    /// افعل
+    Do,
+    /// قطع
+    Break,
+    /// وصل
+    Continue,
+    /// أرجع
+    Return,
 }
