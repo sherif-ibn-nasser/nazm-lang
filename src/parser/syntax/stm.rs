@@ -4,9 +4,6 @@ use super::*;
 pub(crate) enum Stm {
     Semicolon(SemicolonSymbol),
     Let(LetStm),
-    Break(BreakStm),
-    Continue(ContinueStm),
-    Return(ReturnStm),
     Expr(ExprStm),
 }
 
@@ -33,26 +30,6 @@ pub(crate) struct LetAssign {
 }
 
 #[derive(NazmcParse)]
-pub(crate) struct BreakStm {
-    pub(crate) break_keyowrd: SyntaxNode<BreakKeyword>,
-    pub(crate) expr: Optional<Expr>,
-    pub(crate) semicolon: ParseResult<SemicolonSymbol>,
-}
-
-#[derive(NazmcParse)]
-pub(crate) struct ContinueStm {
-    pub(crate) continue_keyowrd: SyntaxNode<ContinueKeyword>,
-    pub(crate) semicolon: ParseResult<SemicolonSymbol>,
-}
-
-#[derive(NazmcParse)]
-pub(crate) struct ReturnStm {
-    pub(crate) return_keyowrd: SyntaxNode<ReturnKeyword>,
-    pub(crate) expr: Optional<Expr>,
-    pub(crate) semicolon: ParseResult<SemicolonSymbol>,
-}
-
-#[derive(NazmcParse)]
 pub(crate) enum ExprStm {
     WithBlock(ExprWithBlockStm),
     WithoutBlock(ExprWithBlockStm),
@@ -67,12 +44,5 @@ pub(crate) struct ExprWithBlockStm {
 #[derive(NazmcParse)]
 pub(crate) struct ExprWithoutBlockStm {
     pub(crate) expr: SyntaxNode<ExprWithoutBlock>,
-    pub(crate) assign: Optional<Assign>,
     pub(crate) semicolon: ParseResult<SemicolonSymbol>,
-}
-
-#[derive(NazmcParse)]
-pub(crate) struct Assign {
-    pub(crate) op: SyntaxNode<AssignOp>,
-    pub(crate) right: ParseResult<Expr>,
 }

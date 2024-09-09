@@ -75,7 +75,32 @@ pub(crate) struct BlockExpr {
 }
 
 #[derive(NazmcParse)]
-pub(crate) struct ExprWithoutBlock {
+pub(crate) enum ExprWithoutBlock {
+    Break(BreakExpr),
+    Continue(ContinueExpr),
+    Return(ReturnExpr),
+    Op(OpExpr),
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct BreakExpr {
+    pub(crate) break_keyowrd: SyntaxNode<BreakKeyword>,
+    pub(crate) expr: Optional<Expr>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct ContinueExpr {
+    pub(crate) continue_keyowrd: SyntaxNode<ContinueKeyword>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct ReturnExpr {
+    pub(crate) return_keyowrd: SyntaxNode<ReturnKeyword>,
+    pub(crate) expr: Optional<Expr>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct OpExpr {
     pub(crate) left: SyntaxNode<UnaryExpr>,
     pub(crate) bin: Vec<SyntaxNode<BinExpr>>,
 }
@@ -115,6 +140,8 @@ pub(crate) enum AtomicExpr {
     Id(IdExpr),
     Literal(LiteralExpr),
     On(OnKeyword),
+    /// This must has a unary operator on it as it is parsed firstly in Expr enum
+    WithBlock(ExprWithBlock),
 }
 
 #[derive(NazmcParse)]
