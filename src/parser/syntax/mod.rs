@@ -59,7 +59,7 @@ pub(crate) struct StructFieldInitExpr {
 
 #[derive(NazmcParse)]
 pub(crate) struct StructFieldInitExplicitExpr {
-    pub(crate) colon: SyntaxNode<ColonSymbol>,
+    pub(crate) equal: SyntaxNode<EqualSymbol>,
     pub(crate) expr: ParseResult<Expr>,
 }
 
@@ -108,13 +108,6 @@ generateDelimitedPunctuated!(
     OpenParenthesisSymbol,
     Expr,
     CloseParenthesisSymbol
-);
-
-generateDelimitedPunctuated!(
-    ArrayExpr,
-    OpenSquareBracketSymbol,
-    Expr,
-    CloseSquareBracketSymbol
 );
 
 generateDelimitedPunctuated!(

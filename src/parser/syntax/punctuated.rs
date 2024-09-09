@@ -76,7 +76,7 @@ macro_rules! generateDelimitedPunctuated {
                     };
 
                     let first_item = close_decl_withitems.first_item;
-                    let _restitems = close_decl_withitems.items_with_terminator.items;
+                    let _rest_items = close_decl_withitems.items_with_terminator.items;
                     let (_trailing_comma, close_delim) = match close_decl_withitems.items_with_terminator.terminator {
                         ParseResult::Parsed(node) => (
                             node.tree._comma,
@@ -100,18 +100,18 @@ macro_rules! generateDelimitedPunctuated {
 
                     if let Optional::Some(comma_node) = &_trailing_comma {
                         items_span = items_span.merged_with(&comma_node.span)
-                    } else if let Option::Some(last_param) = _restitems.last() {
+                    } else if let Option::Some(last_param) = _rest_items.last() {
                         items_span = items_span.merged_with(&last_param.span().unwrap())
                     }
 
                     let items = SyntaxNode {
                         span: items_span,
                         is_broken: !first_item.is_parsed_and_valid()
-                            || _restitems.iter().any(|p| !p.is_parsed_and_valid())
+                            || _rest_items.iter().any(|p| !p.is_parsed_and_valid())
                             || !_trailing_comma.is_parsed_and_valid(),
                         tree: [<Punctuated $item>] {
                             first_item,
-                            _restitems,
+                            _rest_items,
                             _trailing_comma,
                         },
                     };
@@ -138,7 +138,7 @@ macro_rules! generatePunctuatedItem {
 
             pub(crate) struct [<Punctuated $item>] {
                 pub(crate) first_item: ParseResult<$item>,
-                pub(crate) _restitems: Vec<ParseResult<[<CommaWith $item>]>>,
+                pub(crate) _rest_items: Vec<ParseResult<[<CommaWith $item>]>>,
                 pub(crate) _trailing_comma: Optional<CommaSymbol>,
             }
 
