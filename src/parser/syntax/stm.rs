@@ -4,12 +4,6 @@ use super::*;
 pub(crate) enum Stm {
     Semicolon(SemicolonSymbol),
     Let(LetStm),
-    If(IfStm),
-    Switch(WhenStm),
-    Loop(LoopStm),
-    While(WhileStm),
-    DoWhile(DoWhileStm),
-    BLock(BlockStm),
     Break(BreakStm),
     Continue(ContinueStm),
     Return(ReturnStm),
@@ -39,63 +33,6 @@ pub(crate) struct LetAssign {
 }
 
 #[derive(NazmcParse)]
-pub(crate) struct IfStm {
-    pub(crate) if_keyword: SyntaxNode<IfKeyword>,
-    pub(crate) condition: ParseResult<Expr>,
-    pub(crate) block: ParseResult<BlockStm>,
-    pub(crate) else_ifs: Vec<SyntaxNode<ElseIfClause>>,
-    pub(crate) else_cluase: Optional<ElseClause>,
-}
-
-#[derive(NazmcParse)]
-pub(crate) struct ElseIfClause {
-    pub(crate) else_keyword: SyntaxNode<ElseKeyword>,
-    pub(crate) if_keyword: SyntaxNode<IfKeyword>,
-    pub(crate) condition: ParseResult<Expr>,
-    pub(crate) block: ParseResult<BlockStm>,
-}
-
-#[derive(NazmcParse)]
-pub(crate) struct ElseClause {
-    pub(crate) else_keyword: SyntaxNode<ElseKeyword>,
-    pub(crate) block: ParseResult<BlockStm>,
-}
-
-#[derive(NazmcParse)]
-pub(crate) struct WhenStm {
-    pub(crate) when_keyword: SyntaxNode<WhenKeyword>,
-    pub(crate) expr: ParseResult<Expr>,
-}
-
-#[derive(NazmcParse)]
-pub(crate) struct LoopStm {
-    pub(crate) loop_keyword: SyntaxNode<LoopKeyword>,
-    pub(crate) block: ParseResult<BlockStm>,
-}
-
-#[derive(NazmcParse)]
-pub(crate) struct WhileStm {
-    pub(crate) while_keyword: SyntaxNode<WhileKeyword>,
-    pub(crate) block: ParseResult<BlockStm>,
-    pub(crate) condition: ParseResult<Expr>,
-}
-
-#[derive(NazmcParse)]
-pub(crate) struct DoWhileStm {
-    pub(crate) do_keyword: SyntaxNode<DoKeyword>,
-    pub(crate) block: ParseResult<BlockStm>,
-    pub(crate) while_keyword: ParseResult<WhileKeyword>,
-    pub(crate) condition: ParseResult<Expr>,
-    pub(crate) semicolon: ParseResult<SemicolonSymbol>,
-}
-
-#[derive(NazmcParse)]
-pub(crate) struct BlockStm {
-    pub(crate) open_delimiter: SyntaxNode<OpenCurlyBracesSymbol>,
-    pub(crate) stms: ZeroOrMany<Stm, CloseCurlyBracesSymbol>,
-}
-
-#[derive(NazmcParse)]
 pub(crate) struct BreakStm {
     pub(crate) break_keyowrd: SyntaxNode<BreakKeyword>,
     pub(crate) expr: Optional<Expr>,
@@ -116,8 +53,20 @@ pub(crate) struct ReturnStm {
 }
 
 #[derive(NazmcParse)]
-pub(crate) struct ExprStm {
-    pub(crate) expr: SyntaxNode<Expr>,
+pub(crate) enum ExprStm {
+    WithBlock(ExprWithBlockStm),
+    WithoutBlock(ExprWithBlockStm),
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct ExprWithBlockStm {
+    pub(crate) expr: SyntaxNode<ExprWithBlock>,
+    pub(crate) semicolon: Optional<SemicolonSymbol>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct ExprWithoutBlockStm {
+    pub(crate) expr: SyntaxNode<ExprWithoutBlock>,
     pub(crate) assign: Optional<Assign>,
     pub(crate) semicolon: ParseResult<SemicolonSymbol>,
 }

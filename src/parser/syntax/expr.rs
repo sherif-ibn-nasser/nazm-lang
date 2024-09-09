@@ -2,9 +2,80 @@ use crate::{parser::*, LiteralKind};
 
 use super::*;
 
-/// The wrapper for all valid expressions syntax in the language
 #[derive(NazmcParse)]
-pub(crate) struct Expr {
+/// The wrapper for all valid expressions syntax in the language
+pub(crate) enum Expr {
+    WithBlock(Box<ExprWithBlock>),
+    WithoutBlock(Box<ExprWithoutBlock>),
+}
+
+#[derive(NazmcParse)]
+pub(crate) enum ExprWithBlock {
+    If(IfExpr),
+    When(WhenExpr),
+    Loop(LoopExpr),
+    While(WhileExpr),
+    DoWhile(DoWhileExpr),
+    Block(BlockExpr),
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct IfExpr {
+    pub(crate) if_keyword: SyntaxNode<IfKeyword>,
+    pub(crate) condition: ParseResult<Expr>,
+    pub(crate) block: ParseResult<BlockExpr>,
+    pub(crate) else_ifs: Vec<SyntaxNode<ElseIfClause>>,
+    pub(crate) else_cluase: Optional<ElseClause>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct ElseIfClause {
+    pub(crate) else_keyword: SyntaxNode<ElseKeyword>,
+    pub(crate) if_keyword: SyntaxNode<IfKeyword>,
+    pub(crate) condition: ParseResult<Expr>,
+    pub(crate) block: ParseResult<BlockExpr>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct ElseClause {
+    pub(crate) else_keyword: SyntaxNode<ElseKeyword>,
+    pub(crate) block: ParseResult<BlockExpr>,
+}
+#[derive(NazmcParse)]
+pub(crate) struct WhenExpr {
+    pub(crate) when_keyword: SyntaxNode<WhenKeyword>,
+    pub(crate) expr: ParseResult<Expr>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct LoopExpr {
+    pub(crate) loop_keyword: SyntaxNode<LoopKeyword>,
+    pub(crate) block: ParseResult<BlockExpr>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct WhileExpr {
+    pub(crate) while_keyword: SyntaxNode<WhileKeyword>,
+    pub(crate) block: ParseResult<BlockExpr>,
+    pub(crate) condition: ParseResult<Expr>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct DoWhileExpr {
+    pub(crate) do_keyword: SyntaxNode<DoKeyword>,
+    pub(crate) block: ParseResult<BlockExpr>,
+    pub(crate) while_keyword: ParseResult<WhileKeyword>,
+    pub(crate) condition: ParseResult<Expr>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct BlockExpr {
+    pub(crate) open_delimiter: SyntaxNode<OpenCurlyBracesSymbol>,
+    pub(crate) stms: ZeroOrMany<Stm, CloseCurlyBracesSymbol>,
+}
+
+#[derive(NazmcParse)]
+pub(crate) struct ExprWithoutBlock {
     pub(crate) left: SyntaxNode<UnaryExpr>,
     pub(crate) bin: Vec<SyntaxNode<BinExpr>>,
 }
@@ -38,18 +109,12 @@ pub(crate) struct InnerAccessExpr {
 #[derive(NazmcParse)]
 /// It's the atom in constructing an expression
 pub(crate) enum AtomicExpr {
-    Array(Box<ArrayExpr>),
-    Paren(Box<ParenExpr>),
-    Struct(Box<StructExpr>),
-    Id(Box<IdExpr>),
+    Array(ArrayExpr),
+    Paren(ParenExpr),
+    Struct(StructExpr),
+    Id(IdExpr),
     Literal(LiteralExpr),
     On(OnKeyword),
-    If(Box<IfExpr>),
-    When(Box<WhenExpr>),
-    Loop(Box<LoopExpr>),
-    While(Box<WhileExpr>),
-    DoWhile(Box<DoWhileExpr>),
-    BLock(Box<BlockExpr>),
 }
 
 #[derive(NazmcParse)]
@@ -121,24 +186,6 @@ impl NazmcParse for ParseResult<LiteralExpr> {
         }
     }
 }
-
-#[derive(NazmcParse)]
-pub(crate) struct IfExpr {}
-
-#[derive(NazmcParse)]
-pub(crate) struct WhenExpr {}
-
-#[derive(NazmcParse)]
-pub(crate) struct LoopExpr {}
-
-#[derive(NazmcParse)]
-pub(crate) struct WhileExpr {}
-
-#[derive(NazmcParse)]
-pub(crate) struct DoWhileExpr {}
-
-#[derive(NazmcParse)]
-pub(crate) struct BlockExpr {}
 
 pub(crate) struct ArrayExpr {
     pub(crate) open_bracket: SyntaxNode<OpenSquareBracketSymbol>,
