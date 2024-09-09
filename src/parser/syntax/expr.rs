@@ -223,15 +223,16 @@ impl NazmcParse for ParseResult<ArrayExpr> {
 
         let expr_kind_is_broken = !first.is_parsed_and_valid() || kind.is_broken;
 
-        let (expr_kind_tree, close_bracket) = match kind.tree {
+        let (expr_kind_tree, end_span, close_bracket) = match kind.tree {
             CloseArrayExprWithItemsKind::ExplicitSize(explicit_size) => {
                 let close_bracket = explicit_size.close_bracket;
+                let end_span = explicit_size.size_expr.span().unwrap();
                 let expr_kind_tree = ArrayExprKind::ExplicitSize(ExplicitSizeArrayExpr {
                     repeated_expr: first,
                     semicolon: explicit_size.semicolon,
                     size_expr: explicit_size.size_expr,
                 });
-                (expr_kind_tree, close_bracket)
+                (expr_kind_tree, end_span, close_bracket)
             }
             CloseArrayExprWithItemsKind::ImplicitSize(imlicit_size) => {
                 let (trailing_comma, close_bracket) = if imlicit_size.items.terminator.is_parsed() {
@@ -244,16 +245,24 @@ impl NazmcParse for ParseResult<ArrayExpr> {
                     )
                 };
 
+                let end_span = if let Some(span) = trailing_comma.span() {
+                    span
+                } else if let Some(item) = imlicit_size.items.items.last() {
+                    item.span().unwrap()
+                } else {
+                    first_span
+                };
+
                 let expr_kind_tree = ArrayExprKind::Elements(ElementsArrayExpr {
                     first,
                     rest: imlicit_size.items.items,
                     trailing_comma,
                 });
-                (expr_kind_tree, close_bracket)
+                (expr_kind_tree, end_span, close_bracket)
             }
         };
 
-        let expr_kind_span = first_span.merged_with(&close_bracket.span().unwrap());
+        let expr_kind_span = first_span.merged_with(&end_span);
 
         ParseResult::Parsed(SyntaxNode {
             span,
