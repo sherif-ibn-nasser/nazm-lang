@@ -8,6 +8,8 @@ mod typ;
 
 mod punctuated;
 
+mod symbols;
+
 mod stm;
 
 use super::*;
@@ -26,6 +28,14 @@ use typ::*;
 
 use stm::*;
 
+use symbols::*;
+
+#[derive(NazmcParse)]
+pub(crate) struct ColonWithType {
+    pub(crate) colon: SyntaxNode<ColonSymbol>,
+    pub(crate) typ: ParseResult<Type>,
+}
+
 #[derive(NazmcParse)]
 pub(crate) enum VisModifier {
     Public(PublicKeyword),
@@ -35,8 +45,7 @@ pub(crate) enum VisModifier {
 #[derive(NazmcParse)]
 pub(crate) struct FnParam {
     pub(crate) name: SyntaxNode<Id>,
-    pub(crate) colon: ParseResult<ColonSymbol>,
-    pub(crate) typ: ParseResult<Type>,
+    pub(crate) typ: ParseResult<ColonWithType>,
 }
 
 #[derive(NazmcParse)]
@@ -67,6 +76,8 @@ generateTrailingCommaWithCloseDelimiter!(CloseCurlyBracesSymbol);
 
 generateTrailingCommaWithCloseDelimiter!(CloseSquareBracketSymbol);
 
+generateTrailingCommaWithCloseDelimiter!(RArrow);
+
 generatePunctuatedItem!(Type);
 
 generatePunctuatedItem!(StructField);
@@ -76,6 +87,10 @@ generatePunctuatedItem!(FnParam);
 generatePunctuatedItem!(Expr);
 
 generatePunctuatedItem!(StructFieldInitExpr);
+
+generatePunctuatedItem!(BindingDecl);
+
+generatePunctuatedItem!(BindingDeclKind);
 
 generateDelimitedPunctuated!(
     StructFieldsDecl,
@@ -112,3 +127,16 @@ generateDelimitedPunctuated!(
     StructFieldInitExpr,
     CloseCurlyBracesSymbol
 );
+
+generateDelimitedPunctuated!(
+    DestructedTuple,
+    OpenParenthesisSymbol,
+    BindingDeclKind,
+    CloseParenthesisSymbol
+);
+
+#[derive(NazmcParse)]
+pub(crate) enum BindingDeclKind {
+    Id(Id),
+    Destructed(Box<DestructedTuple>), // Box for the large size
+}

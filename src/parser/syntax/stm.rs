@@ -11,16 +11,15 @@ pub(crate) enum Stm {
 pub(crate) struct LetStm {
     pub(crate) let_keyword: SyntaxNode<LetKeyword>,
     pub(crate) mut_keyword: Optional<MutKeyword>,
-    pub(crate) id: ParseResult<Id>,
-    pub(crate) let_type: Optional<LetType>,
+    pub(crate) decl: ParseResult<BindingDecl>,
     pub(crate) let_assign: Optional<LetAssign>,
     pub(crate) semicolon: ParseResult<SemicolonSymbol>,
 }
 
 #[derive(NazmcParse)]
-pub(crate) struct LetType {
-    pub(crate) colon: SyntaxNode<ColonSymbol>,
-    pub(crate) typ: ParseResult<Type>,
+pub(crate) struct BindingDecl {
+    pub(crate) kind: SyntaxNode<BindingDeclKind>,
+    pub(crate) typ: Optional<ColonWithType>,
 }
 
 #[derive(NazmcParse)]
@@ -45,4 +44,8 @@ pub(crate) struct ExprWithBlockStm {
 pub(crate) struct AnyExprStm {
     pub(crate) expr: SyntaxNode<Expr>,
     pub(crate) semicolon: ParseResult<SemicolonSymbol>,
+}
+
+fn test() {
+    let (x,): (i32,) = (5,);
 }
