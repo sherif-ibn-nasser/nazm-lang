@@ -119,14 +119,15 @@ create_keyword_parser!(Do);
 create_keyword_parser!(Break);
 create_keyword_parser!(Continue);
 create_keyword_parser!(Return);
+create_keyword_parser!(Run);
 
 create_symbol_parser!(Comma);
 create_symbol_parser!(Semicolon);
 create_symbol_parser!(QuestionMark);
 create_symbol_parser!(OpenParenthesis);
 create_symbol_parser!(CloseParenthesis);
-create_symbol_parser!(OpenCurlyBraces);
-create_symbol_parser!(CloseCurlyBraces);
+create_symbol_parser!(OpenCurlyBrace);
+create_symbol_parser!(CloseCurlyBrace);
 create_symbol_parser!(OpenSquareBracket);
 create_symbol_parser!(CloseSquareBracket);
 create_symbol_parser!(Dot);
@@ -154,7 +155,7 @@ mod tests {
     };
 
     use super::{
-        CloseCurlyBracesSymbol, CloseParenthesisSymbol, FnKeyword, Id, OpenCurlyBracesSymbol,
+        CloseCurlyBraceSymbol, CloseParenthesisSymbol, FnKeyword, Id, OpenCurlyBraceSymbol,
         OpenParenthesisSymbol,
     };
 
@@ -171,8 +172,8 @@ mod tests {
         let _id = ParseResult::<Id>::parse(&mut iter);
         let _open_paren = ParseResult::<OpenParenthesisSymbol>::parse(&mut iter);
         let _close_paren = ParseResult::<CloseParenthesisSymbol>::parse(&mut iter);
-        let _open_curly = ParseResult::<OpenCurlyBracesSymbol>::parse(&mut iter);
-        let _close_curly = ParseResult::<CloseCurlyBracesSymbol>::parse(&mut iter);
+        let _open_curly = ParseResult::<OpenCurlyBraceSymbol>::parse(&mut iter);
+        let _close_curly = ParseResult::<CloseCurlyBraceSymbol>::parse(&mut iter);
 
         assert!(_fn.is_parsed());
         assert!(_id.is_parsed());

@@ -45,7 +45,3 @@ pub(crate) struct AnyExprStm {
     pub(crate) expr: SyntaxNode<Expr>,
     pub(crate) semicolon: ParseResult<SemicolonSymbol>,
 }
-
-fn test() {
-    let (x,): (i32,) = (5,);
-}

@@ -72,9 +72,9 @@ pub enum SymbolKind {
     /// )
     CloseParenthesis,
     /// {
-    OpenCurlyBraces,
+    OpenCurlyBrace,
     /// }
-    CloseCurlyBraces,
+    CloseCurlyBrace,
     /// [
     OpenSquareBracket,
     /// ]
@@ -149,4 +149,6 @@ pub enum KeywordKind {
     Continue,
     /// أرجع
     Return,
+    /// تشغيل
+    Run,
 }

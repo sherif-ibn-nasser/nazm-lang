@@ -72,7 +72,7 @@ generateTrailingCommaWithCloseDelimiter!(CloseParenthesisSymbol);
 
 generateTrailingCommaWithCloseDelimiter!(CloseAngleBracketOrGreaterSymbol);
 
-generateTrailingCommaWithCloseDelimiter!(CloseCurlyBracesSymbol);
+generateTrailingCommaWithCloseDelimiter!(CloseCurlyBraceSymbol);
 
 generateTrailingCommaWithCloseDelimiter!(CloseSquareBracketSymbol);
 
@@ -94,9 +94,9 @@ generatePunctuatedItem!(BindingDeclKind);
 
 generateDelimitedPunctuated!(
     StructFieldsDecl,
-    OpenCurlyBracesSymbol,
+    OpenCurlyBraceSymbol,
     StructField,
-    CloseCurlyBracesSymbol
+    CloseCurlyBraceSymbol
 );
 
 generateDelimitedPunctuated!(
@@ -123,9 +123,9 @@ generateDelimitedPunctuated!(
 
 generateDelimitedPunctuated!(
     StructFieldsInitExpr,
-    OpenCurlyBracesSymbol,
+    OpenCurlyBraceSymbol,
     StructFieldInitExpr,
-    CloseCurlyBracesSymbol
+    CloseCurlyBraceSymbol
 );
 
 generateDelimitedPunctuated!(

@@ -93,11 +93,11 @@ impl<'a> LexerIter<'a> {
             }
             '{' => {
                 self.next_cursor();
-                TokenKind::Symbol(SymbolKind::OpenCurlyBraces)
+                TokenKind::Symbol(SymbolKind::OpenCurlyBrace)
             }
             '}' => {
                 self.next_cursor();
-                TokenKind::Symbol(SymbolKind::CloseCurlyBraces)
+                TokenKind::Symbol(SymbolKind::CloseCurlyBrace)
             }
             '[' => {
                 self.next_cursor();

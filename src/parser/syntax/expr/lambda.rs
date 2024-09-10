@@ -2,12 +2,20 @@ use crate::SymbolKind;
 
 use super::*;
 
-#[derive(NazmcParse)]
 pub(crate) struct LambdaExpr {
-    pub(crate) open_curly: SyntaxNode<OpenCurlyBracesSymbol>,
-    pub(crate) arrow: Optional<LambdaArrow>,
-    // TODO: stms
-    pub(crate) close_curly: SyntaxNode<CloseCurlyBracesSymbol>,
+    pub(crate) open_curly: SyntaxNode<OpenCurlyBraceSymbol>,
+    pub(crate) lambda_arrow: Optional<LambdaArrow>,
+    pub(crate) stms: Vec<ParseResult<Stm>>,
+    /// The last expression that has no semicolons
+    pub(crate) last_expr: Optional<Expr>,
+    pub(crate) close_curly: ParseResult<CloseCurlyBraceSymbol>,
+}
+
+#[derive(NazmcParse)]
+struct LambdaExprImpl {
+    pub(crate) open_curly: SyntaxNode<OpenCurlyBraceSymbol>,
+    pub(crate) lambda_arrow: Optional<LambdaArrow>,
+    pub(crate) stms: ZeroOrMany<Stm, CloseCurlyBraceSymbol>,
 }
 
 #[derive(NazmcParse)]
@@ -23,6 +31,71 @@ pub(crate) struct LambdaParams {
     pub(crate) r_arrow: ParseResult<RArrow>,
 }
 
+impl NazmcParse for ParseResult<LambdaExpr> {
+    fn parse(iter: &mut super::TokensIter) -> Self {
+        let peek_idx = iter.peek_idx;
+        let node = match ParseResult::<LambdaExprImpl>::parse(iter) {
+            ParseResult::Parsed(node) => node,
+            ParseResult::Unexpected { span, found, .. } => {
+                iter.peek_idx = peek_idx;
+                return ParseResult::Unexpected {
+                    span,
+                    found,
+                    is_start_failure: true,
+                };
+            }
+        };
+
+        let span = node.span;
+        let is_broken = node.is_broken;
+        let open_curly = node.tree.open_curly;
+        let lambda_arrow = node.tree.lambda_arrow;
+        let mut stms = node.tree.stms.items;
+
+        let pop = matches!(
+            stms.last(),
+            Some(ParseResult::Parsed(SyntaxNode {
+                tree: Stm::Expr(ExprStm::Any(AnyExprStm {
+                    semicolon: ParseResult::Unexpected { .. },
+                    ..
+                })),
+                ..
+            }))
+        );
+
+        let last_expr = if pop {
+            let Some(ParseResult::Parsed(SyntaxNode {
+                tree:
+                    Stm::Expr(ExprStm::Any(AnyExprStm {
+                        semicolon: ParseResult::Unexpected { .. },
+                        expr,
+                    })),
+                ..
+            })) = stms.pop()
+            else {
+                unreachable!()
+            };
+
+            Optional::Some(expr)
+        } else {
+            Optional::None
+        };
+
+        let close_curly = node.tree.stms.terminator;
+        ParseResult::Parsed(SyntaxNode {
+            span,
+            is_broken,
+            tree: LambdaExpr {
+                open_curly,
+                lambda_arrow,
+                stms,
+                last_expr,
+                close_curly,
+            },
+        })
+    }
+}
+
 impl NazmcParse for ParseResult<LambdaParams> {
     fn parse(iter: &mut TokensIter) -> Self {
         let peek_idx = iter.peek_idx;
@@ -30,6 +103,7 @@ impl NazmcParse for ParseResult<LambdaParams> {
         let first = match <ParseResult<BindingDecl>>::parse(iter) {
             ParseResult::Parsed(tree) => tree,
             ParseResult::Unexpected { span, found, .. } => {
+                iter.peek_idx = peek_idx;
                 return ParseResult::Unexpected {
                     span,
                     found,

@@ -1,15 +1,11 @@
 use super::*;
 
-mod block;
-mod conditional;
-use block::*;
-use conditional::*;
-
 #[derive(NazmcParse)]
 pub(crate) struct IfExpr {
     pub(crate) if_keyword: SyntaxNode<IfKeyword>,
     pub(crate) condition: ParseResult<Expr>,
-    pub(crate) block: ParseResult<BlockExpr>,
+    /// This must be checked that it doesn't have a lambda arrow
+    pub(crate) block: ParseResult<LambdaExpr>,
     pub(crate) else_ifs: Vec<SyntaxNode<ElseIfClause>>,
     pub(crate) else_cluase: Optional<ElseClause>,
 }
@@ -19,45 +15,52 @@ pub(crate) struct ElseIfClause {
     pub(crate) else_keyword: SyntaxNode<ElseKeyword>,
     pub(crate) if_keyword: SyntaxNode<IfKeyword>,
     pub(crate) condition: ParseResult<Expr>,
-    pub(crate) block: ParseResult<BlockExpr>,
+    /// This must be checked that it doesn't have a lambda arrow
+    pub(crate) block: ParseResult<LambdaExpr>,
 }
 
 #[derive(NazmcParse)]
 pub(crate) struct ElseClause {
     pub(crate) else_keyword: SyntaxNode<ElseKeyword>,
-    pub(crate) block: ParseResult<BlockExpr>,
+    /// This must be checked that it doesn't have a lambda arrow
+    pub(crate) block: ParseResult<LambdaExpr>,
 }
 #[derive(NazmcParse)]
 pub(crate) struct WhenExpr {
     pub(crate) when_keyword: SyntaxNode<WhenKeyword>,
     pub(crate) expr: ParseResult<Expr>,
+    // TODO
 }
 
 #[derive(NazmcParse)]
 pub(crate) struct LoopExpr {
     pub(crate) loop_keyword: SyntaxNode<LoopKeyword>,
-    pub(crate) block: ParseResult<BlockExpr>,
+    /// This must be checked that it doesn't have a lambda arrow
+    pub(crate) block: ParseResult<LambdaExpr>,
 }
 
 #[derive(NazmcParse)]
 pub(crate) struct WhileExpr {
     pub(crate) while_keyword: SyntaxNode<WhileKeyword>,
-    pub(crate) block: ParseResult<BlockExpr>,
+    /// This must be checked that it doesn't have a lambda arrow
+    pub(crate) block: ParseResult<LambdaExpr>,
     pub(crate) condition: ParseResult<Expr>,
 }
 
 #[derive(NazmcParse)]
 pub(crate) struct DoWhileExpr {
     pub(crate) do_keyword: SyntaxNode<DoKeyword>,
-    pub(crate) block: ParseResult<BlockExpr>,
+    /// This must be checked that it doesn't have a lambda arrow
+    pub(crate) block: ParseResult<LambdaExpr>,
     pub(crate) while_keyword: ParseResult<WhileKeyword>,
     pub(crate) condition: ParseResult<Expr>,
 }
 
 #[derive(NazmcParse)]
-pub(crate) struct BlockExpr {
-    pub(crate) open_delimiter: SyntaxNode<OpenCurlyBracesSymbol>,
-    pub(crate) stms: ZeroOrMany<Stm, CloseCurlyBracesSymbol>,
+pub(crate) struct RunExpr {
+    pub(crate) run: SyntaxNode<RunKeyword>,
+    /// This must be checked that it doesn't have a lambda arrow
+    pub(crate) block: ParseResult<LambdaExpr>,
 }
 
 #[derive(NazmcParse)]

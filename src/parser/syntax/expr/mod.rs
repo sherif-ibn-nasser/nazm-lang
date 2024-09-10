@@ -7,10 +7,10 @@ mod control_flow;
 mod lambda;
 mod op;
 
-use array::*;
-use control_flow::*;
-use lambda::*;
-use op::*;
+pub(crate) use array::*;
+pub(crate) use control_flow::*;
+pub(crate) use lambda::*;
+pub(crate) use op::*;
 
 #[derive(NazmcParse)]
 pub(crate) enum ExprWithBlock {
@@ -19,7 +19,7 @@ pub(crate) enum ExprWithBlock {
     Loop(LoopExpr),
     While(WhileExpr),
     DoWhile(DoWhileExpr),
-    Block(BlockExpr),
+    Run(RunExpr),
 }
 
 #[derive(NazmcParse)]
