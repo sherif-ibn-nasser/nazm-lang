@@ -32,7 +32,7 @@ pub(crate) struct LetAssign {
 #[derive(NazmcParse)]
 pub(crate) enum ExprStm {
     WithBlock(ExprWithBlockStm),
-    WithoutBlock(ExprWithBlockStm),
+    Any(AnyExprStm),
 }
 
 #[derive(NazmcParse)]
@@ -42,7 +42,7 @@ pub(crate) struct ExprWithBlockStm {
 }
 
 #[derive(NazmcParse)]
-pub(crate) struct ExprWithoutBlockStm {
-    pub(crate) expr: SyntaxNode<ExprWithoutBlock>,
+pub(crate) struct AnyExprStm {
+    pub(crate) expr: SyntaxNode<Expr>,
     pub(crate) semicolon: ParseResult<SemicolonSymbol>,
 }
