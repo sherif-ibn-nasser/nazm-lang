@@ -79,3 +79,64 @@ pub(crate) struct ReturnExpr {
     pub(crate) return_keyowrd: SyntaxNode<ReturnKeyword>,
     pub(crate) expr: Optional<Expr>,
 }
+
+struct ConditionalBlock {
+    pub(crate) condition: SyntaxNode<Expr>,
+    /// This must be checked that it doesn't have a lambda arrow
+    pub(crate) block: ParseResult<LambdaExpr>,
+}
+
+impl NazmcParse for ParseResult<ConditionalBlock> {
+    fn parse(iter: &mut TokensIter) -> Self {
+        let peek_idx = iter.peek_idx;
+        let condition = match ParseResult::<Expr>::parse(iter) {
+            ParseResult::Parsed(node) => node,
+            ParseResult::Unexpected { span, found, .. } => {
+                iter.peek_idx = peek_idx;
+                return ParseResult::Unexpected {
+                    span,
+                    found,
+                    is_start_failure: true,
+                };
+            }
+        };
+
+        let last_unary_ex = match condition.tree.bin.last() {
+            Some(SyntaxNode {
+                tree:
+                    BinExpr {
+                        right: ParseResult::Parsed(node),
+                        ..
+                    },
+                ..
+            }) => node,
+            _ => &condition.tree.left,
+        };
+
+        //let last_lambda_expr =
+        match last_unary_ex.tree.post_ops.last() {
+            Some(SyntaxNode {
+                tree:
+                    PostOpExpr::Lambda(LambdaExpr {
+                        lambda_arrow: Optional::None, // No '->' in the lambda expression
+                        ..
+                    }),
+                ..
+            }) => todo!(), // Block is found
+            Some(_) => todo!(), // Block expected after the condition
+            None => match &last_unary_ex.tree.expr {
+                SyntaxNode {
+                    tree:
+                        AtomicExpr::Lambda(LambdaExpr {
+                            lambda_arrow: Optional::None, // No '->' in the lambda expression
+                            ..
+                        }),
+                    ..
+                } if last_unary_ex.tree.ops.is_empty() => todo!(), // Condition expected before the block
+                _ => todo!(), // Block expected after the condition
+            },
+        };
+
+        todo!()
+    }
+}

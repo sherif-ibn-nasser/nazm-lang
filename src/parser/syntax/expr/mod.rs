@@ -43,7 +43,7 @@ pub(crate) struct BinExpr {
 #[derive(NazmcParse)]
 pub(crate) struct UnaryExpr {
     pub(crate) ops: Vec<SyntaxNode<UnaryOp>>,
-    pub(crate) expr: ParseResult<AtomicExpr>,
+    pub(crate) expr: SyntaxNode<AtomicExpr>,
     pub(crate) post_ops: Vec<SyntaxNode<PostOpExpr>>,
     pub(crate) inner_access: Vec<SyntaxNode<InnerAccessExpr>>,
 }
