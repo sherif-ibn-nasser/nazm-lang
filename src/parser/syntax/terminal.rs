@@ -3,7 +3,13 @@ use crate::{
     KeywordKind, SymbolKind, Token, TokenKind,
 };
 
+use nazmc_diagnostics::span::Span;
 use paste::paste;
+
+pub(crate) struct Terminal<T> {
+    pub(crate) span: Span,
+    pub(crate) data: T,
+}
 
 pub(crate) struct Id {
     val: String,

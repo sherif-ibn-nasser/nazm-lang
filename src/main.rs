@@ -3,13 +3,8 @@ mod lexer;
 mod parser;
 
 use lexer::*;
-use nazmc_parse_derive::NazmcParse;
 use owo_colors::{OwoColorize, XtermColors};
-use parser::{
-    syntax::{CloseParenthesisSymbol, FnKeyword, Id, OpenParenthesisSymbol},
-    tokens_iter::TokensIter,
-    NazmcParse, ParseResult, SyntaxNode,
-};
+use parser::tokens_iter::TokensIter;
 use std::{
     io::{self, Write},
     process::Command,
