@@ -404,372 +404,368 @@ where
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-
-//     use syntax::*;
-
-//     use crate::LexerIter;
-
-//     use super::*;
-
-//     #[derive(NazmcParse)]
-//     pub(crate) enum TermBinOp {
-//         Plus(PlusSymbol),
-//         Minus(Box<MinusSymbol>),
-//     }
-
-//     #[derive(NazmcParse)]
-//     pub(crate) struct SimpleFn {
-//         pub(crate) _fn: SyntaxNode<FnKeyword>,
-//         pub(crate) _id: ParseResult<Id>,
-//         pub(crate) _params_decl: ParseResult<FnParamsDecl>,
-//     }
-
-//     pub(crate) struct FnParamsDecl {
-//         pub(crate) _open_paren: SyntaxNode<OpenParenthesisSymbol>,
-//         pub(crate) _params: Optional<FnParams>,
-//         pub(crate) _close_paren: ParseResult<CloseParenthesisSymbol>,
-//     }
-
-//     impl NazmcParse for ParseResult<FnParamsDecl> {
-//         fn parse(iter: &mut TokensIter) -> Self {
-//             let parse_result = ParseResult::<FnParamsDeclImpl>::parse(iter);
-
-//             let decl_impl_node = match parse_result {
-//                 ParseResult::Parsed(decl_impl) => decl_impl,
-//                 ParseResult::Unexpected {
-//                     span,
-//                     found,
-//                     is_start_failure,
-//                 } => {
-//                     return ParseResult::Unexpected {
-//                         span,
-//                         found,
-//                         is_start_failure,
-//                     }
-//                 }
-//             };
-
-//             let is_broken = decl_impl_node.is_broken;
-//             let span = decl_impl_node.span;
-//             let open_paren = decl_impl_node.tree._open_paren;
-
-//             // The unexpected case is unreachable as it will be include in WithParams case, so we can safely unwrap it
-//             let close = decl_impl_node.tree._fn_param_close.unwrap();
-
-//             let fn_decl_with_params = match close.tree {
-//                 CloseFnParamsDecl::NoParams(close_paren) => {
-//                     return ParseResult::Parsed(SyntaxNode {
-//                         span,
-//                         is_broken,
-//                         tree: FnParamsDecl {
-//                             _open_paren: open_paren,
-//                             _params: Optional::None,
-//                             _close_paren: ParseResult::Parsed(SyntaxNode {
-//                                 span: close.span,
-//                                 is_broken: close.is_broken,
-//                                 tree: close_paren,
-//                             }),
-//                         },
-//                     })
-//                 }
-//                 CloseFnParamsDecl::WithParams(fn_decl_with_params) => fn_decl_with_params,
-//             };
-
-//             let first_param = fn_decl_with_params._first_param;
-//             let rest_params = fn_decl_with_params._params.items;
-//             let (trailing_comma, close_paren) = match fn_decl_with_params._params.terminator {
-//                 ParseResult::Parsed(node) => (
-//                     node.tree._comma,
-//                     ParseResult::Parsed(node.tree._close_paren),
-//                 ),
-//                 ParseResult::Unexpected {
-//                     span,
-//                     found,
-//                     is_start_failure,
-//                 } => (
-//                     Optional::None,
-//                     ParseResult::Unexpected {
-//                         span,
-//                         found,
-//                         is_start_failure,
-//                     },
-//                 ),
-//             };
-
-//             let mut params_span = first_param.span().unwrap();
-
-//             if let Optional::Some(comma_node) = &trailing_comma {
-//                 params_span = params_span.merged_with(&comma_node.span)
-//             } else if let Option::Some(last_param) = rest_params.last() {
-//                 params_span = params_span.merged_with(&last_param.span().unwrap())
-//             }
-
-//             let params = SyntaxNode {
-//                 span: params_span,
-//                 is_broken: !first_param.is_parsed_and_valid()
-//                     || rest_params.iter().any(|p| !p.is_parsed_and_valid())
-//                     || !trailing_comma.is_parsed_and_valid(),
-//                 tree: FnParams {
-//                     _first_param: first_param,
-//                     _rest_params: rest_params,
-//                     _trailing_comma: trailing_comma,
-//                 },
-//             };
-
-//             ParseResult::Parsed(SyntaxNode {
-//                 span,
-//                 is_broken,
-//                 tree: FnParamsDecl {
-//                     _open_paren: open_paren,
-//                     _params: Optional::Some(params),
-//                     _close_paren: close_paren,
-//                 },
-//             })
-//         }
-//     }
-
-//     pub(crate) struct FnParams {
-//         pub(crate) _first_param: ParseResult<FnParam>,
-//         pub(crate) _rest_params: Vec<ParseResult<CommaWithFnParam>>,
-//         pub(crate) _trailing_comma: Optional<CommaSymbol>,
-//     }
-
-//     impl NazmcParse for ParseResult<FnParams> {
-//         fn parse(_iter: &mut TokensIter) -> Self {
-//             unreachable!() // Just  added to usee it as Optional
-//         }
-//     }
-
-//     #[derive(NazmcParse)]
-//     pub(crate) struct FnParamsDeclImpl {
-//         pub(crate) _open_paren: SyntaxNode<OpenParenthesisSymbol>,
-//         pub(crate) _fn_param_close: ParseResult<CloseFnParamsDecl>,
-//     }
-
-//     #[derive(NazmcParse)]
-//     pub(crate) enum CloseFnParamsDecl {
-//         NoParams(CloseParenthesisSymbol),
-//         WithParams(Box<FnDeclWithParams>),
-//     }
-
-//     #[derive(NazmcParse)]
-//     pub(crate) struct FnDeclWithParams {
-//         pub(crate) _first_param: ParseResult<FnParam>,
-//         pub(crate) _params: ZeroOrMany<CommaWithFnParam, CommaWithCloseParenthesis>,
-//     }
-
-//     #[derive(NazmcParse)]
-//     pub(crate) struct CommaWithFnParam {
-//         _comma: SyntaxNode<CommaSymbol>,
-//         _fn_param: SyntaxNode<FnParam>,
-//     }
-
-//     #[derive(NazmcParse)]
-//     pub(crate) struct CommaWithCloseParenthesis {
-//         _comma: Optional<CommaSymbol>,
-//         _close_paren: SyntaxNode<CloseParenthesisSymbol>,
-//     }
-
-//     #[derive(NazmcParse)]
-//     pub(crate) struct FnParam {
-//         pub(crate) _name: SyntaxNode<Id>,
-//         pub(crate) _colon: ParseResult<ColonSymbol>,
-//         pub(crate) _type: ParseResult<Id>,
-//     }
-
-//     #[test]
-//     fn test_wrong_params() {
-//         let (tokens, ..) =
-//             LexerIter::new("دالة البداية(123 دالة، ت: ح 444، س: ص، ع: ك،) {}").collect_all();
-//         let mut tokens_iter = TokensIter::new(&tokens);
-//         tokens_iter.next(); // Init recent
-
-//         let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
-//         let fn_node = parse_result.unwrap();
-
-//         assert!(fn_node.is_broken);
-//         assert!(!fn_node.tree._fn.is_broken);
-
-//         let params_decl = fn_node.tree._params_decl.unwrap();
-//         assert!(params_decl.is_broken);
-//         assert!(!params_decl.tree._open_paren.is_broken);
-//         assert!(params_decl.tree._close_paren.is_parsed_and_valid());
-
-//         assert!(params_decl.tree._params.is_some_and_broken());
-//         let params = params_decl.tree._params.unwrap().tree;
-
-//         assert!(params._first_param.is_unexpected());
-//         println!("{:?}\n----------", params._first_param);
-//         assert!(params._trailing_comma.is_some_and_valid());
-
-//         for param in params._rest_params {
-//             println!("{:?}", param)
-//         }
-//     }
-
-//     #[test]
-//     fn test_enum() {
-//         let (tokens, ..) = LexerIter::new("+-  /** */ - +").collect_all();
-//         let mut tokens_iter = TokensIter::new(&tokens);
-//         tokens_iter.next(); // Init recent
-
-//         let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
-//         assert!(parse_result.is_parsed_and_valid());
-//         let op = parse_result.unwrap().tree;
-//         assert!(matches!(op, TermBinOp::Plus(_)));
-
-//         let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
-//         assert!(parse_result.is_parsed_and_valid());
-//         let op = parse_result.unwrap().tree;
-//         assert!(matches!(op, TermBinOp::Minus(_)));
-
-//         let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
-//         assert!(parse_result.is_parsed_and_valid());
-//         let op = parse_result.unwrap().tree;
-//         assert!(matches!(op, TermBinOp::Minus(_)));
-
-//         let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
-//         assert!(parse_result.is_parsed_and_valid());
-//         let op = parse_result.unwrap().tree;
-//         assert!(matches!(op, TermBinOp::Plus(_)));
-//     }
-
-//     #[test]
-//     fn test_zero_params() {
-//         let (tokens, ..) = LexerIter::new("دالة البداية() {}").collect_all();
-//         let mut tokens_iter = TokensIter::new(&tokens);
-//         tokens_iter.next(); // Init recent
-
-//         let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
-
-//         let ParseResult::Parsed(fn_node) = parse_result else {
-//             panic!();
-//         };
-
-//         assert!(!fn_node.tree._fn.is_broken);
-//         assert!(fn_node.tree._id.is_parsed_and_valid());
-
-//         let params_decl = fn_node.tree._params_decl.unwrap();
-//         assert!(!params_decl.is_broken);
-//         assert!(!params_decl.tree._open_paren.is_broken);
-//         assert!(params_decl.tree._close_paren.is_parsed_and_valid());
-
-//         assert!(params_decl.tree._params.is_none());
-//     }
-
-//     #[test]
-//     fn test_one_param_no_trailing_comma() {
-//         let (tokens, ..) = LexerIter::new("دالة البداية(س: ص8) {}").collect_all();
-//         let mut tokens_iter = TokensIter::new(&tokens);
-//         tokens_iter.next(); // Init recent
-
-//         let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
-
-//         let ParseResult::Parsed(fn_node) = parse_result else {
-//             panic!();
-//         };
-
-//         assert!(!fn_node.tree._fn.is_broken);
-//         assert!(fn_node.tree._id.is_parsed_and_valid());
-
-//         let params_decl = fn_node.tree._params_decl.unwrap();
-//         assert!(!params_decl.is_broken);
-//         assert!(!params_decl.tree._open_paren.is_broken);
-//         assert!(params_decl.tree._close_paren.is_parsed_and_valid());
-
-//         assert!(params_decl.tree._params.is_some_and_valid());
-//         let params = params_decl.tree._params.unwrap().tree;
-
-//         assert!(params._first_param.is_parsed_and_valid());
-//         assert!(params._rest_params.is_empty());
-//         assert!(params._trailing_comma.is_none());
-//     }
-
-//     #[test]
-//     fn test_one_param_with_trailing_comma() {
-//         let (tokens, ..) = LexerIter::new("دالة البداية(س: ص8،) {}").collect_all();
-//         let mut tokens_iter = TokensIter::new(&tokens);
-//         tokens_iter.next(); // Init recent
-
-//         let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
-
-//         let ParseResult::Parsed(fn_node) = parse_result else {
-//             panic!();
-//         };
-
-//         assert!(!fn_node.tree._fn.is_broken);
-//         assert!(fn_node.tree._id.is_parsed_and_valid());
-
-//         let params_decl = fn_node.tree._params_decl.unwrap();
-//         assert!(!params_decl.is_broken);
-//         assert!(!params_decl.tree._open_paren.is_broken);
-//         assert!(params_decl.tree._close_paren.is_parsed_and_valid());
-
-//         assert!(params_decl.tree._params.is_some_and_valid());
-//         let params = params_decl.tree._params.unwrap().tree;
-
-//         assert!(params._first_param.is_parsed_and_valid());
-//         assert!(params._rest_params.is_empty());
-//         assert!(params._trailing_comma.is_some_and_valid());
-//     }
-
-//     #[test]
-//     fn test_two_params_no_trailing_comma() {
-//         let (tokens, ..) = LexerIter::new("دالة البداية(س: ص8، ك: م) {}").collect_all();
-//         let mut tokens_iter = TokensIter::new(&tokens);
-//         tokens_iter.next(); // Init recent
-
-//         let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
-
-//         let ParseResult::Parsed(fn_node) = parse_result else {
-//             panic!();
-//         };
-
-//         assert!(!fn_node.tree._fn.is_broken);
-//         assert!(fn_node.tree._id.is_parsed_and_valid());
-
-//         let params_decl = fn_node.tree._params_decl.unwrap();
-//         assert!(!params_decl.is_broken);
-//         assert!(!params_decl.tree._open_paren.is_broken);
-//         assert!(params_decl.tree._close_paren.is_parsed_and_valid());
-
-//         assert!(params_decl.tree._params.is_some_and_valid());
-//         let params = params_decl.tree._params.unwrap().tree;
-
-//         assert!(params._first_param.is_parsed_and_valid());
-//         assert!(params._rest_params.len() == 1);
-//         assert!(params._rest_params[0].is_parsed_and_valid());
-//         assert!(params._trailing_comma.is_none());
-//     }
-
-//     #[test]
-//     fn test_two_params_with_trailing_comma() {
-//         let (tokens, ..) = LexerIter::new("دالة البداية(س: ص8، ك: م،) {}").collect_all();
-//         let mut tokens_iter = TokensIter::new(&tokens);
-//         tokens_iter.next(); // Init recent
-
-//         let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
-
-//         let ParseResult::Parsed(fn_node) = parse_result else {
-//             panic!();
-//         };
-
-//         assert!(!fn_node.tree._fn.is_broken);
-//         assert!(fn_node.tree._id.is_parsed_and_valid());
-
-//         let params_decl = fn_node.tree._params_decl.unwrap();
-//         assert!(!params_decl.is_broken);
-//         assert!(!params_decl.tree._open_paren.is_broken);
-//         assert!(params_decl.tree._close_paren.is_parsed_and_valid());
-
-//         assert!(params_decl.tree._params.is_some_and_valid());
-//         let params = params_decl.tree._params.unwrap().tree;
-
-//         assert!(params._first_param.is_parsed_and_valid());
-//         assert!(params._rest_params.len() == 1);
-//         assert!(params._rest_params[0].is_parsed_and_valid());
-//         assert!(params._trailing_comma.is_some_and_valid());
-//     }
-// }
+#[cfg(test)]
+mod tests {
+
+    use syntax::*;
+
+    use crate::LexerIter;
+
+    use super::*;
+
+    #[derive(NazmcParse)]
+    pub(crate) enum TermBinOp {
+        Plus(PlusSymbol),
+        Minus(Box<MinusSymbol>),
+    }
+
+    #[test]
+    fn test_enum() {
+        let (tokens, ..) = LexerIter::new("+-  /** */ - +").collect_all();
+        let mut tokens_iter = TokensIter::new(&tokens);
+        tokens_iter.next(); // Init recent
+
+        let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
+        let op = parse_result.unwrap();
+        assert!(matches!(op, TermBinOp::Plus(_)));
+
+        let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
+        let op = parse_result.unwrap();
+        assert!(matches!(op, TermBinOp::Minus(_)));
+
+        let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
+        let op = parse_result.unwrap();
+        assert!(matches!(op, TermBinOp::Minus(_)));
+
+        let parse_result = <ParseResult<TermBinOp>>::parse(&mut tokens_iter);
+        let op = parse_result.unwrap();
+        assert!(matches!(op, TermBinOp::Plus(_)));
+    }
+
+    // #[derive(NazmcParse)]
+    // pub(crate) struct SimpleFn {
+    //     pub(crate) _fn: FnKeyword,
+    //     pub(crate) _id: ParseResult<Id>,
+    //     pub(crate) _params_decl: ParseResult<FnParamsDecl>,
+    // }
+
+    // pub(crate) struct FnParamsDecl {
+    //     pub(crate) _open_paren: OpenParenthesisSymbol,
+    //     pub(crate) _params: Option<FnParams>,
+    //     pub(crate) _close_paren: ParseResult<CloseParenthesisSymbol>,
+    // }
+
+    // impl NazmcParse for ParseResult<FnParamsDecl> {
+    //     fn parse(iter: &mut TokensIter) -> Self {
+    //         let parse_result = ParseResult::<FnParamsDeclImpl>::parse(iter);
+
+    //         let decl_impl_node = match parse_result {
+    //             ParseResult::Parsed(decl_impl) => decl_impl,
+    //             ParseResult::Unexpected {
+    //                 span,
+    //                 found,
+    //                 is_start_failure,
+    //             } => {
+    //                 return ParseResult::Unexpected {
+    //                     span,
+    //                     found,
+    //                     is_start_failure,
+    //                 }
+    //             }
+    //         };
+
+    //         let is_broken = decl_impl_node.is_broken;
+    //         let span = decl_impl_node.span;
+    //         let open_paren = decl_impl_node.tree._open_paren;
+
+    //         // The unexpected case is unreachable as it will be include in WithParams case, so we can safely unwrap it
+    //         let close = decl_impl_node.tree._fn_param_close.unwrap();
+
+    //         let fn_decl_with_params = match close.tree {
+    //             CloseFnParamsDecl::NoParams(close_paren) => {
+    //                 return ParseResult::Parsed(SyntaxNode {
+    //                     span,
+    //                     is_broken,
+    //                     tree: FnParamsDecl {
+    //                         _open_paren: open_paren,
+    //                         _params: Optional::None,
+    //                         _close_paren: ParseResult::Parsed(SyntaxNode {
+    //                             span: close.span,
+    //                             is_broken: close.is_broken,
+    //                             tree: close_paren,
+    //                         }),
+    //                     },
+    //                 })
+    //             }
+    //             CloseFnParamsDecl::WithParams(fn_decl_with_params) => fn_decl_with_params,
+    //         };
+
+    //         let first_param = fn_decl_with_params._first_param;
+    //         let rest_params = fn_decl_with_params._params.items;
+    //         let (trailing_comma, close_paren) = match fn_decl_with_params._params.terminator {
+    //             ParseResult::Parsed(node) => (
+    //                 node.tree._comma,
+    //                 ParseResult::Parsed(node.tree._close_paren),
+    //             ),
+    //             ParseResult::Unexpected {
+    //                 span,
+    //                 found,
+    //                 is_start_failure,
+    //             } => (
+    //                 Optional::None,
+    //                 ParseResult::Unexpected {
+    //                     span,
+    //                     found,
+    //                     is_start_failure,
+    //                 },
+    //             ),
+    //         };
+
+    //         let mut params_span = first_param.span().unwrap();
+
+    //         if let Optional::Some(comma_node) = &trailing_comma {
+    //             params_span = params_span.merged_with(&comma_node.span)
+    //         } else if let Option::Some(last_param) = rest_params.last() {
+    //             params_span = params_span.merged_with(&last_param.span().unwrap())
+    //         }
+
+    //         let params = SyntaxNode {
+    //             span: params_span,
+    //             is_broken: !first_param.is_parsed_and_valid()
+    //                 || rest_params.iter().any(|p| !p.is_parsed_and_valid())
+    //                 || !trailing_comma.is_parsed_and_valid(),
+    //             tree: FnParams {
+    //                 _first_param: first_param,
+    //                 _rest_params: rest_params,
+    //                 _trailing_comma: trailing_comma,
+    //             },
+    //         };
+
+    //         ParseResult::Parsed(SyntaxNode {
+    //             span,
+    //             is_broken,
+    //             tree: FnParamsDecl {
+    //                 _open_paren: open_paren,
+    //                 _params: Optional::Some(params),
+    //                 _close_paren: close_paren,
+    //             },
+    //         })
+    //     }
+    // }
+
+    // pub(crate) struct FnParams {
+    //     pub(crate) _first_param: ParseResult<FnParam>,
+    //     pub(crate) _rest_params: Vec<ParseResult<CommaWithFnParam>>,
+    //     pub(crate) _trailing_comma: Optional<CommaSymbol>,
+    // }
+
+    // impl NazmcParse for ParseResult<FnParams> {
+    //     fn parse(_iter: &mut TokensIter) -> Self {
+    //         unreachable!() // Just  added to usee it as Optional
+    //     }
+    // }
+
+    // #[derive(NazmcParse)]
+    // pub(crate) struct FnParamsDeclImpl {
+    //     pub(crate) _open_paren: SyntaxNode<OpenParenthesisSymbol>,
+    //     pub(crate) _fn_param_close: ParseResult<CloseFnParamsDecl>,
+    // }
+
+    // #[derive(NazmcParse)]
+    // pub(crate) enum CloseFnParamsDecl {
+    //     NoParams(CloseParenthesisSymbol),
+    //     WithParams(Box<FnDeclWithParams>),
+    // }
+
+    // #[derive(NazmcParse)]
+    // pub(crate) struct FnDeclWithParams {
+    //     pub(crate) _first_param: ParseResult<FnParam>,
+    //     pub(crate) _params: ZeroOrMany<CommaWithFnParam, CommaWithCloseParenthesis>,
+    // }
+
+    // #[derive(NazmcParse)]
+    // pub(crate) struct CommaWithFnParam {
+    //     _comma: SyntaxNode<CommaSymbol>,
+    //     _fn_param: SyntaxNode<FnParam>,
+    // }
+
+    // #[derive(NazmcParse)]
+    // pub(crate) struct CommaWithCloseParenthesis {
+    //     _comma: Optional<CommaSymbol>,
+    //     _close_paren: SyntaxNode<CloseParenthesisSymbol>,
+    // }
+
+    // #[derive(NazmcParse)]
+    // pub(crate) struct FnParam {
+    //     pub(crate) _name: SyntaxNode<Id>,
+    //     pub(crate) _colon: ParseResult<ColonSymbol>,
+    //     pub(crate) _type: ParseResult<Id>,
+    // }
+
+    // #[test]
+    // fn test_wrong_params() {
+    //     let (tokens, ..) =
+    //         LexerIter::new("دالة البداية(123 دالة، ت: ح 444، س: ص، ع: ك،) {}").collect_all();
+    //     let mut tokens_iter = TokensIter::new(&tokens);
+    //     tokens_iter.next(); // Init recent
+
+    //     let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
+    //     let fn_node = parse_result.unwrap();
+
+    //     assert!(fn_node.is_broken);
+    //     assert!(!fn_node.tree._fn.is_broken);
+
+    //     let params_decl = fn_node.tree._params_decl.unwrap();
+    //     assert!(params_decl.is_broken);
+    //     assert!(!params_decl.tree._open_paren.is_broken);
+    //     assert!(params_decl.tree._close_paren.is_parsed_and_valid());
+
+    //     assert!(params_decl.tree._params.is_some_and_broken());
+    //     let params = params_decl.tree._params.unwrap().tree;
+
+    //     assert!(params._first_param.is_unexpected());
+    //     println!("{:?}\n----------", params._first_param);
+    //     assert!(params._trailing_comma.is_some_and_valid());
+
+    //     for param in params._rest_params {
+    //         println!("{:?}", param)
+    //     }
+    // }
+
+    // #[test]
+    // fn test_zero_params() {
+    //     let (tokens, ..) = LexerIter::new("دالة البداية() {}").collect_all();
+    //     let mut tokens_iter = TokensIter::new(&tokens);
+    //     tokens_iter.next(); // Init recent
+
+    //     let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
+
+    //     let ParseResult::Parsed(fn_node) = parse_result else {
+    //         panic!();
+    //     };
+
+    //     assert!(!fn_node.tree._fn.is_broken);
+    //     assert!(fn_node.tree._id.is_parsed_and_valid());
+
+    //     let params_decl = fn_node.tree._params_decl.unwrap();
+    //     assert!(!params_decl.is_broken);
+    //     assert!(!params_decl.tree._open_paren.is_broken);
+    //     assert!(params_decl.tree._close_paren.is_parsed_and_valid());
+
+    //     assert!(params_decl.tree._params.is_none());
+    // }
+
+    // #[test]
+    // fn test_one_param_no_trailing_comma() {
+    //     let (tokens, ..) = LexerIter::new("دالة البداية(س: ص8) {}").collect_all();
+    //     let mut tokens_iter = TokensIter::new(&tokens);
+    //     tokens_iter.next(); // Init recent
+
+    //     let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
+
+    //     let ParseResult::Parsed(fn_node) = parse_result else {
+    //         panic!();
+    //     };
+
+    //     assert!(!fn_node.tree._fn.is_broken);
+    //     assert!(fn_node.tree._id.is_parsed_and_valid());
+
+    //     let params_decl = fn_node.tree._params_decl.unwrap();
+    //     assert!(!params_decl.is_broken);
+    //     assert!(!params_decl.tree._open_paren.is_broken);
+    //     assert!(params_decl.tree._close_paren.is_parsed_and_valid());
+
+    //     assert!(params_decl.tree._params.is_some_and_valid());
+    //     let params = params_decl.tree._params.unwrap().tree;
+
+    //     assert!(params._first_param.is_parsed_and_valid());
+    //     assert!(params._rest_params.is_empty());
+    //     assert!(params._trailing_comma.is_none());
+    // }
+
+    // #[test]
+    // fn test_one_param_with_trailing_comma() {
+    //     let (tokens, ..) = LexerIter::new("دالة البداية(س: ص8،) {}").collect_all();
+    //     let mut tokens_iter = TokensIter::new(&tokens);
+    //     tokens_iter.next(); // Init recent
+
+    //     let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
+
+    //     let ParseResult::Parsed(fn_node) = parse_result else {
+    //         panic!();
+    //     };
+
+    //     assert!(!fn_node.tree._fn.is_broken);
+    //     assert!(fn_node.tree._id.is_parsed_and_valid());
+
+    //     let params_decl = fn_node.tree._params_decl.unwrap();
+    //     assert!(!params_decl.is_broken);
+    //     assert!(!params_decl.tree._open_paren.is_broken);
+    //     assert!(params_decl.tree._close_paren.is_parsed_and_valid());
+
+    //     assert!(params_decl.tree._params.is_some_and_valid());
+    //     let params = params_decl.tree._params.unwrap().tree;
+
+    //     assert!(params._first_param.is_parsed_and_valid());
+    //     assert!(params._rest_params.is_empty());
+    //     assert!(params._trailing_comma.is_some_and_valid());
+    // }
+
+    // #[test]
+    // fn test_two_params_no_trailing_comma() {
+    //     let (tokens, ..) = LexerIter::new("دالة البداية(س: ص8، ك: م) {}").collect_all();
+    //     let mut tokens_iter = TokensIter::new(&tokens);
+    //     tokens_iter.next(); // Init recent
+
+    //     let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
+
+    //     let ParseResult::Parsed(fn_node) = parse_result else {
+    //         panic!();
+    //     };
+
+    //     assert!(!fn_node.tree._fn.is_broken);
+    //     assert!(fn_node.tree._id.is_parsed_and_valid());
+
+    //     let params_decl = fn_node.tree._params_decl.unwrap();
+    //     assert!(!params_decl.is_broken);
+    //     assert!(!params_decl.tree._open_paren.is_broken);
+    //     assert!(params_decl.tree._close_paren.is_parsed_and_valid());
+
+    //     assert!(params_decl.tree._params.is_some_and_valid());
+    //     let params = params_decl.tree._params.unwrap().tree;
+
+    //     assert!(params._first_param.is_parsed_and_valid());
+    //     assert!(params._rest_params.len() == 1);
+    //     assert!(params._rest_params[0].is_parsed_and_valid());
+    //     assert!(params._trailing_comma.is_none());
+    // }
+
+    // #[test]
+    // fn test_two_params_with_trailing_comma() {
+    //     let (tokens, ..) = LexerIter::new("دالة البداية(س: ص8، ك: م،) {}").collect_all();
+    //     let mut tokens_iter = TokensIter::new(&tokens);
+    //     tokens_iter.next(); // Init recent
+
+    //     let parse_result = <ParseResult<SimpleFn>>::parse(&mut tokens_iter);
+
+    //     let ParseResult::Parsed(fn_node) = parse_result else {
+    //         panic!();
+    //     };
+
+    //     assert!(!fn_node.tree._fn.is_broken);
+    //     assert!(fn_node.tree._id.is_parsed_and_valid());
+
+    //     let params_decl = fn_node.tree._params_decl.unwrap();
+    //     assert!(!params_decl.is_broken);
+    //     assert!(!params_decl.tree._open_paren.is_broken);
+    //     assert!(params_decl.tree._close_paren.is_parsed_and_valid());
+
+    //     assert!(params_decl.tree._params.is_some_and_valid());
+    //     let params = params_decl.tree._params.unwrap().tree;
+
+    //     assert!(params._first_param.is_parsed_and_valid());
+    //     assert!(params._rest_params.len() == 1);
+    //     assert!(params._rest_params[0].is_parsed_and_valid());
+    //     assert!(params._trailing_comma.is_some_and_valid());
+    // }
+}

@@ -90,16 +90,16 @@ fn derive_for_enum(
 
         let ty_checked = check_type(ty);
 
-        let is_boxed = match ty_checked {
-            Some(ParseFieldType::Boxed(_)) => true,
-            Some(ParseFieldType::Pure(_)) => false,
+        let pair = match ty_checked {
+            Some(ParseFieldType::Boxed(ty)) => (ty, true),
+            Some(ParseFieldType::Pure(ty)) => (ty, false),
             _ => {
                 emit_err(&ty.span());
                 continue;
             }
         };
 
-        types.push((ty, is_boxed)); // Value is boxed
+        types.push(pair);
     }
 
     // Errors occured in fields
@@ -131,14 +131,14 @@ fn derive_for_enum(
         });
 
         let return_tree_stm = if *is_boxed {
-            quote! { Box::new(node.tree) }
+            quote! { Box::new(tree) }
         } else {
-            quote! { node.tree }
+            quote! { tree }
         };
 
         let variant_stm = if i < last_variant_idx {
             quote! {
-                if let Ok(node) = <ParseResult<#ty>>::parse(iter) {
+                if let Ok(tree) = <ParseResult<#ty>>::parse(iter) {
                     return Ok(#enum_name::#variant_name(#return_tree_stm));
                 }
 
@@ -147,7 +147,7 @@ fn derive_for_enum(
         } else {
             quote! {
                 match <ParseResult<#ty>>::parse(iter) {
-                    Ok(node) => {
+                    Ok(tree) => {
                         return Ok(#enum_name::#variant_name(#return_tree_stm));
                     }
                     Err(err) => {
@@ -242,7 +242,7 @@ fn derive_for_struct(
                     let peek_idx = iter.peek_idx;
                     let #field_name = match <ParseResult<#ty>>::parse(iter) {
                         Ok(tree) => {
-                            #return_tree_stm
+                            return #return_tree_stm;
                         },
                         Err(err) =>{
                             iter.peek_idx = peek_idx; // Backtrack

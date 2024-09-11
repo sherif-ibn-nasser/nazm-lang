@@ -33,15 +33,17 @@ impl<T: TerminalGuard> Check for Terminal<T> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Id {
+pub(crate) struct IdToken {
     val: String,
 }
 
-impl private::Sealed for Id {}
+impl private::Sealed for IdToken {}
 
-impl TerminalGuard for Id {}
+impl TerminalGuard for IdToken {}
 
-impl NazmcParse for ParseResult<Terminal<Id>> {
+pub(crate) type Id = Terminal<IdToken>;
+
+impl NazmcParse for ParseResult<Terminal<IdToken>> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(Token {
@@ -51,7 +53,7 @@ impl NazmcParse for ParseResult<Terminal<Id>> {
             }) => {
                 let ok = Ok(Terminal {
                     span: *span,
-                    data: Id {
+                    data: IdToken {
                         val: val.to_string(),
                     },
                 });
@@ -72,13 +74,15 @@ macro_rules! create_keyword_parser {
         paste! {
 
             #[derive(Debug)]
-            pub(crate) struct [<$keyword Keyword>];
+            pub(crate) struct [<$keyword KeywordToken>];
 
-            impl private::Sealed for [<$keyword Keyword>] {}
+            impl private::Sealed for [<$keyword KeywordToken>] {}
 
-            impl TerminalGuard for [<$keyword Keyword>] {}
+            impl TerminalGuard for [<$keyword KeywordToken>] {}
 
-            impl NazmcParse for ParseResult<Terminal<[<$keyword Keyword>]>>{
+            pub(crate) type [<$keyword Keyword>] = Terminal<[<$keyword KeywordToken>]>;
+
+            impl NazmcParse for ParseResult<Terminal<[<$keyword KeywordToken>]>>{
 
                 fn parse(iter: &mut TokensIter) -> Self {
 
@@ -86,7 +90,7 @@ macro_rules! create_keyword_parser {
                         Some(Token { span, kind: TokenKind::Keyword(KeywordKind::$keyword), .. }) => {
                             let ok = Ok(Terminal {
                                 span: *span,
-                                data: [<$keyword Keyword>],
+                                data: [<$keyword KeywordToken>],
                             });
                             iter.next_non_space_or_comment();
                             ok
@@ -108,13 +112,15 @@ macro_rules! create_symbol_parser {
         paste! {
 
             #[derive(Debug)]
-            pub(crate) struct [<$symbol Symbol>];
+            pub(crate) struct [<$symbol SymbolToken>];
 
-            impl private::Sealed for [<$symbol Symbol>] {}
+            impl private::Sealed for [<$symbol SymbolToken>] {}
 
-            impl TerminalGuard for [<$symbol Symbol>] {}
+            impl TerminalGuard for [<$symbol SymbolToken>] {}
 
-            impl NazmcParse for ParseResult<Terminal<[<$symbol Symbol>]>>{
+            pub(crate) type [<$symbol Symbol>] = Terminal<[<$symbol SymbolToken>]>;
+
+            impl NazmcParse for ParseResult<Terminal<[<$symbol SymbolToken>]>>{
 
                 fn parse(iter: &mut TokensIter) -> Self {
 
@@ -122,7 +128,7 @@ macro_rules! create_symbol_parser {
                         Some(Token { span, kind: TokenKind::Symbol(SymbolKind::$symbol), .. }) => {
                             let ok = Ok(Terminal {
                                 span: *span,
-                                data: [<$symbol Symbol>],
+                                data: [<$symbol SymbolToken>],
                             });
                             iter.next_non_space_or_comment();
                             ok
@@ -515,12 +521,12 @@ mod tests {
         let mut iter = TokensIter::new(&tokens);
         iter.next(); // Initialize the value of recent
 
-        let _fn = ParseResult::<Terminal<FnKeyword>>::parse(&mut iter);
-        let _id = ParseResult::<Terminal<Id>>::parse(&mut iter);
-        let _open_paren = ParseResult::<Terminal<OpenParenthesisSymbol>>::parse(&mut iter);
-        let _close_paren = ParseResult::<Terminal<CloseParenthesisSymbol>>::parse(&mut iter);
-        let _open_curly = ParseResult::<Terminal<OpenCurlyBraceSymbol>>::parse(&mut iter);
-        let _close_curly = ParseResult::<Terminal<CloseCurlyBraceSymbol>>::parse(&mut iter);
+        let _fn = ParseResult::<FnKeyword>::parse(&mut iter);
+        let _id = ParseResult::<Id>::parse(&mut iter);
+        let _open_paren = ParseResult::<OpenParenthesisSymbol>::parse(&mut iter);
+        let _close_paren = ParseResult::<CloseParenthesisSymbol>::parse(&mut iter);
+        let _open_curly = ParseResult::<OpenCurlyBraceSymbol>::parse(&mut iter);
+        let _close_curly = ParseResult::<CloseCurlyBraceSymbol>::parse(&mut iter);
 
         assert!(!_fn.unwrap().is_broken());
         assert!(!_id.unwrap().is_broken());
@@ -540,10 +546,10 @@ mod tests {
         let mut iter = TokensIter::new(&tokens);
         iter.next(); // Initialize the value of recent
 
-        let _fn = ParseResult::<Terminal<FnKeyword>>::parse(&mut iter);
-        let _id = ParseResult::<Terminal<Id>>::parse(&mut iter);
-        let _open_paren = ParseResult::<Terminal<OpenParenthesisSymbol>>::parse(&mut iter);
-        let _close_paren = ParseResult::<Terminal<CloseParenthesisSymbol>>::parse(&mut iter);
+        let _fn = ParseResult::<FnKeyword>::parse(&mut iter);
+        let _id = ParseResult::<Id>::parse(&mut iter);
+        let _open_paren = ParseResult::<OpenParenthesisSymbol>::parse(&mut iter);
+        let _close_paren = ParseResult::<CloseParenthesisSymbol>::parse(&mut iter);
 
         assert!(!_fn.unwrap().is_broken());
         assert!(!_id.unwrap().is_broken());
