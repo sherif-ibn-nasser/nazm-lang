@@ -8,7 +8,7 @@ use tokens_iter::TokensIter;
 
 use crate::{Token, TokenKind};
 
-// pub(crate) mod syntax;
+pub(crate) mod syntax;
 
 pub(crate) mod tokens_iter;
 
@@ -33,6 +33,7 @@ pub(crate) trait Check {
 
 pub(crate) type ParseResult<T> = Result<T, ParseErr>;
 
+#[derive(Debug)]
 pub(crate) struct ParseErr {
     pub(crate) span: Span,
     pub(crate) found_token: TokenKind,
