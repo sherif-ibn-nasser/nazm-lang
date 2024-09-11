@@ -59,6 +59,51 @@ pub fn derive_nazmc_parser(input: TokenStream) -> TokenStream {
     .into()
 }
 
+#[proc_macro_error]
+#[proc_macro_derive(SpannedAndCheck)]
+pub fn derive_spanned_and_check(input: TokenStream) -> TokenStream {
+    let derive_input = parse_macro_input!(input as DeriveInput);
+
+    let tree_name = &derive_input.ident;
+
+    let (_, impl_spanned_block, impl_is_broken_block) = match derive_input.data {
+        syn::Data::Enum(data_enum) => {
+            let token_stream = derive_for_enum(tree_name, data_enum);
+            if token_stream.0.to_string().is_empty() {
+                return TokenStream::new();
+            }
+            token_stream
+        }
+        syn::Data::Struct(data_struct) => {
+            let token_stream = derive_for_struct(tree_name, data_struct);
+            if token_stream.0.to_string().is_empty() {
+                return TokenStream::new();
+            }
+            token_stream
+        }
+        syn::Data::Union(_) => abort!(
+            tree_name.span(),
+            "Cannot dervie the trait `NazmcParse` for unions"
+        ),
+    };
+
+    quote! {
+
+        impl Spanned for #tree_name {
+            fn span(&self) -> Option<Span> {
+                #impl_spanned_block
+            }
+        }
+
+        impl Check for #tree_name {
+            fn is_broken(&self) -> bool {
+                #impl_is_broken_block
+            }
+        }
+    }
+    .into()
+}
+
 fn derive_for_enum(
     enum_name: &Ident,
     data_enum: DataEnum,
@@ -217,8 +262,8 @@ fn derive_for_struct(
             impl_is_broken_block.extend(quote! {
                 self.#field_name.is_broken()
             });
-        } else {
             first_item = false;
+        } else {
             impl_spanned_block.extend(quote! {
                 .merged_with(self.#field_name.span())
             });
@@ -241,9 +286,7 @@ fn derive_for_struct(
                 quote! {
                     let peek_idx = iter.peek_idx;
                     let #field_name = match <ParseResult<#ty>>::parse(iter) {
-                        Ok(tree) => {
-                            return #return_tree_stm;
-                        },
+                        Ok(tree) => #return_tree_stm,
                         Err(err) =>{
                             iter.peek_idx = peek_idx; // Backtrack
                             return Err(err);
@@ -272,7 +315,7 @@ fn derive_for_struct(
         );
     };
 
-    (impl_parse_block, quote! {}, impl_is_broken_block)
+    (impl_parse_block, impl_spanned_block, impl_is_broken_block)
 }
 
 fn check_field(field: &Field) -> Option<ParseFieldType> {
