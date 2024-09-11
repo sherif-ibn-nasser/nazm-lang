@@ -31,6 +31,24 @@ pub(crate) trait Check {
     fn is_broken(&self) -> bool;
 }
 
+/// This is used to make calculating the span of a tree eaiser in the derive macro
+pub(crate) trait OptionSpanMerger {
+    fn merged_with(&self, other: Option<Span>) -> Option<Span>;
+}
+
+impl OptionSpanMerger for Option<Span> {
+    /// This is used to make calculating the span of a tree eaiser in the derive macro
+    fn merged_with(&self, other: Option<Span>) -> Option<Span> {
+        match self {
+            Some(self_span) => match other {
+                Some(other_span) => Some(self_span.merged_with(&other_span)),
+                None => Some(*self_span),
+            },
+            None => other,
+        }
+    }
+}
+
 pub(crate) type ParseResult<T> = Result<T, ParseErr>;
 
 #[derive(Debug)]

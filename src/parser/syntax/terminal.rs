@@ -19,12 +19,14 @@ where
 }
 
 impl<T: TerminalGuard> Spanned for Terminal<T> {
+    #[inline]
     fn span(&self) -> Option<Span> {
         Some(self.span)
     }
 }
 
 impl<T: TerminalGuard> Check for Terminal<T> {
+    #[inline]
     fn is_broken(&self) -> bool {
         false
     }
