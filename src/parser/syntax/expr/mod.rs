@@ -112,3 +112,34 @@ pub(crate) enum ExprWithBlock {
     DoWhile(DoWhileExpr),
     Run(RunExpr),
 }
+
+#[derive(NazmcParse, Debug)]
+pub(crate) struct StructFieldInitExpr {
+    pub(crate) name: Id,
+    pub(crate) expr: Option<StructFieldInitExplicitExpr>,
+}
+
+#[derive(NazmcParse, Debug)]
+pub(crate) struct StructFieldInitExplicitExpr {
+    pub(crate) equal: EqualSymbol,
+    pub(crate) expr: ParseResult<Expr>,
+}
+
+generatePunctuatedItem!(StructFieldInitExpr);
+
+generateDelimitedPunctuated!(
+    StructFieldsInitExpr,
+    OpenCurlyBraceSymbol,
+    StructFieldInitExpr,
+    CloseCurlyBraceSymbol
+);
+
+generatePunctuatedItem!(Expr);
+
+// Could be used for tuples, function calls and and nodrma paren expressions
+generateDelimitedPunctuated!(
+    ParenExpr,
+    OpenParenthesisSymbol,
+    Expr,
+    CloseParenthesisSymbol
+);

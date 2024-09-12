@@ -247,23 +247,39 @@ pub(crate) enum UnaryOpToken {
     BorrowMut,
 }
 
+#[derive(Debug)]
+/// The parse method is written by hand to avoid backtracking
+pub(crate) enum VisModifierToken {
+    Public,
+    Private,
+}
+
+#[derive(Debug)]
+pub(crate) struct EOFToken;
+
 impl private::Sealed for DoubleColonsSymbolToken {}
 impl private::Sealed for RArrowSymbolToken {}
 impl private::Sealed for BinOpToken {}
 impl private::Sealed for UnaryOpToken {}
 impl private::Sealed for LiteralKind {}
+impl private::Sealed for VisModifierToken {}
+impl private::Sealed for EOFToken {}
 
 impl TerminalGuard for DoubleColonsSymbolToken {}
 impl TerminalGuard for RArrowSymbolToken {}
 impl TerminalGuard for BinOpToken {}
 impl TerminalGuard for UnaryOpToken {}
 impl TerminalGuard for LiteralKind {}
+impl TerminalGuard for VisModifierToken {}
+impl TerminalGuard for EOFToken {}
 
 pub(crate) type DoubleColonsSymbol = Terminal<DoubleColonsSymbolToken>;
 pub(crate) type RArrowSymbol = Terminal<RArrowSymbolToken>;
 pub(crate) type BinOp = Terminal<BinOpToken>;
 pub(crate) type UnaryOp = Terminal<UnaryOpToken>;
 pub(crate) type LiteralExpr = Terminal<LiteralKind>;
+pub(crate) type VisModifier = Terminal<VisModifierToken>;
+pub(crate) type EOF = Terminal<EOFToken>;
 
 macro_rules! match_peek_symbols {
     ($iter:ident, $symbol0:ident, $symbol1:ident, $symbol2:ident) => {
@@ -288,7 +304,7 @@ macro_rules! match_peek_symbols {
     };
 }
 
-impl NazmcParse for ParseResult<Terminal<DoubleColonsSymbolToken>> {
+impl NazmcParse for ParseResult<DoubleColonsSymbol> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(
@@ -315,7 +331,7 @@ impl NazmcParse for ParseResult<Terminal<DoubleColonsSymbolToken>> {
     }
 }
 
-impl NazmcParse for ParseResult<Terminal<RArrowSymbolToken>> {
+impl NazmcParse for ParseResult<RArrowSymbol> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(
@@ -342,7 +358,7 @@ impl NazmcParse for ParseResult<Terminal<RArrowSymbolToken>> {
     }
 }
 
-impl NazmcParse for ParseResult<Terminal<BinOpToken>> {
+impl NazmcParse for ParseResult<BinOp> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(
@@ -476,7 +492,7 @@ impl NazmcParse for ParseResult<Terminal<BinOpToken>> {
     }
 }
 
-impl NazmcParse for ParseResult<Terminal<UnaryOpToken>> {
+impl NazmcParse for ParseResult<UnaryOp> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(
@@ -547,6 +563,46 @@ impl NazmcParse for ParseResult<LiteralExpr> {
                 iter.next_non_space_or_comment();
                 ok
             }
+            Some(token) => Err(ParseErr {
+                span: token.span,
+                found_token: token.kind.clone(),
+            }),
+            None => ParseErr::eof(iter.peek_start_span()),
+        }
+    }
+}
+
+impl NazmcParse for ParseResult<VisModifier> {
+    fn parse(iter: &mut TokensIter) -> Self {
+        match iter.recent() {
+            Some(Token {
+                span,
+                kind: TokenKind::Keyword(KeywordKind::Public),
+                ..
+            }) => Ok(Terminal {
+                span: *span,
+                data: VisModifierToken::Public,
+            }),
+            Some(Token {
+                span,
+                kind: TokenKind::Keyword(KeywordKind::Private),
+                ..
+            }) => Ok(Terminal {
+                span: *span,
+                data: VisModifierToken::Private,
+            }),
+            Some(token) => Err(ParseErr {
+                span: token.span,
+                found_token: token.kind.clone(),
+            }),
+            None => ParseErr::eof(iter.peek_start_span()),
+        }
+    }
+}
+
+impl NazmcParse for ParseResult<EOF> {
+    fn parse(iter: &mut TokensIter) -> Self {
+        match iter.recent() {
             Some(token) => Err(ParseErr {
                 span: token.span,
                 found_token: token.kind.clone(),

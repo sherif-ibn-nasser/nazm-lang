@@ -6,8 +6,8 @@ pub(crate) enum Type {
     Ptr(Box<PtrType>),
     Ref(Box<RefType>),
     Paren(Box<ParenType>),
-    // Slice(Box<SliceType>),
-    // Tuple(Box<TupleType>),
+    Slice(Box<SliceType>),
+    Tuple(Box<TupleType>),
 }
 
 #[derive(NazmcParse, Debug)]
@@ -31,16 +31,25 @@ pub(crate) struct ParenType {
     pub(crate) close_paren: ParseResult<CloseParenthesisSymbol>,
 }
 
-// #[derive(NazmcParse, Debug)]
-// pub(crate) struct SliceType {
-//     pub(crate) open_bracket: OpenSquareBracketSymbol,
-//     pub(crate) typ: ParseResult<Type>,
-//     pub(crate) array_size: Option<ArraySizeExpr>,
-//     pub(crate) close_bracket: ParseResult<CloseSquareBracketSymbol>,
-// }
+#[derive(NazmcParse, Debug)]
+pub(crate) struct SliceType {
+    pub(crate) open_bracket: OpenSquareBracketSymbol,
+    pub(crate) typ: ParseResult<Type>,
+    pub(crate) array_size: Option<ArraySizeExpr>,
+    pub(crate) close_bracket: ParseResult<CloseSquareBracketSymbol>,
+}
 
-// #[derive(NazmcParse, Debug)]
-// pub(crate) struct ArraySizeExpr {
-//     pub(crate) semicolon: SemicolonSymbol,
-//     pub(crate) expr: ParseResult<Expr>,
-// }
+#[derive(NazmcParse, Debug)]
+pub(crate) struct ArraySizeExpr {
+    pub(crate) semicolon: SemicolonSymbol,
+    pub(crate) expr: ParseResult<Expr>,
+}
+
+generatePunctuatedItem!(Type);
+
+generateDelimitedPunctuated!(
+    TupleType,
+    OpenParenthesisSymbol,
+    Type,
+    CloseParenthesisSymbol
+);

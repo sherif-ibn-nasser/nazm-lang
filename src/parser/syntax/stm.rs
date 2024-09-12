@@ -23,6 +23,29 @@ pub(crate) struct BindingDecl {
 }
 
 #[derive(NazmcParse, Debug)]
+pub(crate) enum BindingDeclKind {
+    Id(Id),
+    Destructed(Box<DestructedTuple>), // Box for the large size
+}
+
+generatePunctuatedItem!(BindingDecl);
+
+generatePunctuatedItem!(BindingDeclKind);
+
+generateDelimitedPunctuated!(
+    DestructedTuple,
+    OpenParenthesisSymbol,
+    BindingDeclKind,
+    CloseParenthesisSymbol
+);
+
+#[derive(NazmcParse, Debug)]
+pub(crate) struct ColonWithType {
+    pub(crate) colon: ColonSymbol,
+    pub(crate) typ: ParseResult<Type>,
+}
+
+#[derive(NazmcParse, Debug)]
 pub(crate) struct LetAssign {
     pub(crate) equal: EqualSymbol,
     pub(crate) expr: ParseResult<Expr>,
