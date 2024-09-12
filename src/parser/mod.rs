@@ -2,11 +2,11 @@
 /// in the Nazmc language parser. It provides the foundational structures and parsing logic for different
 /// AST node types, ensuring that the syntax is correctly interpreted and processed.
 use nazmc_diagnostics::span::Span;
-use nazmc_parse_derive::NazmcParse;
+use nazmc_parse_derive::*;
 // use syntax::{CloseParenthesisSymbol, FnKeyword, Id, OpenParenthesisSymbol};
 use tokens_iter::TokensIter;
 
-use crate::{Token, TokenKind};
+use crate::TokenKind;
 
 pub(crate) mod syntax;
 
@@ -51,7 +51,7 @@ impl OptionSpanMerger for Option<Span> {
 
 pub(crate) type ParseResult<T> = Result<T, ParseErr>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct ParseErr {
     pub(crate) span: Span,
     pub(crate) found_token: TokenKind,
@@ -513,6 +513,7 @@ mod tests {
             };
 
             let first_param = fn_decl_with_params._first_param;
+
             let rest_params = fn_decl_with_params._params.items;
 
             let (trailing_comma, close_paren) = match fn_decl_with_params._params.terminator {

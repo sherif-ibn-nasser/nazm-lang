@@ -1,140 +1,131 @@
 use super::*;
 use paste::paste;
 
+pub(crate) mod punctuated;
+pub(crate) use punctuated::*;
+
 pub(crate) mod terminal;
 pub(crate) use terminal::*;
 
-// mod path;
+pub(crate) mod path;
+pub(crate) use path::*;
 
-// mod expr;
+pub(crate) mod typ;
+pub(crate) use typ::*;
 
-// mod typ;
+pub(crate) mod stm;
+pub(crate) use stm::*;
 
-// mod punctuated;
+pub(crate) mod expr;
+pub(crate) use expr::*;
 
-// mod symbols;
+#[derive(NazmcParse, Debug)]
+pub(crate) struct ColonWithType {
+    pub(crate) colon: ColonSymbol,
+    pub(crate) typ: ParseResult<Type>,
+}
 
-// mod stm;
+#[derive(NazmcParse, Debug)]
+pub(crate) enum VisModifier {
+    Public(PublicKeyword),
+    Private(PrivateKeyword),
+}
 
-// use path::*;
+#[derive(NazmcParse, Debug)]
+pub(crate) struct FnParam {
+    pub(crate) name: Id,
+    pub(crate) typ: ParseResult<ColonWithType>,
+}
 
-// use punctuated::*;
+#[derive(NazmcParse, Debug)]
+pub(crate) struct StructField {
+    pub(crate) visibility: Option<VisModifier>,
+    pub(crate) name: Id,
+    pub(crate) colon: ParseResult<ColonSymbol>,
+    pub(crate) typ: ParseResult<Type>,
+}
 
-// use expr::*;
+#[derive(NazmcParse, Debug)]
+pub(crate) struct StructFieldInitExpr {
+    pub(crate) name: Id,
+    pub(crate) expr: Option<StructFieldInitExplicitExpr>,
+}
 
-// use typ::*;
+#[derive(NazmcParse, Debug)]
+pub(crate) struct StructFieldInitExplicitExpr {
+    pub(crate) equal: EqualSymbol,
+    pub(crate) expr: ParseResult<Expr>,
+}
 
-// use stm::*;
+generateTrailingCommaWithCloseDelimiter!(CloseParenthesisSymbol);
 
-// use symbols::*;
+generateTrailingCommaWithCloseDelimiter!(CloseAngleBracketOrGreaterSymbol);
 
-// #[derive(NazmcParse)]
-// pub(crate) struct ColonWithType {
-//     pub(crate) colon: SyntaxNode<ColonSymbol>,
-//     pub(crate) typ: ParseResult<Type>,
-// }
+generateTrailingCommaWithCloseDelimiter!(CloseCurlyBraceSymbol);
 
-// #[derive(NazmcParse)]
-// pub(crate) enum VisModifier {
-//     Public(PublicKeyword),
-//     Private(PrivateKeyword),
-// }
+generateTrailingCommaWithCloseDelimiter!(CloseSquareBracketSymbol);
 
-// #[derive(NazmcParse)]
-// pub(crate) struct FnParam {
-//     pub(crate) name: SyntaxNode<Id>,
-//     pub(crate) typ: ParseResult<ColonWithType>,
-// }
+generateTrailingCommaWithCloseDelimiter!(RArrowSymbol);
 
-// #[derive(NazmcParse)]
-// pub(crate) struct StructField {
-//     pub(crate) visibility: Optional<VisModifier>,
-//     pub(crate) name: SyntaxNode<Id>,
-//     pub(crate) colon: ParseResult<ColonSymbol>,
-//     pub(crate) typ: ParseResult<Type>,
-// }
+generatePunctuatedItem!(Type);
 
-// #[derive(NazmcParse)]
-// pub(crate) struct StructFieldInitExpr {
-//     pub(crate) name: SyntaxNode<Id>,
-//     pub(crate) expr: Optional<StructFieldInitExplicitExpr>,
-// }
+generatePunctuatedItem!(StructField);
 
-// #[derive(NazmcParse)]
-// pub(crate) struct StructFieldInitExplicitExpr {
-//     pub(crate) equal: SyntaxNode<EqualSymbol>,
-//     pub(crate) expr: ParseResult<Expr>,
-// }
+generatePunctuatedItem!(FnParam);
 
-// generateTrailingCommaWithCloseDelimiter!(CloseParenthesisSymbol);
+generatePunctuatedItem!(Expr);
 
-// generateTrailingCommaWithCloseDelimiter!(CloseAngleBracketOrGreaterSymbol);
+generatePunctuatedItem!(StructFieldInitExpr);
 
-// generateTrailingCommaWithCloseDelimiter!(CloseCurlyBraceSymbol);
+generatePunctuatedItem!(BindingDecl);
 
-// generateTrailingCommaWithCloseDelimiter!(CloseSquareBracketSymbol);
+generatePunctuatedItem!(BindingDeclKind);
 
-// generateTrailingCommaWithCloseDelimiter!(RArrow);
+generateDelimitedPunctuated!(
+    StructFieldsDecl,
+    OpenCurlyBraceSymbol,
+    StructField,
+    CloseCurlyBraceSymbol
+);
 
-// generatePunctuatedItem!(Type);
+generateDelimitedPunctuated!(
+    TupleType,
+    OpenParenthesisSymbol,
+    Type,
+    CloseParenthesisSymbol
+);
 
-// generatePunctuatedItem!(StructField);
+generateDelimitedPunctuated!(
+    FnParamsDecl,
+    OpenParenthesisSymbol,
+    FnParam,
+    CloseParenthesisSymbol
+);
 
-// generatePunctuatedItem!(FnParam);
+// Could be used for tuples, function calls and and nodrma paren expressions
+generateDelimitedPunctuated!(
+    ParenExpr,
+    OpenParenthesisSymbol,
+    Expr,
+    CloseParenthesisSymbol
+);
 
-// generatePunctuatedItem!(Expr);
+generateDelimitedPunctuated!(
+    StructFieldsInitExpr,
+    OpenCurlyBraceSymbol,
+    StructFieldInitExpr,
+    CloseCurlyBraceSymbol
+);
 
-// generatePunctuatedItem!(StructFieldInitExpr);
+generateDelimitedPunctuated!(
+    DestructedTuple,
+    OpenParenthesisSymbol,
+    BindingDeclKind,
+    CloseParenthesisSymbol
+);
 
-// generatePunctuatedItem!(BindingDecl);
-
-// generatePunctuatedItem!(BindingDeclKind);
-
-// generateDelimitedPunctuated!(
-//     StructFieldsDecl,
-//     OpenCurlyBraceSymbol,
-//     StructField,
-//     CloseCurlyBraceSymbol
-// );
-
-// generateDelimitedPunctuated!(
-//     TupleType,
-//     OpenParenthesisSymbol,
-//     Type,
-//     CloseParenthesisSymbol
-// );
-
-// generateDelimitedPunctuated!(
-//     FnParamsDecl,
-//     OpenParenthesisSymbol,
-//     FnParam,
-//     CloseParenthesisSymbol
-// );
-
-// // Could be used for tuples, function calls and and nodrma paren expressions
-// generateDelimitedPunctuated!(
-//     ParenExpr,
-//     OpenParenthesisSymbol,
-//     Expr,
-//     CloseParenthesisSymbol
-// );
-
-// generateDelimitedPunctuated!(
-//     StructFieldsInitExpr,
-//     OpenCurlyBraceSymbol,
-//     StructFieldInitExpr,
-//     CloseCurlyBraceSymbol
-// );
-
-// generateDelimitedPunctuated!(
-//     DestructedTuple,
-//     OpenParenthesisSymbol,
-//     BindingDeclKind,
-//     CloseParenthesisSymbol
-// );
-
-// #[derive(NazmcParse)]
-// pub(crate) enum BindingDeclKind {
-//     Id(Id),
-//     Destructed(Box<DestructedTuple>), // Box for the large size
-// }
+#[derive(NazmcParse, Debug)]
+pub(crate) enum BindingDeclKind {
+    Id(Id),
+    Destructed(Box<DestructedTuple>), // Box for the large size
+}

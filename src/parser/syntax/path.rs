@@ -1,15 +1,13 @@
-use crate::SymbolKind;
-
 use super::*;
 
-#[derive(NazmcParse)]
+#[derive(NazmcParse, Debug)]
 pub(crate) struct SimplePath {
-    pub(crate) top: SyntaxNode<Id>,
-    pub(crate) inners: Vec<SyntaxNode<SimpleInnerPath>>,
+    pub(crate) top: Id,
+    pub(crate) inners: Vec<SimpleInnerPath>,
 }
 
-#[derive(NazmcParse)]
+#[derive(NazmcParse, Debug)]
 pub(crate) struct SimpleInnerPath {
-    pub(crate) double_colons: SyntaxNode<DoubleColonsSymbol>,
+    pub(crate) double_colons: DoubleColonsSymbol,
     pub(crate) inner: ParseResult<Id>,
 }

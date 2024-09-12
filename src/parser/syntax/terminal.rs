@@ -191,14 +191,14 @@ create_symbol_parser!(Equal);
 create_symbol_parser!(Hash);
 
 #[derive(Debug)]
-pub(crate) struct DoubleColonsSymbol;
+pub(crate) struct DoubleColonsSymbolToken;
 
 #[derive(Debug)]
-pub(crate) struct RArrow;
+pub(crate) struct RArrowSymbolToken;
 
 #[derive(Debug)]
 /// The parse method is written by hand to avoid backtracking
-pub(crate) enum BinOp {
+pub(crate) enum BinOpToken {
     LOr,
     LAnd,
     EqualEqual,
@@ -238,7 +238,7 @@ pub(crate) enum BinOp {
 /// The parse method is written by hand to avoid backtracking
 ///
 /// Note that there is no unary plus operator
-pub(crate) enum UnaryOp {
+pub(crate) enum UnaryOpToken {
     Minus,
     LNot,
     BNot,
@@ -247,15 +247,23 @@ pub(crate) enum UnaryOp {
     BorrowMut,
 }
 
-impl private::Sealed for DoubleColonsSymbol {}
-impl private::Sealed for RArrow {}
-impl private::Sealed for BinOp {}
-impl private::Sealed for UnaryOp {}
+impl private::Sealed for DoubleColonsSymbolToken {}
+impl private::Sealed for RArrowSymbolToken {}
+impl private::Sealed for BinOpToken {}
+impl private::Sealed for UnaryOpToken {}
+impl private::Sealed for LiteralKind {}
 
-impl TerminalGuard for DoubleColonsSymbol {}
-impl TerminalGuard for RArrow {}
-impl TerminalGuard for BinOp {}
-impl TerminalGuard for UnaryOp {}
+impl TerminalGuard for DoubleColonsSymbolToken {}
+impl TerminalGuard for RArrowSymbolToken {}
+impl TerminalGuard for BinOpToken {}
+impl TerminalGuard for UnaryOpToken {}
+impl TerminalGuard for LiteralKind {}
+
+pub(crate) type DoubleColonsSymbol = Terminal<DoubleColonsSymbolToken>;
+pub(crate) type RArrowSymbol = Terminal<RArrowSymbolToken>;
+pub(crate) type BinOp = Terminal<BinOpToken>;
+pub(crate) type UnaryOp = Terminal<UnaryOpToken>;
+pub(crate) type LiteralExpr = Terminal<LiteralKind>;
 
 macro_rules! match_peek_symbols {
     ($iter:ident, $symbol0:ident, $symbol1:ident, $symbol2:ident) => {
@@ -280,7 +288,7 @@ macro_rules! match_peek_symbols {
     };
 }
 
-impl NazmcParse for ParseResult<Terminal<DoubleColonsSymbol>> {
+impl NazmcParse for ParseResult<Terminal<DoubleColonsSymbolToken>> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(
@@ -295,7 +303,7 @@ impl NazmcParse for ParseResult<Terminal<DoubleColonsSymbol>> {
                 iter.next_non_space_or_comment();
                 Ok(Terminal {
                     span,
-                    data: DoubleColonsSymbol,
+                    data: DoubleColonsSymbolToken,
                 })
             }
             Some(token) => Err(ParseErr {
@@ -307,7 +315,7 @@ impl NazmcParse for ParseResult<Terminal<DoubleColonsSymbol>> {
     }
 }
 
-impl NazmcParse for ParseResult<Terminal<RArrow>> {
+impl NazmcParse for ParseResult<Terminal<RArrowSymbolToken>> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(
@@ -320,7 +328,10 @@ impl NazmcParse for ParseResult<Terminal<RArrow>> {
                 span.end.col += 1;
                 iter.peek_idx += 1; // Eat next '>'
                 iter.next_non_space_or_comment();
-                Ok(Terminal { span, data: RArrow })
+                Ok(Terminal {
+                    span,
+                    data: RArrowSymbolToken,
+                })
             }
             Some(token) => Err(ParseErr {
                 span: token.span,
@@ -331,7 +342,7 @@ impl NazmcParse for ParseResult<Terminal<RArrow>> {
     }
 }
 
-impl NazmcParse for ParseResult<Terminal<BinOp>> {
+impl NazmcParse for ParseResult<Terminal<BinOpToken>> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(
@@ -345,83 +356,99 @@ impl NazmcParse for ParseResult<Terminal<BinOp>> {
                     SymbolKind::OpenAngleBracketOrLess
                         if match_peek_symbols!(iter, Dot, Dot, OpenAngleBracketOrLess) =>
                     {
-                        (BinOp::OpenOpenRange, 3)
+                        (BinOpToken::OpenOpenRange, 3)
                     }
                     SymbolKind::OpenAngleBracketOrLess if match_peek_symbols!(iter, Dot, Dot) => {
-                        (BinOp::OpenCloseRange, 2)
+                        (BinOpToken::OpenCloseRange, 2)
                     }
                     SymbolKind::OpenAngleBracketOrLess
                         if match_peek_symbols!(iter, OpenAngleBracketOrLess, Equal) =>
                     {
-                        (BinOp::ShrAssign, 2)
+                        (BinOpToken::ShrAssign, 2)
                     }
                     SymbolKind::OpenAngleBracketOrLess
                         if match_peek_symbols!(iter, OpenAngleBracketOrLess) =>
                     {
-                        (BinOp::Shr, 1)
+                        (BinOpToken::Shr, 1)
                     }
                     SymbolKind::OpenAngleBracketOrLess if match_peek_symbols!(iter, Equal) => {
-                        (BinOp::LE, 1)
+                        (BinOpToken::LE, 1)
                     }
-                    SymbolKind::OpenAngleBracketOrLess => (BinOp::LT, 0),
+                    SymbolKind::OpenAngleBracketOrLess => (BinOpToken::LT, 0),
 
                     SymbolKind::CloseAngleBracketOrGreater
                         if match_peek_symbols!(iter, CloseAngleBracketOrGreater, Equal) =>
                     {
-                        (BinOp::ShlAssign, 2)
+                        (BinOpToken::ShlAssign, 2)
                     }
                     SymbolKind::CloseAngleBracketOrGreater
                         if match_peek_symbols!(iter, CloseAngleBracketOrGreater) =>
                     {
-                        (BinOp::Shl, 1)
+                        (BinOpToken::Shl, 1)
                     }
                     SymbolKind::CloseAngleBracketOrGreater if match_peek_symbols!(iter, Equal) => {
-                        (BinOp::GE, 1)
+                        (BinOpToken::GE, 1)
                     }
-                    SymbolKind::CloseAngleBracketOrGreater => (BinOp::GT, 0),
+                    SymbolKind::CloseAngleBracketOrGreater => (BinOpToken::GT, 0),
 
                     SymbolKind::Dot if match_peek_symbols!(iter, Dot, OpenAngleBracketOrLess) => {
-                        (BinOp::CloseOpenRange, 2)
+                        (BinOpToken::CloseOpenRange, 2)
                     }
                     SymbolKind::Dot if match_peek_symbols!(iter, Dot) => {
-                        (BinOp::CloseCloseRange, 1)
+                        (BinOpToken::CloseCloseRange, 1)
                     }
 
-                    SymbolKind::Equal if match_peek_symbols!(iter, Equal) => (BinOp::EqualEqual, 1),
-                    SymbolKind::Equal => (BinOp::Assign, 0),
+                    SymbolKind::Equal if match_peek_symbols!(iter, Equal) => {
+                        (BinOpToken::EqualEqual, 1)
+                    }
+                    SymbolKind::Equal => (BinOpToken::Assign, 0),
                     SymbolKind::ExclamationMark if match_peek_symbols!(iter, Equal) => {
-                        (BinOp::NotEqual, 1)
+                        (BinOpToken::NotEqual, 1)
                     }
 
-                    SymbolKind::BitOr if match_peek_symbols!(iter, BitOr) => (BinOp::LOr, 1),
-                    SymbolKind::BitOr if match_peek_symbols!(iter, Equal) => (BinOp::BOrAssign, 1),
-                    SymbolKind::BitOr => (BinOp::BOr, 0),
+                    SymbolKind::BitOr if match_peek_symbols!(iter, BitOr) => (BinOpToken::LOr, 1),
+                    SymbolKind::BitOr if match_peek_symbols!(iter, Equal) => {
+                        (BinOpToken::BOrAssign, 1)
+                    }
+                    SymbolKind::BitOr => (BinOpToken::BOr, 0),
 
-                    SymbolKind::Xor if match_peek_symbols!(iter, Equal) => (BinOp::XorAssign, 1),
-                    SymbolKind::Xor => (BinOp::Xor, 0),
+                    SymbolKind::Xor if match_peek_symbols!(iter, Equal) => {
+                        (BinOpToken::XorAssign, 1)
+                    }
+                    SymbolKind::Xor => (BinOpToken::Xor, 0),
 
-                    SymbolKind::BitAnd if match_peek_symbols!(iter, BitAnd) => (BinOp::LAnd, 1),
+                    SymbolKind::BitAnd if match_peek_symbols!(iter, BitAnd) => {
+                        (BinOpToken::LAnd, 1)
+                    }
                     SymbolKind::BitAnd if match_peek_symbols!(iter, Equal) => {
-                        (BinOp::BAndAssign, 1)
+                        (BinOpToken::BAndAssign, 1)
                     }
-                    SymbolKind::BitAnd => (BinOp::BAnd, 0),
+                    SymbolKind::BitAnd => (BinOpToken::BAnd, 0),
 
-                    SymbolKind::Plus if match_peek_symbols!(iter, Equal) => (BinOp::PlusAssign, 1),
-                    SymbolKind::Plus => (BinOp::Plus, 0),
+                    SymbolKind::Plus if match_peek_symbols!(iter, Equal) => {
+                        (BinOpToken::PlusAssign, 1)
+                    }
+                    SymbolKind::Plus => (BinOpToken::Plus, 0),
 
                     SymbolKind::Minus if match_peek_symbols!(iter, Equal) => {
-                        (BinOp::MinusAssign, 1)
+                        (BinOpToken::MinusAssign, 1)
                     }
-                    SymbolKind::Minus => (BinOp::Minus, 0),
+                    SymbolKind::Minus => (BinOpToken::Minus, 0),
 
-                    SymbolKind::Star if match_peek_symbols!(iter, Equal) => (BinOp::TimesAssign, 1),
-                    SymbolKind::Star => (BinOp::Times, 0),
+                    SymbolKind::Star if match_peek_symbols!(iter, Equal) => {
+                        (BinOpToken::TimesAssign, 1)
+                    }
+                    SymbolKind::Star => (BinOpToken::Times, 0),
 
-                    SymbolKind::Slash if match_peek_symbols!(iter, Equal) => (BinOp::DivAssign, 1),
-                    SymbolKind::Slash => (BinOp::Div, 0),
+                    SymbolKind::Slash if match_peek_symbols!(iter, Equal) => {
+                        (BinOpToken::DivAssign, 1)
+                    }
+                    SymbolKind::Slash => (BinOpToken::Div, 0),
 
-                    SymbolKind::Modulo if match_peek_symbols!(iter, Equal) => (BinOp::ModAssign, 1),
-                    SymbolKind::Modulo => (BinOp::Mod, 0),
+                    SymbolKind::Modulo if match_peek_symbols!(iter, Equal) => {
+                        (BinOpToken::ModAssign, 1)
+                    }
+                    SymbolKind::Modulo => (BinOpToken::Mod, 0),
 
                     _ => {
                         return Err(ParseErr {
@@ -449,7 +476,7 @@ impl NazmcParse for ParseResult<Terminal<BinOp>> {
     }
 }
 
-impl NazmcParse for ParseResult<Terminal<UnaryOp>> {
+impl NazmcParse for ParseResult<Terminal<UnaryOpToken>> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(
@@ -462,12 +489,12 @@ impl NazmcParse for ParseResult<Terminal<UnaryOp>> {
                 let mut span = *span;
 
                 let op_kind = match symbol_kind {
-                    SymbolKind::Minus if !match_peek_symbols!(iter, Equal) => UnaryOp::Minus,
+                    SymbolKind::Minus if !match_peek_symbols!(iter, Equal) => UnaryOpToken::Minus,
                     SymbolKind::ExclamationMark if !match_peek_symbols!(iter, Equal) => {
-                        UnaryOp::LNot
+                        UnaryOpToken::LNot
                     }
-                    SymbolKind::BitNot if !match_peek_symbols!(iter, Equal) => UnaryOp::BNot,
-                    SymbolKind::Star if !match_peek_symbols!(iter, Equal) => UnaryOp::Deref,
+                    SymbolKind::BitNot if !match_peek_symbols!(iter, Equal) => UnaryOpToken::BNot,
+                    SymbolKind::Star if !match_peek_symbols!(iter, Equal) => UnaryOpToken::Deref,
                     SymbolKind::Hash => {
                         let peek_idx = iter.peek_idx;
                         if let Some(Token {
@@ -477,10 +504,10 @@ impl NazmcParse for ParseResult<Terminal<UnaryOp>> {
                         }) = iter.next_non_space_or_comment()
                         {
                             span = span.merged_with(mut_keyword_span);
-                            UnaryOp::Borrow
+                            UnaryOpToken::Borrow
                         } else {
                             iter.peek_idx = peek_idx;
-                            UnaryOp::BorrowMut
+                            UnaryOpToken::BorrowMut
                         }
                     }
                     _ => {
@@ -495,6 +522,30 @@ impl NazmcParse for ParseResult<Terminal<UnaryOp>> {
                     span,
                     data: op_kind,
                 })
+            }
+            Some(token) => Err(ParseErr {
+                span: token.span,
+                found_token: token.kind.clone(),
+            }),
+            None => ParseErr::eof(iter.peek_start_span()),
+        }
+    }
+}
+
+impl NazmcParse for ParseResult<LiteralExpr> {
+    fn parse(iter: &mut TokensIter) -> Self {
+        match iter.recent() {
+            Some(Token {
+                span,
+                kind: TokenKind::Literal(literal_kind),
+                ..
+            }) => {
+                let ok = Ok(Terminal {
+                    span: *span,
+                    data: literal_kind.clone(),
+                });
+                iter.next_non_space_or_comment();
+                ok
             }
             Some(token) => Err(ParseErr {
                 span: token.span,

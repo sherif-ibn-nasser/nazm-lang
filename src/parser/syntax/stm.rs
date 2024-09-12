@@ -1,47 +1,47 @@
 use super::*;
 
-#[derive(NazmcParse)]
+#[derive(NazmcParse, Debug)]
 pub(crate) enum Stm {
     Semicolon(SemicolonSymbol),
     Let(LetStm),
     Expr(ExprStm),
 }
 
-#[derive(NazmcParse)]
+#[derive(NazmcParse, Debug)]
 pub(crate) struct LetStm {
-    pub(crate) let_keyword: SyntaxNode<LetKeyword>,
-    pub(crate) mut_keyword: Optional<MutKeyword>,
+    pub(crate) let_keyword: LetKeyword,
+    pub(crate) mut_keyword: Option<MutKeyword>,
     pub(crate) decl: ParseResult<BindingDecl>,
-    pub(crate) let_assign: Optional<LetAssign>,
+    pub(crate) let_assign: Option<LetAssign>,
     pub(crate) semicolon: ParseResult<SemicolonSymbol>,
 }
 
-#[derive(NazmcParse)]
+#[derive(NazmcParse, Debug)]
 pub(crate) struct BindingDecl {
-    pub(crate) kind: SyntaxNode<BindingDeclKind>,
-    pub(crate) typ: Optional<ColonWithType>,
+    pub(crate) kind: BindingDeclKind,
+    pub(crate) typ: Option<ColonWithType>,
 }
 
-#[derive(NazmcParse)]
+#[derive(NazmcParse, Debug)]
 pub(crate) struct LetAssign {
-    pub(crate) equal: SyntaxNode<EqualSymbol>,
+    pub(crate) equal: EqualSymbol,
     pub(crate) expr: ParseResult<Expr>,
 }
 
-#[derive(NazmcParse)]
+#[derive(NazmcParse, Debug)]
 pub(crate) enum ExprStm {
     WithBlock(ExprWithBlockStm),
     Any(AnyExprStm),
 }
 
-#[derive(NazmcParse)]
+#[derive(NazmcParse, Debug)]
 pub(crate) struct ExprWithBlockStm {
-    pub(crate) expr: SyntaxNode<ExprWithBlock>,
-    pub(crate) semicolon: Optional<SemicolonSymbol>,
+    pub(crate) expr: ExprWithBlock,
+    pub(crate) semicolon: Option<SemicolonSymbol>,
 }
 
-#[derive(NazmcParse)]
+#[derive(NazmcParse, Debug)]
 pub(crate) struct AnyExprStm {
-    pub(crate) expr: SyntaxNode<Expr>,
+    pub(crate) expr: Expr,
     pub(crate) semicolon: ParseResult<SemicolonSymbol>,
 }
