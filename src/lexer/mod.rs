@@ -1,16 +1,19 @@
-mod token;
-mod lexing_methods;
 mod error;
+mod lexing_methods;
+mod token;
 
-use std::str::Chars;
 use documented::DocumentedVariants;
-use error::{LexerError, LexerErrorType};
+use error::{LexerError, LexerErrorKind};
 use itertools::Itertools;
-use nazmc_diagnostics::{span::{Span, SpanCursor}, PhaseDiagnostics};
+use nazmc_diagnostics::{
+    span::{Span, SpanCursor},
+    PhaseDiagnostics,
+};
+use std::str::Chars;
 use strum::IntoEnumIterator;
 pub use token::*;
 
-pub(crate) struct LexerIter<'a>{
+pub(crate) struct LexerIter<'a> {
     content: &'a str,
     cursor: CharsCursor<'a>,
     /// The byte index the cursor stopped at
@@ -29,20 +32,19 @@ impl<'a> Iterator for LexerIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.cursor.stopped_at.0;
         let start_byte = self.stopped_at_bidx;
-        let typ = self.next_token_type();
-        if let TokenType::EOF = typ {
+        let kind = self.next_token_type();
+        if let TokenKind::EOF = kind {
             return None;
         }
         let end = self.cursor.stopped_at.0;
         let end_byte = self.stopped_at_bidx;
         let val = &self.content[start_byte..end_byte];
         let span = Span { start, end };
-        Some(Token { val, span, typ })
+        Some(Token { val, span, kind })
     }
 }
 
 impl<'a> LexerIter<'a> {
-
     pub fn new(content: &'a str) -> Self {
         let mut _self = Self {
             content,
@@ -56,56 +58,141 @@ impl<'a> LexerIter<'a> {
         _self
     }
 
-    pub fn get_file_lines_and_diagnostics(mut self) -> (Vec<&'a str>, PhaseDiagnostics<'a>) {
-
-        for _ in self.by_ref() {}
+    pub fn collect_all(mut self) -> (Vec<Token<'a>>, Vec<&'a str>, PhaseDiagnostics<'a>) {
+        let tokens = self.by_ref().collect_vec();
 
         if self.file_lines.is_empty() {
             self.file_lines.push("");
         }
 
-        (self.file_lines, self.diagnostics)
+        (tokens, self.file_lines, self.diagnostics)
     }
 
-    fn next_token_type(&mut self) -> TokenType {
-
+    fn next_token_type(&mut self) -> TokenKind {
         match self.cursor.stopped_at.1 {
             '/' => self.next_token_with_slash(),
-            '،' => { self.next_cursor(); TokenType::Symbol(SymbolType::Comma) }
-            '؛' => { self.next_cursor(); TokenType::Symbol(SymbolType::Semicolon) }
-            '؟' => { self.next_cursor(); TokenType::Symbol(SymbolType::QuestionMark) }
-            '\n' => { self.next_cursor(); TokenType::EOL }
+            '،' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Comma)
+            }
+            '؛' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Semicolon)
+            }
+            '؟' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::QuestionMark)
+            }
+            '(' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::OpenParenthesis)
+            }
+            ')' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::CloseParenthesis)
+            }
+            '{' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::OpenCurlyBrace)
+            }
+            '}' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::CloseCurlyBrace)
+            }
+            '[' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::OpenSquareBracket)
+            }
+            ']' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::CloseSquareBracket)
+            }
+            '.' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Dot)
+            }
+            '<' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::OpenAngleBracketOrLess)
+            }
+            '>' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::CloseAngleBracketOrGreater)
+            }
+            '*' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Star)
+            }
+            '+' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Plus)
+            }
+            '-' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Minus)
+            }
+            '|' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::BitOr)
+            }
+            '&' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::BitAnd)
+            }
+            '%' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Modulo)
+            }
+            '~' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::BitNot)
+            }
+            '^' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Xor)
+            }
+            '!' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::ExclamationMark)
+            }
+            ':' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Colon)
+            }
+            '=' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Equal)
+            }
+            '#' => {
+                self.next_cursor();
+                TokenKind::Symbol(SymbolKind::Hash)
+            }
+            '\n' => {
+                self.next_cursor();
+                TokenKind::EOL
+            }
             '0'..='9' => self.next_num_token(),
             '\'' | '\"' => self.next_str_or_char_token(),
             '\t' | '\x0C' | '\r' | ' ' => {
-                while self.next_cursor().is_some_and(|(_, ch)| ch.is_ascii_whitespace() && ch != '\n') {} // Skip whitespaces
-                TokenType::Space
+                while self
+                    .next_cursor()
+                    .is_some_and(|(_, ch)| ch.is_ascii_whitespace() && ch != '\n')
+                {} // Skip whitespaces
+                TokenKind::Space
             }
             _ => {
-
                 if self.stopped_at_bidx == self.content.len() {
-                    return TokenType::EOF;
+                    return TokenKind::EOF;
                 }
 
                 let text = &self.content[self.stopped_at_bidx..];
 
-                for symbol in SymbolType::iter() {
-                    if symbol.get_variant_docs().is_ok_and(|val| text.starts_with(val)){
-                        for _ in 0..symbol.get_variant_docs().unwrap().len() { // The multibyte symbols are checked above
-                            self.next_cursor();
-                        }
-                        return TokenType::Symbol(symbol);
-                    }
-                }
-
                 self.next_id_or_keyword()
-            },
+            }
         }
-
     }
 
     fn next_cursor(&mut self) -> Option<(SpanCursor, char)> {
-
         let current_line = &self.content[self.current_line_start_bidx..self.stopped_at_bidx];
 
         let size = self.cursor.stopped_at.1.len_utf8();
@@ -122,13 +209,11 @@ impl<'a> LexerIter<'a> {
         let next = self.cursor.next();
 
         if next.is_none() {
-
             if stopped_at_eol {
                 self.file_lines.push("");
-            }
-
-            else if self.current_line_start_bidx < self.content.len() {  
-                let current_line = &self.content[self.current_line_start_bidx..self.stopped_at_bidx];
+            } else if self.current_line_start_bidx < self.content.len() {
+                let current_line =
+                    &self.content[self.current_line_start_bidx..self.stopped_at_bidx];
                 self.file_lines.push(current_line);
                 self.current_line_start_bidx = self.stopped_at_bidx;
             }
@@ -144,36 +229,35 @@ impl<'a> LexerIter<'a> {
         }
     }
 
-    fn next_token_with_slash(&mut self) -> TokenType {
-
+    fn next_token_with_slash(&mut self) -> TokenKind {
         match self.next_cursor() {
-            Some((_, '=')) => { self.next_cursor(); TokenType::Symbol(SymbolType::SlashEqual) }
             Some((_, '/')) => {
                 let mut errs = vec![];
-                while self.next_cursor_non_eol().is_some(){ // Skip all until first EOL
+                while self.next_cursor_non_eol().is_some() {
+                    // Skip all until first EOL
                     if let Err(err) = self.check_is_kufr_or_unsupported_char() {
                         errs.push(err);
                     }
                 }
 
-                if errs.is_empty() { TokenType::LineComment }
-                else { TokenType::Bad(errs) }
+                if errs.is_empty() {
+                    TokenKind::LineComment
+                } else {
+                    TokenKind::Bad(errs)
+                }
             }
             Some((_, '*')) => {
                 let mut opened_delimted_comments = 1;
                 let mut errs = vec![];
 
                 while let Some((_, ch)) = self.next_cursor() {
-
                     if opened_delimted_comments == 0 {
                         break;
                     }
 
                     if ch == '/' && self.next_cursor().is_some_and(|(_, ch)| ch == '*') {
                         opened_delimted_comments += 1;
-                    }
-
-                    else if ch == '*' && self.next_cursor().is_some_and(|(_, ch)| ch == '/') {
+                    } else if ch == '*' && self.next_cursor().is_some_and(|(_, ch)| ch == '/') {
                         opened_delimted_comments -= 1;
                     }
 
@@ -183,61 +267,57 @@ impl<'a> LexerIter<'a> {
                 }
 
                 if opened_delimted_comments == 0 {
-                    if errs.is_empty() { TokenType::DelimitedComment }
-                    else { TokenType::Bad(errs) }
-                }
-                else {
-                    TokenType::Bad(vec![
-                        LexerError {
-                            col: self.cursor.stopped_at.0.col,
-                            len: 1,
-                            typ: LexerErrorType::UnclosedDelimitedComment,
-                        }
-                    ])
+                    if errs.is_empty() {
+                        TokenKind::DelimitedComment
+                    } else {
+                        TokenKind::Bad(errs)
+                    }
+                } else {
+                    TokenKind::Bad(vec![LexerError {
+                        col: self.cursor.stopped_at.0.col,
+                        len: 1,
+                        kind: LexerErrorKind::UnclosedDelimitedComment,
+                    }])
                 }
             }
-            _ => TokenType::Symbol(SymbolType::Slash),
+            _ => TokenKind::Symbol(SymbolKind::Slash),
         }
-
-
     }
 
-    fn next_id_or_keyword(&mut self) -> TokenType {
-
+    fn next_id_or_keyword(&mut self) -> TokenKind {
         if !self.cursor.stopped_at.1.is_alphabetic() {
             self.next_cursor();
-            return TokenType::Bad(vec![
-                LexerError {
-                    col: self.cursor.stopped_at.0.col,
-                    len: 1,
-                    typ: LexerErrorType::UnknownToken,
-                }
-            ]);
+            return TokenKind::Bad(vec![LexerError {
+                col: self.cursor.stopped_at.0.col,
+                len: 1,
+                kind: LexerErrorKind::UnknownToken,
+            }]);
         }
 
         let start = self.stopped_at_bidx;
 
-        while self.next_cursor_non_eol().is_some_and(|(_, ch)| ch.is_alphanumeric() || ch == '_' ) {}
+        while self
+            .next_cursor_non_eol()
+            .is_some_and(|(_, ch)| ch.is_alphanumeric() || ch == '_')
+        {}
 
         let end = self.stopped_at_bidx;
-        
+
         let id = &self.content[start..end];
 
         if id == "مؤكد" {
-            return TokenType::Literal(LiteralTokenType::Bool(true));
-        }
-        else if id == "محال" {
-            return TokenType::Literal(LiteralTokenType::Bool(false));
+            return TokenKind::Literal(LiteralKind::Bool(true));
+        } else if id == "محال" {
+            return TokenKind::Literal(LiteralKind::Bool(false));
         }
 
-        for keyword_typ in KeywordType::iter() {
+        for keyword_typ in KeywordKind::iter() {
             if keyword_typ.get_variant_docs().is_ok_and(|val| id == val) {
-                return TokenType::Keyword(keyword_typ);
+                return TokenKind::Keyword(keyword_typ);
             }
         }
 
-        TokenType::Id
-
+        TokenKind::Id
     }
 
     #[inline]
@@ -245,17 +325,15 @@ impl<'a> LexerIter<'a> {
         let (start, ch) = self.cursor.stopped_at;
 
         if is_kufr_or_unsupported_character(ch) {
-            Err(
-                LexerError {
-                    col: start.col,
-                    len: 1,
-                    typ: LexerErrorType::KufrOrInvalidChar,
-                }
-            )
+            Err(LexerError {
+                col: start.col,
+                len: 1,
+                kind: LexerErrorKind::KufrOrInvalidChar,
+            })
+        } else {
+            Ok(Some(ch))
         }
-        else { Ok(Some(ch)) }
     }
-
 }
 
 #[derive(Clone)]
@@ -265,29 +343,24 @@ struct CharsCursor<'a> {
 }
 
 impl<'a> CharsCursor<'a> {
-
     fn new(text: &'a str) -> Self {
         Self {
-            stopped_at: (
-                SpanCursor { line: 0, col: 0},
-                '\0'
-            ),
+            stopped_at: (SpanCursor { line: 0, col: 0 }, '\0'),
             chars: text.chars(),
         }
     }
-
 }
 
 impl<'a> Iterator for CharsCursor<'a> {
-
     type Item = (SpanCursor, char);
 
     fn next(&mut self) -> Option<Self::Item> {
-
-        if self.stopped_at.1 != '\0' {  // Not the first time to call the `next` method
+        if self.stopped_at.1 != '\0' {
+            // Not the first time to call the `next` method
             self.stopped_at.0.col += 1; // Update the column
         }
-        if self.stopped_at.1 == '\n' { // Last was a new line character
+        if self.stopped_at.1 == '\n' {
+            // Last was a new line character
             self.stopped_at.0.line += 1; // Update the line
             self.stopped_at.0.col = 0; // Reset the column
         }
@@ -303,70 +376,65 @@ impl<'a> Iterator for CharsCursor<'a> {
             }
         }
     }
-    
 }
 
-fn is_kufr_or_unsupported_character(c:char) -> bool{
-    let chars=[
-        '\u{03EE}','\u{03EF}','\u{058d}','\u{058e}',
-        '\u{05EF}', // yod triangle
-        '\u{07D9}','\u{093B}','\u{13D0}','\u{16BE}','\u{165C}','\u{16ED}',
-        '\u{17D2}','\u{1D7B}','\u{2020}','\u{2021}','\u{256A}','\u{256B}',
-        '\u{256C}','\u{2616}','\u{2617}','\u{269C}','\u{269E}','\u{269F}',
-        '\u{26AF}','\u{26B0}','\u{26B1}','\u{26F3}','\u{26F9}','\u{26FB}',
-        '\u{26FF}','\u{27CA}','\u{29FE}','\u{2CFE}',
+fn is_kufr_or_unsupported_character(c: char) -> bool {
+    let chars = [
+        '\u{03EE}', '\u{03EF}', '\u{058d}', '\u{058e}', '\u{05EF}', // yod triangle
+        '\u{07D9}', '\u{093B}', '\u{13D0}', '\u{16BE}', '\u{165C}', '\u{16ED}', '\u{17D2}',
+        '\u{1D7B}', '\u{2020}', '\u{2021}', '\u{256A}', '\u{256B}', '\u{256C}', '\u{2616}',
+        '\u{2617}', '\u{269C}', '\u{269E}', '\u{269F}', '\u{26AF}', '\u{26B0}', '\u{26B1}',
+        '\u{26F3}', '\u{26F9}', '\u{26FB}', '\u{26FF}', '\u{27CA}', '\u{29FE}', '\u{2CFE}',
     ];
 
-    if chars.contains(&c){
-        return true
+    if chars.contains(&c) {
+        return true;
     }
 
-    let ranges=[
+    let ranges = [
         /*  from  ,    to  */
-        ('\u{0900}','\u{109F}'),//HinduEurope
-        ('\u{1100}','\u{1C7F}'),//HinduEurope
-        ('\u{253C}','\u{254B}'),
-        ('\u{2624}','\u{2638}'),//Kufr
-        ('\u{263D}','\u{2653}'),//Kufr
-        ('\u{2654}','\u{2667}'),
-        ('\u{2669}','\u{2671}'),//Music and kufr crosses
-        ('\u{2680}','\u{268F}'),
-        ('\u{2680}','\u{268F}'),
-        ('\u{26A2}','\u{26A9}'),// Pride
-        ('\u{26B3}','\u{26BC}'),// Kufr
-        ('\u{26BF}','\u{26EC}'),
-        ('\u{2719}','\u{2725}'),// Kufr crosses
-        ('\u{2BF0}','\u{2C5F}'),// Includes astrology
-        ('\u{2D80}','\u{AB2F}'),
-        ('\u{AB70}','\u{FAFF}'),
+        ('\u{0900}', '\u{109F}'), //HinduEurope
+        ('\u{1100}', '\u{1C7F}'), //HinduEurope
+        ('\u{253C}', '\u{254B}'),
+        ('\u{2624}', '\u{2638}'), //Kufr
+        ('\u{263D}', '\u{2653}'), //Kufr
+        ('\u{2654}', '\u{2667}'),
+        ('\u{2669}', '\u{2671}'), //Music and kufr crosses
+        ('\u{2680}', '\u{268F}'),
+        ('\u{2680}', '\u{268F}'),
+        ('\u{26A2}', '\u{26A9}'), // Pride
+        ('\u{26B3}', '\u{26BC}'), // Kufr
+        ('\u{26BF}', '\u{26EC}'),
+        ('\u{2719}', '\u{2725}'), // Kufr crosses
+        ('\u{2BF0}', '\u{2C5F}'), // Includes astrology
+        ('\u{2D80}', '\u{AB2F}'),
+        ('\u{AB70}', '\u{FAFF}'),
     ];
 
-    for (r1,r2) in ranges{
-        if c>=r1 && c<=r2{
-            return true
+    for (r1, r2) in ranges {
+        if c >= r1 && c <= r2 {
+            return true;
         }
     }
 
     false
 }
 
-
 #[cfg(test)]
 
-mod tests{
+mod tests {
     use std::vec;
 
+    use super::{KeywordKind, LexerIter, SymbolKind};
+    use crate::{lexer::TokenKind, Token};
     use documented::DocumentedVariants;
     use itertools::Itertools;
     use nazmc_diagnostics::span::{Span, SpanCursor};
     use strum::IntoEnumIterator;
-    use crate::{lexer::TokenType, Token};
-    use super::{KeywordType, LexerIter, SymbolType};
 
     #[test]
     fn test_lines() {
-
-        assert_eq!(vec![""], LexerIter::new("").get_file_lines_and_diagnostics().0);
+        assert_eq!(vec![""], LexerIter::new("").collect_all().1);
 
         let content = concat!(
             "\n",
@@ -382,7 +450,7 @@ mod tests{
 
         let lexer: LexerIter = LexerIter::new(content);
 
-        let (lines, _) = lexer.get_file_lines_and_diagnostics();
+        let (_, lines, _) = lexer.collect_all();
         let expected_lines = content.split('\n').collect_vec();
 
         assert_eq!(expected_lines, lines);
@@ -402,7 +470,7 @@ mod tests{
 
         let lexer: LexerIter = LexerIter::new(content);
 
-        let (lines, _) = lexer.get_file_lines_and_diagnostics();
+        let (_, lines, _) = lexer.collect_all();
         let expected_lines = content.split('\n').collect_vec();
 
         assert_eq!(expected_lines, lines);
@@ -410,107 +478,136 @@ mod tests{
 
     #[test]
     fn test_symbols_lexing() {
-        for symbol in SymbolType::iter() {
+        for symbol in SymbolKind::iter() {
             let symbol_val = symbol.get_variant_docs().unwrap();
-            let Token { span, val, typ } = LexerIter::new(symbol_val).next().unwrap();
+            let Token { span, val, kind } = LexerIter::new(symbol_val).next().unwrap();
             assert_eq!(
                 span,
-                Span { 
-                    start: SpanCursor { line:0, col: 0 },
-                    end:   SpanCursor { line:0, col: symbol_val.chars().count() },
+                Span {
+                    start: SpanCursor { line: 0, col: 0 },
+                    end: SpanCursor {
+                        line: 0,
+                        col: symbol_val.chars().count()
+                    },
                 }
             );
             assert_eq!(val, symbol_val);
-            assert_eq!(typ, TokenType::Symbol(symbol));
+            assert_eq!(kind, TokenKind::Symbol(symbol));
         }
 
         let mut symbols_line = String::new();
-        for symbol in SymbolType::iter() {
+        for symbol in SymbolKind::iter() {
             let symbol_val = symbol.get_variant_docs().unwrap();
             symbols_line.push_str(symbol_val);
         }
 
         let tokens = LexerIter::new(&symbols_line);
-        let mut symbols_iter = SymbolType::iter();
+        let mut symbols_iter = SymbolKind::iter();
         let mut columns = 0;
 
-        for Token { span, val, typ } in tokens {
+        for Token { span, val, kind } in tokens {
             let symbol = symbols_iter.next().unwrap();
             let symbol_val = symbol.get_variant_docs().unwrap();
 
             assert_eq!(
                 span,
-                Span { 
-                    start: SpanCursor { line:0, col: columns },
-                    end:   SpanCursor { line:0, col: columns + symbol_val.chars().count() },
+                Span {
+                    start: SpanCursor {
+                        line: 0,
+                        col: columns
+                    },
+                    end: SpanCursor {
+                        line: 0,
+                        col: columns + symbol_val.chars().count()
+                    },
                 },
-                "Maybe the tokens are overlapping for left: `{}`, right: `{}`",val, symbol_val
+                "Maybe the tokens are overlapping for left: `{}`, right: `{}`",
+                val,
+                symbol_val
             );
 
             columns += symbol_val.chars().count();
 
             assert_eq!(val, symbol_val);
-            assert_eq!(typ, TokenType::Symbol(symbol));
+            assert_eq!(kind, TokenKind::Symbol(symbol));
         }
 
         let mut symbols_line = String::new();
-        for symbol in SymbolType::iter() {
+        for symbol in SymbolKind::iter() {
             let symbol_val = symbol.get_variant_docs().unwrap();
             symbols_line.push_str(symbol_val);
             symbols_line.push('\n');
         }
 
         let mut tokens = LexerIter::new(&symbols_line);
-        let mut symbols_iter = SymbolType::iter();
+        let mut symbols_iter = SymbolKind::iter();
         let mut lines = 0;
 
-        while let Some(Token { span, val, typ }) = tokens.next() {
+        while let Some(Token { span, val, kind }) = tokens.next() {
             let symbol = symbols_iter.next().unwrap();
             let symbol_val = symbol.get_variant_docs().unwrap();
 
             assert_eq!(
                 span,
-                Span { 
-                    start: SpanCursor { line: lines, col: 0 },
-                    end:   SpanCursor { line: lines, col: symbol_val.chars().count() },
+                Span {
+                    start: SpanCursor {
+                        line: lines,
+                        col: 0
+                    },
+                    end: SpanCursor {
+                        line: lines,
+                        col: symbol_val.chars().count()
+                    },
                 },
-                "Maybe the tokens are overlapping for left: `{}`, right: `{}`",val, symbol_val
+                "Maybe the tokens are overlapping for left: `{}`, right: `{}`",
+                val,
+                symbol_val
             );
 
             assert_eq!(val, symbol_val);
-            assert_eq!(typ, TokenType::Symbol(symbol));
+            assert_eq!(kind, TokenKind::Symbol(symbol));
 
-            let Token { span, val, typ } = tokens.next().unwrap();
+            let Token { span, val, kind } = tokens.next().unwrap();
 
             assert_eq!(
                 span,
-                Span { 
-                    start: SpanCursor { line: lines, col: symbol_val.chars().count() },
-                    end:   SpanCursor { line: lines + 1, col: 0 },
+                Span {
+                    start: SpanCursor {
+                        line: lines,
+                        col: symbol_val.chars().count()
+                    },
+                    end: SpanCursor {
+                        line: lines + 1,
+                        col: 0
+                    },
                 },
-                "On symbol `{}`", symbol_val
+                "On symbol `{}`",
+                symbol_val
             );
 
             assert_eq!(val, "\n");
-            assert_eq!(typ, TokenType::EOL);
+            assert_eq!(kind, TokenKind::EOL);
             lines += 1;
         }
     }
 
     #[test]
     fn test_keywords_lexing() {
-        for keyword in KeywordType::iter() {
+        for keyword in KeywordKind::iter() {
             let keyword_val = keyword.get_variant_docs().unwrap();
-            let Token { span, val, typ } = LexerIter::new(keyword_val).next().unwrap();
+            let Token { span, val, kind } = LexerIter::new(keyword_val).next().unwrap();
             assert_eq!(
                 span,
-                Span { 
-                    start: SpanCursor { line:0, col: 0 },
-                    end:   SpanCursor { line:0, col: keyword_val.chars().count() },
+                Span {
+                    start: SpanCursor { line: 0, col: 0 },
+                    end: SpanCursor {
+                        line: 0,
+                        col: keyword_val.chars().count()
+                    },
                 }
             );
             assert_eq!(val, keyword_val);
-            assert_eq!(typ, TokenType::Keyword(keyword));
+            assert_eq!(kind, TokenKind::Keyword(keyword));
         }
     }
 }

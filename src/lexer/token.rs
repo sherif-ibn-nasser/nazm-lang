@@ -1,39 +1,42 @@
-use documented::{DocumentedFields, DocumentedVariants};
-use strum::EnumIter;
-use nazmc_diagnostics::span::*;
-use super::error::LexerError;
+use std::rc::Rc;
 
-#[derive(Clone, PartialEq, Debug)]
+use super::error::LexerError;
+use documented::DocumentedVariants;
+use nazmc_diagnostics::span::*;
+use strum::EnumIter;
+
+#[derive(Clone, PartialEq, Debug, Default)]
 pub struct Token<'a> {
     pub val: &'a str,
     pub span: Span,
-    pub typ: TokenType,
+    pub kind: TokenKind,
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub enum TokenType {
-    Bad(Vec<LexerError>),
-    EOL,
+#[derive(Clone, PartialEq, Debug, Default)]
+pub enum TokenKind {
+    #[default]
     EOF,
+    EOL,
     Space,
     LineComment,
     DelimitedComment,
-    Literal(LiteralTokenType),
+    Literal(LiteralKind),
     Id,
-    Symbol(SymbolType),
-    Keyword(KeywordType),
+    Symbol(SymbolKind),
+    Keyword(KeywordKind),
+    Bad(Vec<LexerError>),
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum LiteralTokenType {
-    Str(String),
+pub enum LiteralKind {
+    Str(Rc<String>),
     Char(char),
     Bool(bool),
-    Num(NumType),
+    Num(NumKind),
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum NumType {
+pub enum NumKind {
     F4(f32),
     F8(f64),
     I(isize),
@@ -58,67 +61,8 @@ pub enum Base {
     Hex = 16,
 }
 
-#[derive(Clone, PartialEq, Debug, DocumentedVariants, DocumentedFields, EnumIter)]
-pub enum SymbolType {
-
-    /// <..<
-    LessDotDotLess,
-    /// <..
-    LessDotDot,
-    /// ..<
-    DotDotLess,
-    /// <<=
-    ShrEqual,
-    /// >>=
-    ShlEqual,
-    /// **=
-    PowerEqual,
-
-    /// <=
-    LessEqual,
-    /// <<
-    Shr,
-    /// >=
-    GreaterEqual,
-    /// >>
-    Shl,
-    /// *=
-    StarEqual,
-    /// **
-    Power,
-    /// /=
-    SlashEqual,
-    /// +=
-    PLusEqual,
-    /// ++
-    PlusPlus,
-    /// -=
-    MinusEqual,
-    /// --
-    MinusMinus,
-    /// |=
-    BitOrEqual,
-    /// ||
-    LogicalOr,
-    /// &=
-    BitAndEqual,
-    /// &&
-    LogicalAnd,
-    /// %=
-    ModuloEqual,
-    /// ~=
-    BitNotEqual,
-    /// ^=
-    XorEqual,
-    /// ==
-    EqualEqual,
-    /// !=
-    NotEqual,
-    /// ::
-    DoubleColons,
-    /// ..
-    DotDot,
-
+#[derive(Clone, PartialEq, Debug, DocumentedVariants, EnumIter)]
+pub enum SymbolKind {
     /// ،
     Comma,
     /// ؛
@@ -130,9 +74,9 @@ pub enum SymbolType {
     /// )
     CloseParenthesis,
     /// {
-    OpenCurlyBraces,
+    OpenCurlyBrace,
     /// }
-    CloseCurlyBraces,
+    CloseCurlyBrace,
     /// [
     OpenSquareBracket,
     /// ]
@@ -167,11 +111,12 @@ pub enum SymbolType {
     Colon,
     /// =
     Equal,
-    
+    /// #
+    Hash,
 }
 
 #[derive(DocumentedVariants, Debug, Clone, PartialEq, EnumIter)]
-pub enum KeywordType {
+pub enum KeywordKind {
     /// دالة
     Fn,
     /// احجز
@@ -180,4 +125,32 @@ pub enum KeywordType {
     Mut,
     /// ثابت
     Const,
+    /// تصنيف
+    Struct,
+    /// تصدير
+    Public,
+    /// تخصيص
+    Private,
+    /// على
+    On,
+    /// لو
+    If,
+    /// وإلا
+    Else,
+    /// عندما
+    When,
+    /// تكرار
+    Loop,
+    /// طالما
+    While,
+    /// افعل
+    Do,
+    /// قطع
+    Break,
+    /// وصل
+    Continue,
+    /// أرجع
+    Return,
+    /// تشغيل
+    Run,
 }
