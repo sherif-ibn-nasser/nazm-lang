@@ -1,13 +1,19 @@
 use super::*;
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct Item {
-    pub(crate) visibility: Option<VisModifier>,
-    pub(crate) kind: ItemKind,
+pub(crate) enum FileItem {
+    WithVisModifier(ItemWithVisibility),
+    WithoutModifier(Item),
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) enum ItemKind {
+pub(crate) struct ItemWithVisibility {
+    pub(crate) visibility: VisModifier,
+    pub(crate) item: ParseResult<Item>,
+}
+
+#[derive(NazmcParse, Debug)]
+pub(crate) enum Item {
     Struct(Struct),
     Fn(Fn),
 }
