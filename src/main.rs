@@ -13,7 +13,7 @@ use std::{
 fn main() {
     let (file_path, file_content) = cli::read_file();
 
-    let (tokens, file_lines, lexer_diagnostics) = LexerIter::new(&file_content).collect_all();
+    let (tokens, file_lines) = LexerIter::new(&file_content).collect_all();
 
     let mut tokens_iter = TokensIter::new(&tokens);
 

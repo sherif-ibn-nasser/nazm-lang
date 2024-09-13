@@ -20,8 +20,6 @@ pub(crate) struct LexerIter<'a> {
     stopped_at_bidx: usize,
     /// The file lines to fill from lexing
     file_lines: Vec<&'a str>,
-    /// The diagnostics of lexing phase
-    diagnostics: PhaseDiagnostics<'a>,
     /// The start byte index of current line
     current_line_start_bidx: usize,
 }
@@ -50,7 +48,6 @@ impl<'a> LexerIter<'a> {
             content,
             cursor: CharsCursor::new(content),
             stopped_at_bidx: 0,
-            diagnostics: PhaseDiagnostics::new(),
             file_lines: vec![],
             current_line_start_bidx: 0,
         };
@@ -58,14 +55,14 @@ impl<'a> LexerIter<'a> {
         _self
     }
 
-    pub fn collect_all(mut self) -> (Vec<Token<'a>>, Vec<&'a str>, PhaseDiagnostics<'a>) {
+    pub fn collect_all(mut self) -> (Vec<Token<'a>>, Vec<&'a str>) {
         let tokens = self.by_ref().collect_vec();
 
         if self.file_lines.is_empty() {
             self.file_lines.push("");
         }
 
-        (tokens, self.file_lines, self.diagnostics)
+        (tokens, self.file_lines)
     }
 
     fn next_token_type(&mut self) -> TokenKind {
@@ -450,7 +447,7 @@ mod tests {
 
         let lexer: LexerIter = LexerIter::new(content);
 
-        let (_, lines, _) = lexer.collect_all();
+        let (_, lines) = lexer.collect_all();
         let expected_lines = content.split('\n').collect_vec();
 
         assert_eq!(expected_lines, lines);
@@ -470,7 +467,7 @@ mod tests {
 
         let lexer: LexerIter = LexerIter::new(content);
 
-        let (_, lines, _) = lexer.collect_all();
+        let (_, lines) = lexer.collect_all();
         let expected_lines = content.split('\n').collect_vec();
 
         assert_eq!(expected_lines, lines);
