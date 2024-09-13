@@ -50,7 +50,7 @@ impl<'a> TokensIter<'a> {
 
     #[inline]
     pub(crate) fn next(&mut self) -> Option<&Token<'a>> {
-        if self.peek_idx == self.tokens.len() {
+        if self.peek_idx > self.tokens.len() {
             return None;
         }
         self.peek_idx += 1;

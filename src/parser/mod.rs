@@ -171,7 +171,7 @@ where
 
         loop {
             // No more tokens
-            if iter.peek().is_none() {
+            if iter.recent().is_none() {
                 return Self {
                     items,
                     terminator: ParseErr::eof(),
