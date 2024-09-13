@@ -32,43 +32,6 @@ impl<T: TerminalGuard> Check for Terminal<T> {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct IdToken {
-    val: String,
-}
-
-impl private::Sealed for IdToken {}
-
-impl TerminalGuard for IdToken {}
-
-pub(crate) type Id = Terminal<IdToken>;
-
-impl NazmcParse for ParseResult<Terminal<IdToken>> {
-    fn parse(iter: &mut TokensIter) -> Self {
-        match iter.recent() {
-            Some(Token {
-                val,
-                span,
-                kind: TokenKind::Id,
-            }) => {
-                let ok = Ok(Terminal {
-                    span: *span,
-                    data: IdToken {
-                        val: val.to_string(),
-                    },
-                });
-                iter.next_non_space_or_comment();
-                ok
-            }
-            Some(token) => Err(ParseErr {
-                span: token.span,
-                found_token: token.kind.clone(),
-            }),
-            None => ParseErr::eof(iter.peek_start_span()),
-        }
-    }
-}
-
 macro_rules! create_keyword_parser {
     ($keyword: ident) => {
         paste! {
@@ -95,11 +58,10 @@ macro_rules! create_keyword_parser {
                             iter.next_non_space_or_comment();
                             ok
                         }
-                        Some(token) => Err(ParseErr {
-                            span: token.span,
-                            found_token: token.kind.clone(),
+                        Some(_) => Err(ParseErr {
+                            found_token_index: iter.peek_idx - 1,
                         }),
-                        None => ParseErr::eof(iter.peek_start_span()),
+                        None => ParseErr::eof(),
                     }
                 }
             }
@@ -133,11 +95,10 @@ macro_rules! create_symbol_parser {
                             iter.next_non_space_or_comment();
                             ok
                         }
-                        Some(token) => Err(ParseErr {
-                            span: token.span,
-                            found_token: token.kind.clone(),
+                        Some(_) => Err(ParseErr {
+                            found_token_index: iter.peek_idx - 1,
                         }),
-                        None => ParseErr::eof(iter.peek_start_span()),
+                        None => ParseErr::eof(),
                     }
                 }
             }
@@ -189,6 +150,11 @@ create_symbol_parser!(ExclamationMark);
 create_symbol_parser!(Colon);
 create_symbol_parser!(Equal);
 create_symbol_parser!(Hash);
+
+#[derive(Debug)]
+pub(crate) struct IdToken {
+    val: String,
+}
 
 #[derive(Debug)]
 pub(crate) struct DoubleColonsSymbolToken;
@@ -257,6 +223,7 @@ pub(crate) enum VisModifierToken {
 #[derive(Debug)]
 pub(crate) struct EOFToken;
 
+impl private::Sealed for IdToken {}
 impl private::Sealed for DoubleColonsSymbolToken {}
 impl private::Sealed for RArrowSymbolToken {}
 impl private::Sealed for BinOpToken {}
@@ -265,6 +232,7 @@ impl private::Sealed for LiteralKind {}
 impl private::Sealed for VisModifierToken {}
 impl private::Sealed for EOFToken {}
 
+impl TerminalGuard for IdToken {}
 impl TerminalGuard for DoubleColonsSymbolToken {}
 impl TerminalGuard for RArrowSymbolToken {}
 impl TerminalGuard for BinOpToken {}
@@ -273,6 +241,7 @@ impl TerminalGuard for LiteralKind {}
 impl TerminalGuard for VisModifierToken {}
 impl TerminalGuard for EOFToken {}
 
+pub(crate) type Id = Terminal<IdToken>;
 pub(crate) type DoubleColonsSymbol = Terminal<DoubleColonsSymbolToken>;
 pub(crate) type RArrowSymbol = Terminal<RArrowSymbolToken>;
 pub(crate) type BinOp = Terminal<BinOpToken>;
@@ -304,6 +273,31 @@ macro_rules! match_peek_symbols {
     };
 }
 
+impl NazmcParse for ParseResult<Terminal<IdToken>> {
+    fn parse(iter: &mut TokensIter) -> Self {
+        match iter.recent() {
+            Some(Token {
+                val,
+                span,
+                kind: TokenKind::Id,
+            }) => {
+                let ok = Ok(Terminal {
+                    span: *span,
+                    data: IdToken {
+                        val: val.to_string(),
+                    },
+                });
+                iter.next_non_space_or_comment();
+                ok
+            }
+            Some(_) => Err(ParseErr {
+                found_token_index: iter.peek_idx - 1,
+            }),
+            None => ParseErr::eof(),
+        }
+    }
+}
+
 impl NazmcParse for ParseResult<DoubleColonsSymbol> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
@@ -322,11 +316,10 @@ impl NazmcParse for ParseResult<DoubleColonsSymbol> {
                     data: DoubleColonsSymbolToken,
                 })
             }
-            Some(token) => Err(ParseErr {
-                span: token.span,
-                found_token: token.kind.clone(),
+            Some(_) => Err(ParseErr {
+                found_token_index: iter.peek_idx - 1,
             }),
-            None => ParseErr::eof(iter.peek_start_span()),
+            None => ParseErr::eof(),
         }
     }
 }
@@ -349,11 +342,10 @@ impl NazmcParse for ParseResult<RArrowSymbol> {
                     data: RArrowSymbolToken,
                 })
             }
-            Some(token) => Err(ParseErr {
-                span: token.span,
-                found_token: token.kind.clone(),
+            Some(_) => Err(ParseErr {
+                found_token_index: iter.peek_idx - 1,
             }),
-            None => ParseErr::eof(iter.peek_start_span()),
+            None => ParseErr::eof(),
         }
     }
 }
@@ -468,8 +460,7 @@ impl NazmcParse for ParseResult<BinOp> {
 
                     _ => {
                         return Err(ParseErr {
-                            span: token.span,
-                            found_token: token.kind.clone(),
+                            found_token_index: iter.peek_idx - 1,
                         });
                     }
                 };
@@ -483,11 +474,10 @@ impl NazmcParse for ParseResult<BinOp> {
                     data: op_kind,
                 })
             }
-            Some(token) => Err(ParseErr {
-                span: token.span,
-                found_token: token.kind.clone(),
+            Some(_) => Err(ParseErr {
+                found_token_index: iter.peek_idx - 1,
             }),
-            None => ParseErr::eof(iter.peek_start_span()),
+            None => ParseErr::eof(),
         }
     }
 }
@@ -495,13 +485,11 @@ impl NazmcParse for ParseResult<BinOp> {
 impl NazmcParse for ParseResult<UnaryOp> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
-            Some(
-                token @ Token {
-                    val: _,
-                    span,
-                    kind: TokenKind::Symbol(symbol_kind),
-                },
-            ) => {
+            Some(Token {
+                val: _,
+                span,
+                kind: TokenKind::Symbol(symbol_kind),
+            }) => {
                 let mut span = *span;
 
                 let op_kind = match symbol_kind {
@@ -528,8 +516,7 @@ impl NazmcParse for ParseResult<UnaryOp> {
                     }
                     _ => {
                         return Err(ParseErr {
-                            span: token.span,
-                            found_token: token.kind.clone(),
+                            found_token_index: iter.peek_idx - 1,
                         });
                     }
                 };
@@ -539,11 +526,10 @@ impl NazmcParse for ParseResult<UnaryOp> {
                     data: op_kind,
                 })
             }
-            Some(token) => Err(ParseErr {
-                span: token.span,
-                found_token: token.kind.clone(),
+            Some(_) => Err(ParseErr {
+                found_token_index: iter.peek_idx - 1,
             }),
-            None => ParseErr::eof(iter.peek_start_span()),
+            None => ParseErr::eof(),
         }
     }
 }
@@ -563,11 +549,10 @@ impl NazmcParse for ParseResult<LiteralExpr> {
                 iter.next_non_space_or_comment();
                 ok
             }
-            Some(token) => Err(ParseErr {
-                span: token.span,
-                found_token: token.kind.clone(),
+            Some(_) => Err(ParseErr {
+                found_token_index: iter.peek_idx - 1,
             }),
-            None => ParseErr::eof(iter.peek_start_span()),
+            None => ParseErr::eof(),
         }
     }
 }
@@ -591,11 +576,10 @@ impl NazmcParse for ParseResult<VisModifier> {
                 span: *span,
                 data: VisModifierToken::Private,
             }),
-            Some(token) => Err(ParseErr {
-                span: token.span,
-                found_token: token.kind.clone(),
+            Some(_) => Err(ParseErr {
+                found_token_index: iter.peek_idx - 1,
             }),
-            None => ParseErr::eof(iter.peek_start_span()),
+            None => ParseErr::eof(),
         }
     }
 }
@@ -603,11 +587,13 @@ impl NazmcParse for ParseResult<VisModifier> {
 impl NazmcParse for ParseResult<EOF> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
-            Some(token) => Err(ParseErr {
-                span: token.span,
-                found_token: token.kind.clone(),
+            Some(_) => Err(ParseErr {
+                found_token_index: iter.peek_idx - 1,
             }),
-            None => ParseErr::eof(iter.peek_start_span()),
+            None => Ok(EOF {
+                span: Span::default(),
+                data: EOFToken,
+            }),
         }
     }
 }
@@ -662,11 +648,11 @@ mod tests {
         assert!(!_id.unwrap().is_broken());
         assert!(!_open_paren.unwrap().is_broken());
         assert!(matches!(
-            _close_paren.unwrap_err(),
-            ParseErr {
-                found_token: TokenKind::Id,
+            iter.nth(_close_paren.unwrap_err().found_token_index),
+            Some(Token {
+                kind: TokenKind::Id,
                 ..
-            }
+            })
         ));
     }
 }

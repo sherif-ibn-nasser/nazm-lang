@@ -68,10 +68,7 @@ impl NazmcParse for ParseResult<ArrayExpr> {
                     if let Ok(tree) = imlicit_size.items.terminator {
                         (tree.comma, Ok(tree.close_delim))
                     } else {
-                        (
-                            None,
-                            ParseErr::eof(imlicit_size.items.terminator.span().unwrap()),
-                        )
+                        (None, ParseErr::eof())
                     };
 
                 let expr_kind_tree = ArrayExprKind::Elements(ElementsArrayExpr {

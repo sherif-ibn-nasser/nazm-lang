@@ -1,3 +1,5 @@
+use std::usize;
+
 /// This module defines the core components and traits required for parsing an Abstract Syntax Tree (AST)
 /// in the Nazmc language parser. It provides the foundational structures and parsing logic for different
 /// AST node types, ensuring that the syntax is correctly interpreted and processed.
@@ -53,15 +55,13 @@ pub(crate) type ParseResult<T> = Result<T, ParseErr>;
 
 #[derive(Clone, Debug)]
 pub(crate) struct ParseErr {
-    pub(crate) span: Span,
-    pub(crate) found_token: TokenKind,
+    pub(crate) found_token_index: usize,
 }
 
 impl ParseErr {
-    pub(crate) fn eof<T>(span: Span) -> ParseResult<T> {
+    pub(crate) fn eof<T>() -> ParseResult<T> {
         Err(ParseErr {
-            span,
-            found_token: TokenKind::EOF,
+            found_token_index: usize::MAX,
         })
     }
 }
@@ -174,7 +174,7 @@ where
             if iter.peek().is_none() {
                 return Self {
                     items,
-                    terminator: ParseErr::eof(iter.peek_start_span()),
+                    terminator: ParseErr::eof(),
                 };
             }
             let old_peek_idx = iter.peek_idx;
@@ -216,7 +216,7 @@ where
                 return Self {
                     first: unexpected_node,
                     rest: vec![],
-                    terminator: ParseErr::eof(iter.peek_start_span()),
+                    terminator: ParseErr::eof(),
                 };
             }
         };
@@ -248,7 +248,7 @@ where
     fn span(&self) -> Option<Span> {
         match self {
             Ok(tree) => tree.span(),
-            Err(ParseErr { span, .. }) => Some(*span),
+            Err(_) => None,
         }
     }
 }
@@ -275,12 +275,7 @@ where
         if self.is_empty() {
             None
         } else {
-            Some(
-                self[0]
-                    .span()
-                    .unwrap()
-                    .merged_with(&self[self.len() - 1].span().unwrap()),
-            )
+            self[0].span().merged_with(self[self.len() - 1].span())
         }
     }
 }
@@ -294,12 +289,7 @@ where
         if self.is_empty() {
             None
         } else {
-            Some(
-                self[0]
-                    .span()
-                    .unwrap()
-                    .merged_with(&self[self.len() - 1].span().unwrap()),
-            )
+            self[0].span().merged_with(self[self.len() - 1].span())
         }
     }
 }
@@ -312,16 +302,7 @@ where
     Terminator: Spanned,
 {
     fn span(&self) -> Option<Span> {
-        if self.items.is_empty() {
-            self.terminator.span()
-        } else {
-            Some(
-                self.items[0]
-                    .span()
-                    .unwrap()
-                    .merged_with(&self.terminator.span().unwrap()),
-            )
-        }
+        self.items.span().merged_with(self.terminator.span())
     }
 }
 
@@ -333,23 +314,10 @@ where
     Terminator: Spanned,
 {
     fn span(&self) -> Option<Span> {
-        if self.first.is_ok() {
-            Some(
-                self.first
-                    .span()
-                    .unwrap()
-                    .merged_with(&self.terminator.span().unwrap()),
-            )
-        } else if self.rest.is_empty() {
-            self.terminator.span()
-        } else {
-            Some(
-                self.rest[0]
-                    .span()
-                    .unwrap()
-                    .merged_with(&self.terminator.span().unwrap()),
-            )
-        }
+        self.first
+            .span()
+            .merged_with(self.rest.last().and_then(|item| item.span()))
+            .merged_with(self.terminator.span())
     }
 }
 

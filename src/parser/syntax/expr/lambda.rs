@@ -27,8 +27,8 @@ pub(crate) enum LambdaArrow {
 
 #[derive(SpannedAndCheck, Debug)]
 pub(crate) struct LambdaParams {
-    pub(crate) first: BindingDecl,
-    pub(crate) rest: Vec<CommaWithBindingDecl>,
+    pub(crate) first: Binding,
+    pub(crate) rest: Vec<CommaWithBinding>,
     pub(crate) trailing_comma: Option<CommaSymbol>,
     pub(crate) r_arrow: ParseResult<RArrowSymbol>,
 }
@@ -76,7 +76,7 @@ impl NazmcParse for ParseResult<LambdaParams> {
     fn parse(iter: &mut TokensIter) -> Self {
         let peek_idx = iter.peek_idx;
 
-        let first = ParseResult::<BindingDecl>::parse(iter)?;
+        let first = ParseResult::<Binding>::parse(iter)?;
 
         match iter.recent() {
             Some(Token {
@@ -93,21 +93,19 @@ impl NazmcParse for ParseResult<LambdaParams> {
                     ..
                 },)
             ) => {}
-            Some(token) => {
-                let err = Err(ParseErr {
-                    span: token.span,
-                    found_token: token.kind.clone(),
-                });
+            Some(_) => {
                 iter.peek_idx = peek_idx;
-                return err;
+                return Err(ParseErr {
+                    found_token_index: iter.peek_idx - 1,
+                });
             }
             None => {
                 iter.peek_idx = peek_idx;
-                return ParseErr::eof(iter.peek_start_span());
+                return ParseErr::eof();
             }
         };
 
-        let rest = Vec::<CommaWithBindingDecl>::parse(iter);
+        let rest = Vec::<CommaWithBinding>::parse(iter);
 
         let comma_with_arrow_symbol = ParseResult::<CommaWithRArrowSymbol>::parse(iter);
 

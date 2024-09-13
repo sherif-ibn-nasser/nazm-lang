@@ -11,31 +11,31 @@ pub(crate) enum Stm {
 pub(crate) struct LetStm {
     pub(crate) let_keyword: LetKeyword,
     pub(crate) mut_keyword: Option<MutKeyword>,
-    pub(crate) decl: ParseResult<BindingDecl>,
+    pub(crate) binding: ParseResult<Binding>,
     pub(crate) let_assign: Option<LetAssign>,
     pub(crate) semicolon: ParseResult<SemicolonSymbol>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct BindingDecl {
-    pub(crate) kind: BindingDeclKind,
+pub(crate) struct Binding {
+    pub(crate) kind: BindingKind,
     pub(crate) typ: Option<ColonWithType>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) enum BindingDeclKind {
+pub(crate) enum BindingKind {
     Id(Id),
     Destructed(Box<DestructedTuple>), // Box for the large size
 }
 
-generatePunctuatedItem!(BindingDecl);
+generatePunctuatedItem!(Binding);
 
-generatePunctuatedItem!(BindingDeclKind);
+generatePunctuatedItem!(BindingKind);
 
 generateDelimitedPunctuated!(
     DestructedTuple,
     OpenParenthesisSymbol,
-    BindingDeclKind,
+    BindingKind,
     CloseParenthesisSymbol
 );
 

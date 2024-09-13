@@ -123,11 +123,10 @@ impl NazmcParse for ParseResult<ConditionalBlock> {
             _ => {
                 // No block is found (or found a lambda block with '->')
                 let parse_err = match iter.recent() {
-                    Some(token) => Err(ParseErr {
-                        span: token.span,
-                        found_token: token.kind.clone(),
+                    Some(_) => Err(ParseErr {
+                        found_token_index: iter.peek_idx - 1,
                     }),
-                    None => ParseErr::eof(iter.peek_start_span()),
+                    None => ParseErr::eof(),
                 };
                 return Ok(ConditionalBlock {
                     condition: Ok(condition),

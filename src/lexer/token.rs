@@ -1,5 +1,7 @@
+use std::rc::Rc;
+
 use super::error::LexerError;
-use documented::{DocumentedFields, DocumentedVariants};
+use documented::DocumentedVariants;
 use nazmc_diagnostics::span::*;
 use strum::EnumIter;
 
@@ -27,7 +29,7 @@ pub enum TokenKind {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LiteralKind {
-    Str(String),
+    Str(Rc<String>),
     Char(char),
     Bool(bool),
     Num(NumKind),

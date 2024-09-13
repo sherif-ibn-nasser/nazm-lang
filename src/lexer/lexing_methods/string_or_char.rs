@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use error::*;
 
 use crate::lexer::*;
@@ -39,7 +41,7 @@ impl<'a> LexerIter<'a> {
                 return TokenKind::Bad(errs);
             }
 
-            return TokenKind::Literal(LiteralKind::Str(rust_str_lit));
+            return TokenKind::Literal(LiteralKind::Str(Rc::new(rust_str_lit)));
         }
 
         let mut iter = rust_str_lit.chars();
