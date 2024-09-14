@@ -564,18 +564,26 @@ impl NazmcParse for ParseResult<VisModifier> {
                 span,
                 kind: TokenKind::Keyword(KeywordKind::Public),
                 ..
-            }) => Ok(Terminal {
-                span: *span,
-                data: VisModifierToken::Public,
-            }),
+            }) => {
+                let ok = Ok(Terminal {
+                    span: *span,
+                    data: VisModifierToken::Public,
+                });
+                iter.next_non_space_or_comment();
+                ok
+            }
             Some(Token {
                 span,
                 kind: TokenKind::Keyword(KeywordKind::Private),
                 ..
-            }) => Ok(Terminal {
-                span: *span,
-                data: VisModifierToken::Private,
-            }),
+            }) => {
+                let ok = Ok(Terminal {
+                    span: *span,
+                    data: VisModifierToken::Private,
+                });
+                iter.next_non_space_or_comment();
+                ok
+            }
             Some(_) => Err(ParseErr {
                 found_token_index: iter.peek_idx - 1,
             }),

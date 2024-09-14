@@ -30,7 +30,7 @@ impl<'a> CodeReporter<'a> {
         span: Span,
         sign: char,
         style: Style,
-        labels: &'a [&'a str],
+        labels: Vec<String>,
     ) -> &mut Self {
         let start_line = span.start.line;
         let start_col = span.start.col;
@@ -199,7 +199,7 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
 #[derive(Default)]
 struct CodeLine<'a> {
     /// Map column indecies to markers on them
-    markers: HashMap<usize, (Marker<'a>, MarkerType<'a>)>,
+    markers: HashMap<usize, (Marker<'a>, MarkerType)>,
 }
 
 impl<'a> CodeLine<'a> {
@@ -209,7 +209,7 @@ impl<'a> CodeLine<'a> {
         end_col: usize,
         sign: char,
         style: Style,
-        labels: &'a [&'a str],
+        labels: Vec<String>,
     ) {
         let marker = Marker {
             sign: MarkerSign::Char(sign),
@@ -254,7 +254,7 @@ impl<'a> CodeLine<'a> {
         col: usize,
         sign: char,
         style: Style,
-        labels: &'a [&'a str],
+        labels: Vec<String>,
         connection_margin: Rc<Cell<(usize, usize)>>,
     ) {
         let marker = Marker {
@@ -274,7 +274,7 @@ impl<'a> CodeLine<'a> {
     }
 
     fn draw(
-        &self,
+        &'a self,
         free_connection_margins: &mut Vec<bool>,
         connections_painter: &mut Painter<Marker<'a>>,
         file_line: &'a str,
@@ -594,10 +594,10 @@ enum MarkerSign<'a> {
 }
 
 #[derive(Clone)]
-enum MarkerType<'a> {
+enum MarkerType {
     OneLineStart {
         end_col: usize,
-        labels: &'a [&'a str],
+        labels: Vec<String>,
     },
     StartOfMultiLine {
         /// This margin and the end marker counter-part should agree on the same margin to connect between them correctly
@@ -618,7 +618,7 @@ enum MarkerType<'a> {
         ///
         /// The end counter-part is responsible to draw the connections from it to the position of the start counter-part
         connection_margin: Rc<Cell<(usize, usize)>>,
-        labels: &'a [&'a str],
+        labels: Vec<String>,
     },
 }
 
@@ -627,7 +627,7 @@ impl<'a> fmt::Debug for CodeReporter<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.writeln(
             f,
-            PathBuf::new().as_path(),
+            "اختبار.نظم",
             &[
                 "حجز متغير أ = 555؛",
                 "حجز متغير ب = 555؛",
@@ -679,7 +679,7 @@ mod tests {
             Span::new((0, 0), (0, 4)),
             '?',
             Style::new().blue().cyan(),
-            &["القيمة ليست متغيرة"],
+            vec!["القيمة ليست متغيرة".to_string()],
         );
 
         println!("{:?}", reporter)
@@ -694,7 +694,7 @@ mod tests {
             Span::new((0, 4), (1, 5)),
             '^',
             Style::new().red().bold(),
-            &["القيمة ليست متغيرة"],
+            vec!["القيمة ليست متغيرة".to_string()],
         );
 
         println!("{:?}", reporter)
@@ -710,119 +710,130 @@ mod tests {
                 Span::new((0, 0), (0, 4)),
                 '?',
                 Style::new().blue().cyan(),
-                &["القيمة ليست متغيرة"],
+                vec!["القيمة ليست متغيرة".to_string()],
             )
             .mark(
                 Span::new((0, 15), (0, 18)),
                 '~',
                 Style::new().blue().green(),
-                &[
-                    "القيمة ليست متغيرة",
-                    "القيمة ليست متغيرة",
-                    "القيمة ليست متغيرة",
+                vec![
+                    "القيمة ليست متغيرة".to_string(),
+                    "القيمة ليست متغيرة".to_string(),
+                    "القيمة ليست متغيرة".to_string(),
                 ],
             )
             .mark(
                 Span::new((0, 5), (0, 10)),
                 '-',
                 Style::new().blue().bold(),
-                &["القيمة ليست متغيرة"],
+                vec!["القيمة ليست متغيرة".to_string()],
             )
             .mark(
                 Span::new((2, 5), (2, 10)),
                 '^',
                 Style::new().yellow().bold(),
-                &["القيمة ليست متغيرة", "القيمة ليست متغيرة"],
+                vec![
+                    "القيمة ليست متغيرة".to_string(),
+                    "القيمة ليست متغيرة".to_string(),
+                ],
             )
             .mark(
                 Span::new((1, 5), (2, 4)),
                 '^',
                 Style::new().red().bold(),
-                &[
-                    "علامة طويلة",
-                    "علامة طويلة",
-                    "علامة طويلة",
-                    "علامة طويلة",
-                    "ما قولتلك يا بني علامة طويلة",
+                vec![
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                    "ما قولتلك يا بني علامة طويلة".to_string(),
                 ],
             )
             .mark(
                 Span::new((1, 15), (2, 19)),
                 '^',
                 Style::new().color(XtermColors::FlushOrange).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
                 Span::new((0, 13), (2, 13)),
                 '^',
                 Style::new().color(XtermColors::PinkFlamingo).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
                 Span::new((1, 0), (2, 0)),
                 '^',
                 Style::new().color(XtermColors::Brown).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
                 Span::new((0, 11), (1, 4)),
                 '^',
                 Style::new().magenta().bold(),
-                &["علامة طويلة", "علامة طويلة", "علامة طويلة"],
+                vec![
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                ],
             )
             .mark(
                 Span::new((1, 8), (1, 10)),
                 '^',
                 Style::new().color(XtermColors::Bermuda).bold(),
-                &["علامة طويلة", "علامة طويلة", "علامة طويلة"],
+                vec![
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                ],
             )
             .mark(
                 Span::new((3, 5), (6, 10)),
                 '^',
                 Style::new().color(XtermColors::GreenYellow).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
                 Span::new((4, 11), (5, 5)),
                 '^',
                 Style::new().color(XtermColors::BayLeaf).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
                 Span::new((7, 15), (7, 19)),
                 '^',
                 Style::new().color(XtermColors::Dandelion).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
                 Span::new((7, 0), (9, 4)),
                 '^',
                 Style::new().color(XtermColors::Caramel).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
                 Span::new((7, 5), (9, 9)),
                 '^',
                 Style::new().color(XtermColors::CanCanPink).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
                 Span::new((7, 10), (9, 15)),
                 '^',
                 Style::new().color(XtermColors::DarkRose).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
                 Span::new((7, 12), (9, 19)),
                 '^',
                 Style::new().color(XtermColors::Dandelion).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
                 Span::new((11, 5), (12, 5)),
                 '^',
                 Style::new().color(XtermColors::Dandelion).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             );
 
         println!("{:?}", reporter);

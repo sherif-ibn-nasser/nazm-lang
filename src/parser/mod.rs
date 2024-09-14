@@ -59,44 +59,81 @@ impl<'a> ParseErrorsReporter<'a> {
         }
     }
 
-    fn report(&mut self, expected: &str, err: &ParseErr) {
-        let (found_token_span, found_token_val) = if err.found_token_index < self.tokens.len() {
-            let token = &self.tokens[err.found_token_index];
-            (token.span, token.val)
-        } else {
-            let last_span = self.tokens[self.tokens.len() - 1].span;
+    fn report(
+        &mut self,
+        msg: String,
+        span: Span,
+        error_multiline_label: Vec<String>,
+        secondary_labels: Vec<(Span, Vec<String>)>,
+    ) {
+        let mut code_window = CodeWindow::new(span.start);
 
-            (
-                Span {
-                    start: last_span.end,
-                    end: SpanCursor {
-                        line: last_span.end.line,
-                        col: last_span.end.col + 1,
-                    },
-                },
-                "نهاية الملف",
-            )
-        };
+        if !error_multiline_label.is_empty() {
+            code_window.mark_error(span, error_multiline_label);
+        }
 
-        let mut code_window = CodeWindow::new(found_token_span.start);
-
-        let msg = format!(
-            "يُتوقع {}، ولكن تم العثور على `{}`",
-            expected, found_token_val
-        );
-
-        code_window.mark_error(found_token_span, &["رمز غير متوقع"]);
+        for (span, multiline_label) in secondary_labels {
+            code_window.mark_secondary(span, multiline_label);
+        }
 
         let diagnostic = Diagnostic::error(msg, Some(code_window));
 
         self.diagnostics.push(diagnostic);
     }
 
+    fn report_expected(
+        &mut self,
+        expected: &str,
+        err: &ParseErr,
+        secondary_labels: Vec<(Span, Vec<String>)>,
+    ) {
+        let (found_token_span, found_token_val) = if err.found_token_index < self.tokens.len() {
+            let token = &self.tokens[err.found_token_index];
+            (token.span, token.val)
+        } else {
+            let last_span = self.tokens[self.tokens.len() - 1].span;
+            (Span::after(&last_span), "نهاية الملف")
+        };
+
+        let msg = format!(
+            "يُتوقع {}، ولكن تم العثور على `{}`",
+            expected, found_token_val
+        );
+
+        self.report(
+            msg,
+            found_token_span,
+            vec!["رمز غير متوقع".to_string()],
+            secondary_labels,
+        );
+    }
+
     fn check_file_items(&mut self, items: &[ParseResult<FileItem>]) {
+        let expected = "عنصر ملف (دالة أو تصنيف)";
         for item in items {
-            if let Err(err) = item {
-                self.report("عنصر في الملف {دالة أو تصنيف}", err);
-            }
+            let node = match item {
+                Ok(node) => node,
+                Err(err) => {
+                    self.report_expected(expected, err, vec![]);
+                    continue;
+                }
+            };
+
+            let item = match node {
+                FileItem::WithVisModifier(ItemWithVisibility { visibility, item }) => match item {
+                    Ok(item) => item,
+                    Err(_) => {
+                        self.report(
+                            "يُتوقع عنصر ملف (دالة أو تصنيف) بعد مُعامِل الوصول".to_string(),
+                            visibility.span,
+                            vec!["مُعامِل الوصول".to_string()],
+                            vec![],
+                        );
+                        continue;
+                    }
+                },
+                FileItem::WithoutModifier(item) => item,
+            };
         }
     }
 }

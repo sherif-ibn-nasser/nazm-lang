@@ -142,37 +142,37 @@ impl<'a> CodeWindow<'a> {
         }
     }
 
-    pub fn mark_error(&mut self, span: Span, labels: &'a [&'a str]) -> &mut Self {
+    pub fn mark_error(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
         self.code_reporter
             .mark(span, '^', Style::new().bold().red(), labels);
         self
     }
 
-    pub fn mark_warning(&mut self, span: Span, labels: &'a [&'a str]) -> &mut Self {
+    pub fn mark_warning(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
         self.code_reporter
             .mark(span, '^', Style::new().bold().yellow(), labels);
         self
     }
 
-    pub fn mark_help(&mut self, span: Span, labels: &'a [&'a str]) -> &mut Self {
+    pub fn mark_help(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
         self.code_reporter
             .mark(span, '=', Style::new().bold().green(), labels);
         self
     }
 
-    pub fn mark_note(&mut self, span: Span, labels: &'a [&'a str]) -> &mut Self {
+    pub fn mark_note(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
         self.code_reporter
             .mark(span, '~', Style::new().bold().cyan(), labels);
         self
     }
 
-    pub fn mark_secondary(&mut self, span: Span, labels: &'a [&'a str]) -> &mut Self {
+    pub fn mark_secondary(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
         self.code_reporter
             .mark(span, '-', Style::new().bold().blue(), labels);
         self
     }
 
-    pub fn mark_tertiary(&mut self, span: Span, labels: &'a [&'a str]) -> &mut Self {
+    pub fn mark_tertiary(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
         self.code_reporter
             .mark(span, '*', Style::new().bold().bright_magenta(), labels);
         self
