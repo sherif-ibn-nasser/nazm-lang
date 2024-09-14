@@ -57,4 +57,16 @@ impl Span {
             end: given.end,
         }
     }
+
+    /// Returns a zero-column span located after given the span
+    #[inline]
+    pub fn len_after(given: &Span, len: usize) -> Self {
+        Self {
+            start: given.end,
+            end: SpanCursor {
+                line: given.end.line,
+                col: given.end.col + len,
+            },
+        }
+    }
 }

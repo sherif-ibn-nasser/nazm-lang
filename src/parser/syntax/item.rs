@@ -55,7 +55,7 @@ pub(crate) struct Fn {
     pub(crate) name: ParseResult<Id>,
     pub(crate) params_decl: ParseResult<FnParams>,
     /// This must be checked that it doesn't have a lambda arrow
-    pub(crate) block: ParseResult<LambdaExpr>,
+    pub(crate) body: ParseResult<LambdaExpr>,
 }
 
 #[derive(NazmcParse, Debug)]

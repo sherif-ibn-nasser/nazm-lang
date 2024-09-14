@@ -84,6 +84,19 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
         let mut big_sheet = vec![];
         let mut lines_indecies = self.code_lines.keys().sorted();
 
+        let mut peekable_line_index = lines_indecies.clone().peekable();
+
+        // while let Some(line_index) = peekable_line_index.next() {
+        //     if peekable_line_index
+        //         .peek()
+        //         .is_some_and(|peek_line_index| line_index + 1 == *peek_line_index)
+        //     {
+        //         self.code_lines
+        //             .entry(line_index + 1)
+        //             .or_insert(CodeLine::default());
+        //     }
+        // }
+
         let mut num_of_displayed_lines = 0;
 
         let mut max_line_num = 0; // This is needed later and will be updated in the loop to not calculate it by keys.max()
@@ -158,7 +171,20 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
             {
                 let current_line_num = lines_indecies.next().unwrap() + 1;
                 if prev_line_num > 0 && prev_line_num + 1 < current_line_num {
-                    let _ = writeln!(f, "{}", "...".style(line_nums_style));
+                    if prev_line_num + 2 == current_line_num {
+                        let line_num_str = (prev_line_num + 1).to_string();
+                        let _ = writeln!(
+                            f,
+                            "{}{} {} {}{}",
+                            line_num_str.style(line_nums_style),
+                            " ".repeat(max_line_num_indent - line_num_str.len()),
+                            '|'.style(line_nums_style),
+                            " ".repeat(max_margin),
+                            file_lines[prev_line_num + 1],
+                        );
+                    } else {
+                        let _ = writeln!(f, "{}", "...".style(line_nums_style));
+                    }
                 }
                 prev_line_num = current_line_num;
                 let line_num_str = prev_line_num.to_string();
