@@ -13,17 +13,17 @@ trait DiagnosticPrint<'a> {
     fn write(
         &self,
         f: &mut std::fmt::Formatter<'_>,
-        file_path: &'a Path,
+        path: &'a str,
         file_lines: &'a [&'a str],
     ) -> std::fmt::Result;
     fn writeln(
         &self,
         f: &mut std::fmt::Formatter<'_>,
-        file_path: &'a Path,
+        path: &'a str,
         file_lines: &'a [&'a str],
     ) -> std::fmt::Result {
         let _ = writeln!(f, "");
-        self.write(f, file_path, file_lines)
+        self.write(f, path, file_lines)
     }
 }
 
@@ -51,7 +51,7 @@ impl<'a> PhaseDiagnostics<'a> {
 impl<'a> Display for PhaseDiagnostics<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for d in &self.diagnostics {
-            let _ = d.writeln(f, self.file_path, self.file_lines);
+            let _ = d.writeln(f, self.file_path.to_str().unwrap_or(""), self.file_lines);
         }
         Ok(())
     }
@@ -97,7 +97,7 @@ impl<'a> DiagnosticPrint<'a> for Diagnostic<'a> {
     fn write(
         &self,
         f: &mut std::fmt::Formatter<'_>,
-        file_path: &'a Path,
+        path: &'a str,
         file_lines: &'a [&'a str],
     ) -> std::fmt::Result {
         let _ = match self.level {
@@ -118,11 +118,11 @@ impl<'a> DiagnosticPrint<'a> for Diagnostic<'a> {
         let _ = writeln!(f, "{} {}", ":".bold(), self.msg.bold());
 
         if let Some(code_window) = &self.code_window {
-            let _ = code_window.write(f, file_path, file_lines);
+            let _ = code_window.write(f, path, file_lines);
         }
 
         for chained_diagnostic in &self.chained_diagnostics {
-            let _ = chained_diagnostic.writeln(f, file_path, file_lines);
+            let _ = chained_diagnostic.writeln(f, path, file_lines);
         }
 
         Ok(())
@@ -183,9 +183,11 @@ impl<'a> DiagnosticPrint<'a> for CodeWindow<'a> {
     fn write(
         &self,
         f: &mut std::fmt::Formatter<'_>,
-        file_path: &'a Path,
+        path: &'a str,
         file_lines: &'a [&'a str],
     ) -> std::fmt::Result {
-        self.code_reporter.write(f, file_path, file_lines)
+        let path = format!("{}:{}:{}", path, self.cursor.line + 1, self.cursor.col + 1);
+
+        self.code_reporter.write(f, &path, file_lines)
     }
 }

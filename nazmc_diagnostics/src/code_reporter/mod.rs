@@ -2,7 +2,6 @@ use std::{
     cell::Cell,
     collections::HashMap,
     fmt::{self, Display},
-    path::Path,
     rc::Rc,
 };
 
@@ -72,7 +71,7 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
     fn write(
         &self,
         f: &mut std::fmt::Formatter<'_>,
-        _file_path: &'a Path,
+        path: &'a str,
         file_lines: &'a [&'a str],
     ) -> std::fmt::Result {
         let mut free_connection_margins = vec![];
@@ -134,6 +133,14 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
 
         let _ = writeln!(
             f,
+            "{}{} {}",
+            " ".repeat(max_line_num_indent).style(line_nums_style),
+            "-->".style(line_nums_style),
+            path,
+        );
+
+        let _ = writeln!(
+            f,
             "{} {}",
             " ".repeat(max_line_num_indent).style(line_nums_style),
             '|'.style(line_nums_style)
@@ -157,7 +164,7 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
                 let line_num_str = prev_line_num.to_string();
                 let _ = write!(
                     f,
-                    "{}{} {}",
+                    "{}{} {} ",
                     line_num_str.style(line_nums_style),
                     " ".repeat(max_line_num_indent - line_num_str.len()),
                     '|'.style(line_nums_style)
@@ -165,14 +172,14 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
             } else {
                 let _ = write!(
                     f,
-                    "{} {}",
+                    "{} {} ",
                     " ".repeat(max_line_num_indent).style(line_nums_style),
                     '|'.style(line_nums_style)
                 );
             }
 
             if let (Some(connection_line), true) = (connections.next(), max_margin > 0) {
-                let _ = write!(f, "{}", " ".repeat(max_margin - connection_line.len() + 1));
+                let _ = write!(f, "{}", " ".repeat(max_margin - connection_line.len()));
                 for c in connection_line.iter().rev() {
                     let _ = write!(f, "{c}");
                 }
@@ -616,28 +623,89 @@ enum MarkerType<'a> {
 }
 
 #[cfg(test)]
+impl<'a> fmt::Debug for CodeReporter<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.writeln(
+            f,
+            PathBuf::new().as_path(),
+            &[
+                "حجز متغير أ = 555؛",
+                "حجز متغير ب = 555؛",
+                "حجز متغير ج = 555؛",
+                "حجز متغير د = 555؛",
+                "حجز متغير ه = 555؛",
+                "حجز متغير و = 555؛",
+                "حجز متغير ز = 555؛",
+                "حجز متغير ح = 555؛",
+                "حجز متغير ك = 555؛",
+                "حجز متغير ل = 555؛",
+                "حجز متغير م = 555؛",
+                "حجز متغير ن = 555؛",
+                "حجز متغير ز = 555؛",
+            ],
+        )
+    }
+}
+
+#[cfg(test)]
 mod tests {
 
     use std::{
+        fmt::Debug,
         io::{self, Write},
         process::Command,
     };
 
     use owo_colors::{Style, XtermColors};
 
-    use crate::span::Span;
+    use crate::{span::Span, DiagnosticPrint};
 
     use super::CodeReporter;
 
-    #[test]
-    fn test_reporting() {
+    fn rtl() {
         // RTL printing
         let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
         io::stdout()
             .write_all(&output.stdout[1..output.stdout.len() - 1])
             .unwrap();
+    }
 
-        let reporter = CodeReporter::new()
+    #[test]
+    fn test_one_line() {
+        rtl();
+        let mut reporter = CodeReporter::new();
+
+        reporter.mark(
+            Span::new((0, 0), (0, 4)),
+            '?',
+            Style::new().blue().cyan(),
+            &["القيمة ليست متغيرة"],
+        );
+
+        println!("{:?}", reporter)
+    }
+
+    #[test]
+    fn test_multi_line() {
+        rtl();
+        let mut reporter = CodeReporter::new();
+
+        reporter.mark(
+            Span::new((0, 4), (1, 5)),
+            '^',
+            Style::new().red().bold(),
+            &["القيمة ليست متغيرة"],
+        );
+
+        println!("{:?}", reporter)
+    }
+
+    #[test]
+    fn test_reporting_complex() {
+        rtl();
+        let mut reporter = CodeReporter::new();
+
+        reporter
             .mark(
                 Span::new((0, 0), (0, 4)),
                 '?',
@@ -757,6 +825,6 @@ mod tests {
                 &["علامة طويلة"],
             );
 
-        println!("{}", reporter);
+        println!("{:?}", reporter);
     }
 }
