@@ -4,7 +4,7 @@ mod parser;
 
 use lexer::*;
 use owo_colors::{OwoColorize, XtermColors};
-use parser::{syntax::File, tokens_iter::TokensIter, NazmcParse, ParseResult};
+use parser::{syntax::File, tokens_iter::TokensIter, NazmcParse, ParseCtx, ParseResult};
 use std::{
     io::{self, Write},
     process::Command,
@@ -13,21 +13,13 @@ use std::{
 fn main() {
     let (file_path, file_content) = cli::read_file();
 
-    let (tokens, file_lines) = LexerIter::new(&file_content).collect_all();
-
-    let mut tokens_iter = TokensIter::new(&tokens);
-
-    tokens_iter.next(); // To init recent()
-
-    let result = ParseResult::<File>::parse(&mut tokens_iter);
-
-    println!("{:#?}", result);
-
     // RTL printing
-    // let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
-    // io::stdout()
-    //     .write_all(&output.stdout[1..output.stdout.len() - 1])
-    //     .unwrap();
+    let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
+    io::stdout()
+        .write_all(&output.stdout[1..output.stdout.len() - 1])
+        .unwrap();
+
+    ParseCtx::new(&file_path, &file_content).parse();
 
     // let mut bad_tokens = vec![];
 

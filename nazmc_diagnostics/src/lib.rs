@@ -65,7 +65,7 @@ pub struct Diagnostic<'a> {
 }
 
 impl<'a> Diagnostic<'a> {
-    fn error(msg: String, code_window: Option<CodeWindow<'a>>) -> Self {
+    pub fn error(msg: String, code_window: Option<CodeWindow<'a>>) -> Self {
         Self::new(DiagnosticLevel::Error, msg, code_window)
     }
 
