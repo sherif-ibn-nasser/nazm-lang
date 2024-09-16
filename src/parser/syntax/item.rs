@@ -36,8 +36,7 @@ pub(crate) enum StructKind {
 pub(crate) struct StructField {
     pub(crate) visibility: Option<VisModifier>,
     pub(crate) name: Id,
-    pub(crate) colon: ParseResult<ColonSymbol>,
-    pub(crate) typ: ParseResult<Type>,
+    pub(crate) typ: ParseResult<ColonWithType>,
 }
 
 generatePunctuatedItem!(StructField);

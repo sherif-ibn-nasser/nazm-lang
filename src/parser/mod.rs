@@ -1,7 +1,6 @@
 use std::path::Path;
 
-use bpaf::params;
-use nazmc_diagnostics::{span::SpanCursor, CodeWindow, Diagnostic};
+use nazmc_diagnostics::{CodeWindow, Diagnostic};
 use syntax::File;
 
 pub(crate) mod parse_methods;
@@ -36,7 +35,10 @@ impl<'a> ParseCtx<'a> {
 
         tokens_iter.next_non_space_or_comment(); // To init recent()
 
-        let ZeroOrMany { items, terminator } = ParseResult::<File>::parse(&mut tokens_iter)
+        let ZeroOrMany {
+            items,
+            terminator: _,
+        } = ParseResult::<File>::parse(&mut tokens_iter)
             .unwrap()
             .content;
 
@@ -229,6 +231,67 @@ impl<'a> ParseErrorsReporter<'a> {
                 vec![],
             );
         }
+
+        let kind = match kind {
+            Ok(kind) => kind,
+            Err(err) => {
+                self.report_expected("بعد التصنيف `؛` أو `{` أو `(`", err, vec![]);
+                return;
+            }
+        };
+
+        match kind {
+            StructKind::Unit(_) => {}
+            StructKind::Tuple(tuple_type) => self.check_tuple_type(tuple_type),
+            StructKind::Fields(StructFields {
+                open_delim,
+                items,
+                close_delim,
+            }) => {
+                if let Some(PunctuatedStructField {
+                    first_item,
+                    rest_items,
+                    trailing_comma: _,
+                }) = &items
+                {
+                    match first_item {
+                        Ok(StructField {
+                            visibility: _,
+                            name: _,
+                            typ,
+                        }) => match typ {
+                            Ok(ColonWithType { colon: _, typ }) => self.check_type_result(typ),
+                            Err(err) => self.report_expected("`:` ثم نوع الحقل", err, vec![]),
+                        },
+                        Err(err) => {
+                            self.report_expected("حقل", err, vec![]);
+                        }
+                    }
+
+                    for field in rest_items {
+                        match field {
+                            Ok(CommaWithStructField {
+                                comma: _,
+                                item:
+                                    StructField {
+                                        visibility: _,
+                                        name: _,
+                                        typ,
+                                    },
+                            }) => match typ {
+                                Ok(ColonWithType { colon: _, typ }) => self.check_type_result(typ),
+                                Err(err) => self.report_expected("`:` ثم نوع الحقل", err, vec![]),
+                            },
+                            Err(err) => self.report_expected_comma_or_item("حقل", err, vec![]),
+                        }
+                    }
+                }
+
+                if close_delim.is_err() {
+                    self.report_unclosed_delimiter(open_delim.span);
+                }
+            }
+        }
     }
 
     fn check_fn(&mut self, f: &Fn) {
@@ -265,17 +328,11 @@ impl<'a> ParseErrorsReporter<'a> {
         }
 
         match params_decl {
-            Ok(params) => {
-                let FnParams {
-                    open_delim,
-                    items,
-                    close_delim,
-                } = params;
-
-                if close_delim.is_err() {
-                    self.report_unclosed_delimiter(open_delim.span);
-                }
-
+            Ok(FnParams {
+                open_delim,
+                items,
+                close_delim,
+            }) => {
                 if let Some(PunctuatedFnParam {
                     first_item,
                     rest_items,
@@ -285,7 +342,9 @@ impl<'a> ParseErrorsReporter<'a> {
                     match first_item {
                         Ok(param) => match &param.typ {
                             Ok(node) => self.check_type_result(&node.typ),
-                            Err(err) => self.report_expected("نوع لمُعامِل الدالة", err, vec![]),
+                            Err(err) => {
+                                self.report_expected("`:` ثم نوع لمُعامِل الدالة", err, vec![])
+                            }
                         },
                         Err(err) => self.report_expected("مُعامِل دالة", err, vec![]),
                     }
@@ -301,6 +360,10 @@ impl<'a> ParseErrorsReporter<'a> {
                             }
                         }
                     }
+                }
+
+                if close_delim.is_err() {
+                    self.report_unclosed_delimiter(open_delim.span);
                 }
             }
             Err(err) if !missing_name => {
@@ -343,26 +406,35 @@ impl<'a> ParseErrorsReporter<'a> {
                     self.report_unclosed_delimiter(slice_type.open_bracket.span);
                 }
             }
-            Type::Tuple(tuple_type) => {
-                if let Some(PunctuatedType {
-                    first_item,
-                    rest_items,
-                    trailing_comma: _,
-                }) = &tuple_type.items
-                {
-                    self.check_type_result(first_item);
+            Type::Paren(paren_type) => {
+                self.check_tuple_type(&paren_type.tuple);
 
-                    for param in rest_items {
-                        match param {
-                            Ok(node) => self.check_type(&node.item),
-                            Err(err) => self.report_expected_comma_or_item("نوع", err, vec![]),
-                        }
-                    }
-                }
-                if tuple_type.close_delim.is_err() {
-                    self.report_unclosed_delimiter(tuple_type.open_delim.span);
+                if let Some(LambdaType { r_arrow: _, typ }) = &paren_type.lambda {
+                    self.check_type_result(typ);
                 }
             }
+        }
+    }
+
+    fn check_tuple_type(&mut self, tuple_type: &TupleType) {
+        if let Some(PunctuatedType {
+            first_item,
+            rest_items,
+            trailing_comma: _,
+        }) = &tuple_type.items
+        {
+            self.check_type_result(first_item);
+
+            for param in rest_items {
+                match param {
+                    Ok(node) => self.check_type(&node.item),
+                    Err(err) => self.report_expected_comma_or_item("نوع", err, vec![]),
+                }
+            }
+        }
+
+        if tuple_type.close_delim.is_err() {
+            self.report_unclosed_delimiter(tuple_type.open_delim.span);
         }
     }
 
@@ -511,11 +583,232 @@ impl<'a> ParseErrorsReporter<'a> {
     }
 
     fn check_expr(&mut self, expr: &Expr) {
-        // TODO
+        self.check_primary_expr(&expr.left);
+        for bin_expr in &expr.bin {
+            match &bin_expr.right {
+                Ok(expr) => self.check_primary_expr(expr),
+                Err(err) => self.report_expected("تعبير برمجي", err, vec![]),
+            }
+        }
+    }
+
+    fn check_primary_expr(&mut self, expr: &PrimaryExpr) {
+        match &expr.kind {
+            PrimaryExprKind::Unary(UnaryExpr { expr, .. }) => match expr {
+                Ok(expr) => self.check_atomic_expr(expr),
+                Err(err) => self.report_expected("تعبير برمجي", err, vec![]),
+            },
+            PrimaryExprKind::Atomic(expr) => self.check_atomic_expr(expr),
+        }
+
+        self.check_post_ops(&expr.post_ops);
+
+        for InnerAccessExpr {
+            dot: _,
+            inner,
+            post_ops,
+        } in &expr.inner_access
+        {
+            if let Err(err) = inner {
+                self.report_expected("مُعرِّف", err, vec![]);
+            }
+
+            self.check_post_ops(post_ops);
+        }
+    }
+
+    fn check_post_ops(&mut self, post_ops: &[PostOpExpr]) {
+        for post_op_expr in post_ops {
+            match post_op_expr {
+                PostOpExpr::Invoke(paren_expr) => self.check_paren_expr(paren_expr),
+                PostOpExpr::Lambda(lambda_expr) => self.check_lambda_expr(lambda_expr),
+                PostOpExpr::Index(IdxExpr {
+                    open_bracket,
+                    expr,
+                    close_bracket,
+                }) => {
+                    self.check_expr_result(expr);
+
+                    if close_bracket.is_err() {
+                        self.report_unclosed_delimiter(open_bracket.span);
+                    }
+                }
+            }
+        }
+    }
+
+    fn check_atomic_expr(&mut self, expr: &AtomicExpr) {
+        match expr {
+            AtomicExpr::Literal(_) | AtomicExpr::On(_) | AtomicExpr::Continue(_) => {}
+            AtomicExpr::Paren(paren_expr) => self.check_paren_expr(paren_expr),
+            AtomicExpr::Path(simple_path) => self.check_simple_path(simple_path),
+            AtomicExpr::WithBlock(expr_with_block) => self.check_expr_with_block(expr_with_block),
+            AtomicExpr::Lambda(lambda_expr) => self.check_lambda_expr(lambda_expr),
+            AtomicExpr::Break(BreakExpr {
+                break_keyowrd: _,
+                expr,
+            })
+            | AtomicExpr::Return(ReturnExpr {
+                return_keyowrd: _,
+                expr,
+            }) => match &expr {
+                Some(expr) => self.check_expr(expr),
+                None => {}
+            },
+            AtomicExpr::Array(ArrayExpr {
+                open_bracket,
+                expr_kind,
+                close_bracket,
+            }) => {
+                if close_bracket.is_err() {
+                    self.report_unclosed_delimiter(open_bracket.span);
+                }
+
+                match expr_kind {
+                    Some(ArrayExprKind::ExplicitSize(ExplicitSizeArrayExpr {
+                        repeated_expr,
+                        semicolon: _,
+                        size_expr,
+                    })) => {
+                        self.check_expr_result(repeated_expr);
+                        self.check_expr_result(size_expr);
+                    }
+                    Some(ArrayExprKind::Elements(ElementsArrayExpr {
+                        first,
+                        rest,
+                        trailing_comma: _,
+                    })) => {
+                        self.check_expr_result(first);
+
+                        for result in rest {
+                            match result {
+                                Ok(CommaWithExpr { comma: _, item }) => self.check_expr(item),
+                                Err(err) => {
+                                    self.report_expected_comma_or_item("تعبير برمجي", err, vec![])
+                                }
+                            }
+                        }
+                    }
+                    None => {}
+                }
+            }
+            AtomicExpr::Struct(StructExpr { dot: _, path, init }) => {
+                match path {
+                    Ok(simple_path) => self.check_simple_path(simple_path),
+                    Err(err) => self.report_expected("اسم تصنيف أو مساره", err, vec![]),
+                }
+
+                match init {
+                    Some(StructInit::Fields(StructFieldsInitExpr {
+                        open_delim,
+                        items,
+                        close_delim,
+                    })) => {
+                        if close_delim.is_err() {
+                            self.report_unclosed_delimiter(open_delim.span);
+                        }
+
+                        if let Some(PunctuatedStructFieldInitExpr {
+                            first_item,
+                            rest_items,
+                            trailing_comma: _,
+                        }) = items
+                        {
+                            match first_item {
+                                Ok(node) => match &node.expr {
+                                    Some(node) => self.check_expr_result(&node.expr),
+                                    None => {}
+                                },
+                                Err(err) => self.report_expected("مُعرِّف", err, vec![]),
+                            }
+
+                            for result in rest_items {
+                                match result {
+                                    Ok(CommaWithStructFieldInitExpr { comma: _, item }) => {
+                                        match &item.expr {
+                                            Some(node) => self.check_expr_result(&node.expr),
+                                            None => {}
+                                        }
+                                    }
+                                    Err(err) => {
+                                        self.report_expected_comma_or_item("مُعرِّف", err, vec![])
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Some(StructInit::Tuple(paren_expr)) => self.check_paren_expr(paren_expr),
+                    None => {}
+                }
+            }
+        }
     }
 
     fn check_expr_with_block(&mut self, expr: &ExprWithBlock) {
-        // TODO
+        match expr {
+            ExprWithBlock::If(if_expr) => {
+                if let Err(err) = &if_expr.conditional_block.condition {
+                    self.report_expected("تعبير برمجي (شرط `لو`)", err, vec![]);
+                }
+
+                match &if_expr.conditional_block.block {
+                    Ok(block) => self.check_non_lambda_expr(block),
+                    Err(err) => self.report_expected("محتوى `لو`", err, vec![]),
+                }
+
+                for ElseIfClause {
+                    conditional_block, ..
+                } in &if_expr.else_ifs
+                {
+                    if let Err(err) = &conditional_block.condition {
+                        self.report_expected("تعبير برمجي (شرط `وإلا لو`)", err, vec![]);
+                    }
+
+                    match &conditional_block.block {
+                        Ok(block) => self.check_non_lambda_expr(block),
+                        Err(err) => self.report_expected("محتوى `وإلا لو`", err, vec![]),
+                    }
+                }
+
+                if let Some(ElseClause {
+                    else_keyword: _,
+                    block,
+                }) = &if_expr.else_cluase
+                {
+                    match block {
+                        Ok(block) => self.check_non_lambda_expr(block),
+                        Err(err) => self.report_expected("محتوى `وإلا`", err, vec![]),
+                    }
+                }
+            }
+
+            ExprWithBlock::While(WhileExpr {
+                while_keyword: _,
+                conditional_block,
+            }) => {
+                if let Err(err) = &conditional_block.condition {
+                    self.report_expected("تعبير برمجي (شرط `طالما`)", err, vec![]);
+                }
+
+                match &conditional_block.block {
+                    Ok(block) => self.check_non_lambda_expr(block),
+                    Err(err) => self.report_expected("محتوى `طالما`", err, vec![]),
+                }
+            }
+            ExprWithBlock::Loop(LoopExpr {
+                loop_keyword: _,
+                block,
+            }) => match &block {
+                Ok(block) => self.check_non_lambda_expr(block),
+                Err(err) => self.report_expected("محتوى `تكرار`", err, vec![]),
+            },
+            ExprWithBlock::Run(RunExpr { run: _, block }) => match &block {
+                Ok(block) => self.check_non_lambda_expr(block),
+                Err(err) => self.report_expected("محتوى `تشغيل`", err, vec![]),
+            },
+            ExprWithBlock::When(_) => todo!(),    // TODO
+            ExprWithBlock::DoWhile(_) => todo!(), // TODO
+        }
     }
 
     fn check_non_lambda_expr(&mut self, lambda: &LambdaExpr) {
@@ -551,5 +844,34 @@ impl<'a> ParseErrorsReporter<'a> {
         }
 
         self.check_block(lambda);
+    }
+
+    fn check_paren_expr(
+        &mut self,
+        ParenExpr {
+            open_delim,
+            items,
+            close_delim,
+        }: &ParenExpr,
+    ) {
+        if let Some(PunctuatedExpr {
+            first_item,
+            rest_items,
+            trailing_comma: _,
+        }) = items
+        {
+            self.check_expr_result(first_item);
+
+            for result in rest_items {
+                match result {
+                    Ok(CommaWithExpr { comma: _, item }) => self.check_expr(item),
+                    Err(err) => self.report_expected_comma_or_item("تعبير برمجي", err, vec![]),
+                }
+            }
+        }
+
+        if close_delim.is_err() {
+            self.report_unclosed_delimiter(open_delim.span);
+        }
     }
 }

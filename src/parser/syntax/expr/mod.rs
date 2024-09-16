@@ -28,7 +28,7 @@ pub(crate) struct BinExpr {
 
 #[derive(NazmcParse, Debug)]
 pub(crate) struct PrimaryExpr {
-    pub(crate) expr: PrimaryExprKind,
+    pub(crate) kind: PrimaryExprKind,
     pub(crate) post_ops: Vec<PostOpExpr>,
     pub(crate) inner_access: Vec<InnerAccessExpr>,
 }
@@ -56,7 +56,7 @@ pub(crate) enum PostOpExpr {
 #[derive(NazmcParse, Debug)]
 pub(crate) struct InnerAccessExpr {
     pub(crate) dot: DotSymbol,
-    pub(crate) inner: ParseResult<IdExpr>,
+    pub(crate) inner: ParseResult<Id>,
     pub(crate) post_ops: Vec<PostOpExpr>,
 }
 
@@ -73,7 +73,7 @@ pub(crate) enum AtomicExpr {
     Array(ArrayExpr),
     Paren(ParenExpr),
     Struct(StructExpr),
-    Id(IdExpr),
+    Path(SimplePath),
     Literal(LiteralExpr),
     On(OnKeyword),
     Lambda(LambdaExpr),
@@ -81,11 +81,6 @@ pub(crate) enum AtomicExpr {
     Continue(ContinueExpr),
     Return(ReturnExpr),
     WithBlock(ExprWithBlock),
-}
-
-#[derive(NazmcParse, Debug)]
-pub(crate) struct IdExpr {
-    pub(crate) path: SimplePath,
 }
 
 #[derive(NazmcParse, Debug)]
