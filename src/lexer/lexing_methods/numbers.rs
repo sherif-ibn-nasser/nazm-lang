@@ -183,7 +183,7 @@ impl<'a> LexerIter<'a> {
         match suffix {
             Ok(suffix_str) => to_int_token(&digits, suffix_str, prefix_end_col, digits_len, base),
             Err(mut err) => {
-                err.kind = LexerErrorKind::InvalidIntSuffixForBase(base);
+                err.kind = LexerErrorKind::InvalidIntSuffix;
                 TokenKind::Bad(vec![err])
             }
         }
@@ -217,7 +217,7 @@ impl<'a> LexerIter<'a> {
                 to_int_token(&digits, suffix_str, prefix_end_col, digits_len, Base::Hex)
             }
             Err(mut err) => {
-                err.kind = LexerErrorKind::InvalidIntSuffixForBase(Base::Hex);
+                err.kind = LexerErrorKind::InvalidIntSuffix;
                 TokenKind::Bad(vec![err])
             }
         }
@@ -343,7 +343,7 @@ fn to_int_token(
     TokenKind::Bad(vec![LexerError {
         col: start_col + len,
         len: suffix_str.len(),
-        kind: LexerErrorKind::InvalidIntSuffixForBase(base),
+        kind: LexerErrorKind::InvalidIntSuffix,
     }])
 }
 

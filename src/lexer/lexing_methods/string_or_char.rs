@@ -69,7 +69,7 @@ impl<'a> LexerIter<'a> {
             return TokenKind::Bad(errs);
         }
 
-        return TokenKind::Literal(LiteralKind::Char(ch));
+        TokenKind::Literal(LiteralKind::Char(ch))
     }
 
     fn next_valid_nazm_rust_char_in_str(

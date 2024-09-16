@@ -46,6 +46,15 @@ impl<'a> PhaseDiagnostics<'a> {
     pub fn push(&mut self, diagnostic: Diagnostic<'a>) {
         self.diagnostics.push(diagnostic);
     }
+
+    pub fn chain_on_last(&mut self, diagnostic: Diagnostic<'a>) {
+        match self.diagnostics.last_mut() {
+            Some(last) => {
+                last.chain(diagnostic);
+            }
+            None => {}
+        }
+    }
 }
 
 impl<'a> Display for PhaseDiagnostics<'a> {
@@ -67,6 +76,10 @@ pub struct Diagnostic<'a> {
 impl<'a> Diagnostic<'a> {
     pub fn error(msg: String, code_window: Option<CodeWindow<'a>>) -> Self {
         Self::new(DiagnosticLevel::Error, msg, code_window)
+    }
+
+    pub fn help(msg: String, code_window: Option<CodeWindow<'a>>) -> Self {
+        Self::new(DiagnosticLevel::Help, msg, code_window)
     }
 
     #[inline]

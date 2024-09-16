@@ -1,6 +1,7 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
-use nazmc_diagnostics::{CodeWindow, Diagnostic};
+use itertools::Itertools;
+use nazmc_diagnostics::{span::SpanCursor, CodeWindow, Diagnostic};
 use syntax::File;
 
 pub(crate) mod parse_methods;
@@ -8,7 +9,7 @@ pub(crate) mod syntax;
 pub(crate) mod tokens_iter;
 
 pub(crate) use crate::LexerIter;
-use crate::{SymbolKind, Token, TokenKind};
+use crate::{error::*, NumKind, SymbolKind, Token, TokenKind};
 pub(crate) use nazmc_diagnostics::{span::Span, PhaseDiagnostics};
 pub(crate) use nazmc_parse_derive::*;
 pub(crate) use parse_methods::*;
@@ -43,7 +44,7 @@ impl<'a> ParseCtx<'a> {
             .content;
 
         let mut reporter = ParseErrorsReporter::new(self.file_path, &file_lines, &tokens);
-        reporter.check_file_items(&items);
+        reporter.check(&items);
 
         println!("{}", reporter.diagnostics);
     }
@@ -52,6 +53,7 @@ impl<'a> ParseCtx<'a> {
 struct ParseErrorsReporter<'a> {
     tokens: &'a [Token<'a>],
     diagnostics: PhaseDiagnostics<'a>,
+    bad_tokens_indecies: HashMap<usize, ()>,
 }
 
 impl<'a> ParseErrorsReporter<'a> {
@@ -59,6 +61,16 @@ impl<'a> ParseErrorsReporter<'a> {
         Self {
             tokens,
             diagnostics: PhaseDiagnostics::new(file_path, file_lines),
+            bad_tokens_indecies: HashMap::new(),
+        }
+    }
+
+    fn check(&mut self, items: &[ParseResult<FileItem>]) {
+        self.check_file_items(items);
+
+        let indecies = self.bad_tokens_indecies.keys().cloned().collect_vec();
+        for idx in indecies {
+            self.report_lexer_errors(idx);
         }
     }
 
@@ -82,6 +94,193 @@ impl<'a> ParseErrorsReporter<'a> {
         self.diagnostics.push(diagnostic);
     }
 
+    fn report_lexer_errors(&mut self, idx: usize) {
+        let Token {
+            val: _,
+            span: token_span,
+            kind: TokenKind::Bad(lexer_errors),
+        } = &self.tokens[idx]
+        else {
+            unreachable!()
+        };
+
+        for err in lexer_errors {
+            let err_span = Span {
+                start: SpanCursor {
+                    line: token_span.start.line,
+                    col: err.col,
+                },
+                end: SpanCursor {
+                    line: token_span.end.line,
+                    col: err.col + err.len,
+                },
+            };
+
+            match &err.kind {
+                LexerErrorKind::UnknownToken => {
+                    self.report(
+                        "رمز غير مدعوم".to_string(),
+                        err_span,
+                        "".to_string(),
+                        vec![],
+                    );
+                }
+                LexerErrorKind::UnclosedStr | LexerErrorKind::UnclosedChar => {
+                    self.report(
+                        "علامة تنصيص مفقودة".to_string(),
+                        err_span,
+                        "لم يتم إغلاق علامة التنصيص هذه".to_string(),
+                        vec![],
+                    );
+                }
+                LexerErrorKind::UnclosedDelimitedComment => self.report(
+                    "لم يتم إغلاق التعليق".to_string(),
+                    err_span,
+                    "تم بدء التعليق هنا".to_string(),
+                    vec![],
+                ),
+                LexerErrorKind::ZeroChars => self.report(
+                    "لا يوجد حروف ولكن يُتوقع حرف واحد بين علامتي التنصيص".to_string(),
+                    err_span,
+                    "".to_string(),
+                    vec![],
+                ),
+                LexerErrorKind::ManyChars => self.report(
+                    "يوجد أكثر من حرف ولكن يُتوقع حرف واحد بين علامتي التنصيص".to_string(),
+                    err_span,
+                    "".to_string(),
+                    vec![],
+                ),
+                LexerErrorKind::KufrOrInvalidChar => self.report(
+                    "يحتوي على رمز كُفر أو رمز غير مدعوم".to_string(),
+                    err_span,
+                    "".to_string(),
+                    vec![],
+                ),
+                LexerErrorKind::UnicodeCodePointHexDigitOnly => self.report(
+                    "رمز اليونيكود يجب أن يحتوي فقط على أرقام بالنظام العددي السُداسي عشر"
+                        .to_string(),
+                    err_span,
+                    "".to_string(),
+                    vec![],
+                ),
+                LexerErrorKind::InvalidUnicodeCodePoint => self.report(
+                    "رمز يونيكود غير صالح".to_string(),
+                    err_span,
+                    "".to_string(),
+                    vec![],
+                ),
+                LexerErrorKind::UnknownEscapeSequence => self.report(
+                    "حرف تسلسل غير صالح".to_string(),
+                    err_span,
+                    "".to_string(),
+                    vec![],
+                ),
+                LexerErrorKind::MissingDigitsAfterBasePrefix => self.report(
+                    "يُتوقع أرقام بعد رمز النظام العددي".to_string(),
+                    err_span,
+                    "".to_string(),
+                    vec![],
+                ),
+                LexerErrorKind::MissingDigitsAfterExponent => self.report(
+                    "يُتوقع أرقام الأس".to_string(),
+                    err_span,
+                    "".to_string(),
+                    vec![],
+                ),
+                LexerErrorKind::InvalidIntBasePrefix => self.report(
+                    "نظام عددي غير مدعوم".to_string(),
+                    err_span,
+                    "".to_string(),
+                    vec![],
+                ),
+                LexerErrorKind::InvalidNumSuffix => {
+                    self.report(
+                        "لاحقة غير صحيحة للعدد".to_string(),
+                        err_span,
+                        "".to_string(),
+                        vec![],
+                    );
+
+                    self.diagnostics.chain_on_last(Diagnostic::help(
+                        "اللاحقات الصالحة للعدد هى (ص، ص1، ص2، ص4، ص8، م، م1، م2، م4، م8، ع4، ع8)"
+                            .to_string(),
+                        None,
+                    ));
+                }
+                LexerErrorKind::InvalidFloatSuffix => {
+                    self.report(
+                        "لاحقة غير صحيحة للعدد العشري".to_string(),
+                        err_span,
+                        "".to_string(),
+                        vec![],
+                    );
+
+                    self.diagnostics.chain_on_last(Diagnostic::help(
+                        "اللاحقات الصالحة للعدد العشري هى (ع4، ع8)".to_string(),
+                        None,
+                    ));
+                }
+                LexerErrorKind::InvalidIntSuffix => {
+                    self.report(
+                        "لاحقة غير صالحة للعدد الصحيح".to_string(),
+                        err_span,
+                        "".to_string(),
+                        vec![],
+                    );
+
+                    self.diagnostics.chain_on_last(Diagnostic::help(
+                        "اللاحقات الصالحة للعدد الصحيح هى (ص، ص1، ص2، ص4، ص8، م، م1، م2، م4، م8)"
+                            .to_string(),
+                        None,
+                    ));
+                }
+                LexerErrorKind::InvalidDigitForBase(base) => {
+                    let base_str = match base {
+                        crate::Base::Bin => "الثُنائي",
+                        crate::Base::Oct => "الثُماني",
+                        crate::Base::Dec => "العَشري",
+                        crate::Base::Hex => "السُداسي عشر",
+                    };
+                    self.report(
+                        format!("رقم غير صالح في النظام العددي {}", base_str),
+                        err_span,
+                        "".to_string(),
+                        vec![],
+                    )
+                }
+                LexerErrorKind::NumIsOutOfRange(num_kind) => {
+                    self.report(
+                        "قيمة العدد خارج النطاق المسموح به".to_string(),
+                        err_span,
+                        "".to_string(),
+                        vec![],
+                    );
+
+                    let max_num_str = match num_kind {
+                        NumKind::F4(_) => f32::MAX.to_string(),
+                        NumKind::F8(_) | NumKind::UnspecifiedFloat(_) => f64::MAX.to_string(),
+                        NumKind::I(_) => isize::MAX.to_string(),
+                        NumKind::I1(_) => i8::MAX.to_string(),
+                        NumKind::I2(_) => i16::MAX.to_string(),
+                        NumKind::I4(_) => i32::MAX.to_string(),
+                        NumKind::I8(_) => i64::MAX.to_string(),
+                        NumKind::U(_) => usize::MAX.to_string(),
+                        NumKind::U1(_) => u8::MAX.to_string(),
+                        NumKind::U2(_) => u16::MAX.to_string(),
+                        NumKind::U4(_) => u32::MAX.to_string(),
+                        NumKind::U8(_) | NumKind::UnspecifiedInt(_) => u64::MAX.to_string(),
+                    };
+
+                    self.diagnostics.chain_on_last(Diagnostic::help(
+                        format!("أكبر قيمة من نفس نوع العدد هى `{}`", max_num_str),
+                        None,
+                    ));
+                }
+            };
+        }
+    }
+
     fn report_expected(
         &mut self,
         expected: &str,
@@ -91,6 +290,11 @@ impl<'a> ParseErrorsReporter<'a> {
         let (found_token_span, found_token_val, primary_label) =
             if err.found_token_index < self.tokens.len() {
                 let token = &self.tokens[err.found_token_index];
+                if let TokenKind::Bad(_) = &token.kind {
+                    self.bad_tokens_indecies
+                        .entry(err.found_token_index)
+                        .or_insert(());
+                }
                 (token.span, token.val, "رمز غير متوقع".to_string())
             } else {
                 let last_span = self.tokens[self.tokens.len() - 1].span;
@@ -159,14 +363,6 @@ impl<'a> ParseErrorsReporter<'a> {
             "يجب إغلاق هذا القوس".to_string(),
             vec![],
         );
-    }
-
-    fn span_of_err(&self, err: &ParseErr) -> Span {
-        if err.found_token_index < self.tokens.len() {
-            self.tokens[err.found_token_index].span
-        } else {
-            Span::after(&self.tokens[self.tokens.len() - 1].span)
-        }
     }
 
     fn check_file_items(&mut self, items: &[ParseResult<FileItem>]) {
@@ -343,7 +539,7 @@ impl<'a> ParseErrorsReporter<'a> {
                         Ok(param) => match &param.typ {
                             Ok(node) => self.check_type_result(&node.typ),
                             Err(err) => {
-                                self.report_expected("`:` ثم نوع لمُعامِل الدالة", err, vec![])
+                                self.report_expected("`:` ثم نوع مُعامِل الدالة", err, vec![])
                             }
                         },
                         Err(err) => self.report_expected("مُعامِل دالة", err, vec![]),
@@ -512,9 +708,12 @@ impl<'a> ParseErrorsReporter<'a> {
 
                         if let Some(LetAssign { equal: _, expr }) = let_assign {
                             self.check_expr_result(expr);
+                            if expr.is_ok() {
+                                self.check_semicolon_result(semicolon);
+                            }
+                        } else {
+                            self.check_semicolon_result(semicolon);
                         }
-
-                        self.check_semicolon_result(semicolon);
                     }
                     Stm::Expr(ExprStm::WithBlock(ExprWithBlockStm { expr, semicolon: _ })) => {
                         self.check_expr_with_block(expr);

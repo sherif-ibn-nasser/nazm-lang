@@ -24,10 +24,10 @@ pub enum LexerErrorKind {
     UnknownEscapeSequence,
     MissingDigitsAfterBasePrefix,
     MissingDigitsAfterExponent,
-    InvalidDigitForBase(Base),
     InvalidIntBasePrefix,
     InvalidNumSuffix,
     InvalidFloatSuffix,
-    InvalidIntSuffixForBase(Base),
+    InvalidIntSuffix,
+    InvalidDigitForBase(Base),
     NumIsOutOfRange(NumKind),
 }

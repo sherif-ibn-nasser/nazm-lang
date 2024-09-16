@@ -1,14 +1,11 @@
-mod error;
+pub(crate) mod error;
 mod lexing_methods;
 mod token;
 
 use documented::DocumentedVariants;
 use error::{LexerError, LexerErrorKind};
 use itertools::Itertools;
-use nazmc_diagnostics::{
-    span::{Span, SpanCursor},
-    PhaseDiagnostics,
-};
+use nazmc_diagnostics::span::{Span, SpanCursor};
 use std::str::Chars;
 use strum::IntoEnumIterator;
 pub use token::*;
@@ -181,8 +178,6 @@ impl<'a> LexerIter<'a> {
                 if self.stopped_at_bidx == self.content.len() {
                     return TokenKind::EOF;
                 }
-
-                let text = &self.content[self.stopped_at_bidx..];
 
                 self.next_id_or_keyword()
             }

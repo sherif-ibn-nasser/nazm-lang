@@ -84,19 +84,6 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
         let mut big_sheet = vec![];
         let mut lines_indecies = self.code_lines.keys().sorted();
 
-        let mut peekable_line_index = lines_indecies.clone().peekable();
-
-        // while let Some(line_index) = peekable_line_index.next() {
-        //     if peekable_line_index
-        //         .peek()
-        //         .is_some_and(|peek_line_index| line_index + 1 == *peek_line_index)
-        //     {
-        //         self.code_lines
-        //             .entry(line_index + 1)
-        //             .or_insert(CodeLine::default());
-        //     }
-        // }
-
         let mut num_of_displayed_lines = 0;
 
         let mut max_line_num = 0; // This is needed later and will be updated in the loop to not calculate it by keys.max()
