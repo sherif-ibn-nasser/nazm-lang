@@ -97,8 +97,8 @@ macro_rules! generatePunctuatedItem {
 
             #[derive(NazmcParse, Debug)]
             pub(crate) struct [<CommaWith $item>] {
-                comma: CommaSymbol,
-                item: $item,
+                pub(crate) comma: CommaSymbol,
+                pub(crate) item: $item,
             }
         }
     };

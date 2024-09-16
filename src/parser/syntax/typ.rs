@@ -5,7 +5,6 @@ pub(crate) enum Type {
     Path(SimplePath),
     Ptr(Box<PtrType>),
     Ref(Box<RefType>),
-    Paren(Box<ParenType>),
     Slice(Box<SliceType>),
     Tuple(Box<TupleType>),
 }
@@ -22,13 +21,6 @@ pub(crate) struct RefType {
     pub(crate) hash: HashSymbol,
     pub(crate) mut_keyword: Option<MutKeyword>,
     pub(crate) typ: ParseResult<Type>,
-}
-
-#[derive(NazmcParse, Debug)]
-pub(crate) struct ParenType {
-    pub(crate) open_paren: OpenParenthesisSymbol,
-    pub(crate) typ: ParseResult<Type>,
-    pub(crate) close_paren: ParseResult<CloseParenthesisSymbol>,
 }
 
 #[derive(NazmcParse, Debug)]

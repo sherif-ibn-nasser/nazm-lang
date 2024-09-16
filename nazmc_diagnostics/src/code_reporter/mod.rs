@@ -180,7 +180,7 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
                             " ".repeat(max_line_num_indent - line_num_str.len()),
                             '|'.style(line_nums_style),
                             " ".repeat(max_margin),
-                            file_lines[prev_line_num + 1],
+                            file_lines[prev_line_num],
                         );
                     } else {
                         let _ = writeln!(f, "{}", "...".style(line_nums_style));
