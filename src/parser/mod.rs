@@ -1,7 +1,5 @@
-use std::{collections::HashMap, path::Path};
-
-use itertools::Itertools;
 use nazmc_diagnostics::{span::SpanCursor, CodeWindow, Diagnostic};
+use std::path::Path;
 use syntax::File;
 
 pub(crate) mod parse_methods;
@@ -30,7 +28,10 @@ impl<'a> ParseCtx<'a> {
     }
 
     pub fn parse(&mut self) {
-        let (tokens, file_lines) = LexerIter::new(self.file_content).collect_all();
+        let (tokens, file_lines, lexer_errors) = LexerIter::new(self.file_content).collect_all();
+        let mut reporter = ParseErrorsReporter::new(self.file_path, &file_lines, &tokens);
+
+        reporter.report_lexer_errors(&lexer_errors);
 
         let mut tokens_iter = TokensIter::new(&tokens);
 
@@ -43,8 +44,7 @@ impl<'a> ParseCtx<'a> {
             .unwrap()
             .content;
 
-        let mut reporter = ParseErrorsReporter::new(self.file_path, &file_lines, &tokens);
-        reporter.check(&items);
+        reporter.check_file_items(&items);
 
         println!("{}", reporter.diagnostics);
     }
@@ -53,7 +53,6 @@ impl<'a> ParseCtx<'a> {
 struct ParseErrorsReporter<'a> {
     tokens: &'a [Token<'a>],
     diagnostics: PhaseDiagnostics<'a>,
-    bad_tokens_indecies: HashMap<usize, ()>,
 }
 
 impl<'a> ParseErrorsReporter<'a> {
@@ -61,16 +60,6 @@ impl<'a> ParseErrorsReporter<'a> {
         Self {
             tokens,
             diagnostics: PhaseDiagnostics::new(file_path, file_lines),
-            bad_tokens_indecies: HashMap::new(),
-        }
-    }
-
-    fn check(&mut self, items: &[ParseResult<FileItem>]) {
-        self.check_file_items(items);
-
-        let indecies = self.bad_tokens_indecies.keys().cloned().collect_vec();
-        for idx in indecies {
-            self.report_lexer_errors(idx);
         }
     }
 
@@ -94,26 +83,23 @@ impl<'a> ParseErrorsReporter<'a> {
         self.diagnostics.push(diagnostic);
     }
 
-    fn report_lexer_errors(&mut self, idx: usize) {
-        let Token {
-            val: _,
-            span: token_span,
-            kind: TokenKind::Bad(lexer_errors),
-        } = &self.tokens[idx]
-        else {
-            unreachable!()
-        };
-
+    fn report_lexer_errors(&mut self, lexer_errors: &[LexerError]) {
         for err in lexer_errors {
-            let err_span = Span {
-                start: SpanCursor {
-                    line: token_span.start.line,
-                    col: err.col,
-                },
-                end: SpanCursor {
-                    line: token_span.end.line,
-                    col: err.col + err.len,
-                },
+            let token_span = self.tokens[err.token_idx].span;
+
+            let err_span = if err.len > 0 {
+                Span {
+                    start: SpanCursor {
+                        line: token_span.start.line,
+                        col: err.col,
+                    },
+                    end: SpanCursor {
+                        line: token_span.end.line,
+                        col: err.col + err.len,
+                    },
+                }
+            } else {
+                token_span
             };
 
             match &err.kind {
@@ -125,12 +111,38 @@ impl<'a> ParseErrorsReporter<'a> {
                         vec![],
                     );
                 }
-                LexerErrorKind::UnclosedStr | LexerErrorKind::UnclosedChar => {
+                LexerErrorKind::UnclosedStr => {
                     self.report(
                         "علامة تنصيص مفقودة".to_string(),
                         err_span,
-                        "لم يتم إغلاق علامة التنصيص هذه".to_string(),
-                        vec![],
+                        "قٌم بإضافة `\"`".to_string(),
+                        vec![(
+                            Span {
+                                start: token_span.start,
+                                end: SpanCursor {
+                                    line: token_span.start.line,
+                                    col: token_span.start.col + 1,
+                                },
+                            },
+                            vec!["لم يتم إغلاق علامة التنصيص هذه".to_string()],
+                        )],
+                    );
+                }
+                LexerErrorKind::UnclosedChar => {
+                    self.report(
+                        "علامة تنصيص مفقودة".to_string(),
+                        err_span,
+                        "قٌم بإضافة `\'`".to_string(),
+                        vec![(
+                            Span {
+                                start: token_span.start,
+                                end: SpanCursor {
+                                    line: token_span.start.line,
+                                    col: token_span.start.col + 1,
+                                },
+                            },
+                            vec!["لم يتم إغلاق علامة التنصيص هذه".to_string()],
+                        )],
                     );
                 }
                 LexerErrorKind::UnclosedDelimitedComment => self.report(
@@ -290,11 +302,6 @@ impl<'a> ParseErrorsReporter<'a> {
         let (found_token_span, found_token_val, primary_label) =
             if err.found_token_index < self.tokens.len() {
                 let token = &self.tokens[err.found_token_index];
-                if let TokenKind::Bad(_) = &token.kind {
-                    self.bad_tokens_indecies
-                        .entry(err.found_token_index)
-                        .or_insert(());
-                }
                 (token.span, token.val, "رمز غير متوقع".to_string())
             } else {
                 let last_span = self.tokens[self.tokens.len() - 1].span;
@@ -329,7 +336,7 @@ impl<'a> ParseErrorsReporter<'a> {
                     let mut i = err.found_token_index + 1;
                     while i < self.tokens.len() {
                         match &self.tokens[i].kind {
-                            TokenKind::EOL
+                            TokenKind::Eol
                             | TokenKind::DelimitedComment
                             | TokenKind::LineComment
                             | TokenKind::Space => i += 1,
@@ -739,7 +746,7 @@ impl<'a> ParseErrorsReporter<'a> {
     fn check_semicolon_result(&mut self, semicolon: &ParseResult<SemicolonSymbol>) {
         if let Err(err) = semicolon {
             let mut i = err.found_token_index - 1;
-            while let TokenKind::EOL
+            while let TokenKind::Eol
             | TokenKind::DelimitedComment
             | TokenKind::LineComment
             | TokenKind::Space = &self.tokens[i].kind

@@ -21,7 +21,13 @@ impl<'a> LexerIter<'a> {
                         if is_char {
                             err.kind = LexerErrorKind::UnclosedChar;
                         }
-                        return TokenKind::Bad(vec![err]); // Return unclosed delimiter errors early before validation of typed chars
+                        self.errs.push(err);
+
+                        return if is_char {
+                            TokenKind::Literal(LiteralKind::Char('\0'))
+                        } else {
+                            TokenKind::Literal(LiteralKind::Str(Rc::new("".to_string())))
+                        }; // Return unclosed delimiter errors early before validation of typed chars
                     }
 
                     errs.push(err);
@@ -37,10 +43,7 @@ impl<'a> LexerIter<'a> {
         }
 
         if !is_char {
-            if !errs.is_empty() {
-                return TokenKind::Bad(errs);
-            }
-
+            self.errs.append(&mut errs);
             return TokenKind::Literal(LiteralKind::Str(Rc::new(rust_str_lit)));
         }
 
@@ -48,27 +51,28 @@ impl<'a> LexerIter<'a> {
 
         let ch = match iter.next() {
             None => {
-                return TokenKind::Bad(vec![LexerError {
+                self.errs.push(LexerError {
+                    token_idx: self.current_token_idx,
                     col: start.col,
                     len: 1,
                     kind: LexerErrorKind::ZeroChars,
-                }])
+                }); // Skip literal errors and show only this error
+                return TokenKind::Literal(LiteralKind::Char('\0'));
             }
             Some(ch) => ch,
         };
 
         if iter.next().is_some() {
-            return TokenKind::Bad(vec![LexerError {
+            self.errs.push(LexerError {
+                token_idx: self.current_token_idx,
                 col: start.col,
                 len: 1,
                 kind: LexerErrorKind::ManyChars,
-            }]);
+            }); // Skip literal errors and show only this error
+            return TokenKind::Literal(LiteralKind::Char('\0'));
         }
 
-        if !errs.is_empty() {
-            return TokenKind::Bad(errs);
-        }
-
+        self.errs.append(&mut errs); // Append literal errors
         TokenKind::Literal(LiteralKind::Char(ch))
     }
 
@@ -112,6 +116,7 @@ impl<'a> LexerIter<'a> {
 
         if code_point_str.len() != 4 || !code_point_str.chars().all(|ch| ch.is_ascii_hexdigit()) {
             return Err(LexerError {
+                token_idx: self.current_token_idx,
                 col: start.col + 1, // To start marking after `ي`
                 len: code_point_str.len(),
                 kind: LexerErrorKind::UnicodeCodePointHexDigitOnly,
@@ -123,6 +128,7 @@ impl<'a> LexerIter<'a> {
         match char::from_u32(code_point) {
             Some(ch) => self.check_is_kufr_or_unsupported_char_unicode(ch, start),
             None => Err(LexerError {
+                token_idx: self.current_token_idx,
                 col: start.col + 1, // To start marking after `ي`
                 len: 4,             // The 4 digits
                 kind: LexerErrorKind::InvalidUnicodeCodePoint,
@@ -133,6 +139,7 @@ impl<'a> LexerIter<'a> {
     #[inline]
     fn unclosed_delimiter_err(&self) -> Result<Option<char>, LexerError> {
         Err(LexerError {
+            token_idx: self.current_token_idx,
             col: self.cursor.stopped_at.0.col,
             len: 1,
             kind: LexerErrorKind::UnclosedStr,
@@ -147,6 +154,7 @@ impl<'a> LexerIter<'a> {
     ) -> Result<Option<char>, LexerError> {
         if is_kufr_or_unsupported_character(ch) {
             Err(LexerError {
+                token_idx: self.current_token_idx,
                 col: start.col + 1, // To start marking after `ي`
                 len: 4,             // The 4 digits
                 kind: LexerErrorKind::KufrOrInvalidChar,
@@ -162,6 +170,7 @@ impl<'a> LexerIter<'a> {
 
         match to_escape_sequence(ch) {
             None => Err(LexerError {
+                token_idx: self.current_token_idx,
                 col: start.col,
                 len: 1,
                 kind: LexerErrorKind::UnknownEscapeSequence,

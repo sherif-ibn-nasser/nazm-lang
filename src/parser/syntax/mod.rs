@@ -34,5 +34,5 @@ generateTrailingCommaWithCloseDelimiter!(RArrowSymbol);
 
 #[derive(NazmcParse, Debug)]
 pub(crate) struct File {
-    pub(crate) content: ZeroOrMany<FileItem, EOF>,
+    pub(crate) content: ZeroOrMany<FileItem, Eof>,
 }

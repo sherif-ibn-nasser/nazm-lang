@@ -19,6 +19,9 @@ pub(crate) struct LexerIter<'a> {
     file_lines: Vec<&'a str>,
     /// The start byte index of current line
     current_line_start_bidx: usize,
+    /// Errors
+    errs: Vec<LexerError>,
+    current_token_idx: usize,
 }
 
 impl<'a> Iterator for LexerIter<'a> {
@@ -28,13 +31,14 @@ impl<'a> Iterator for LexerIter<'a> {
         let start = self.cursor.stopped_at.0;
         let start_byte = self.stopped_at_bidx;
         let kind = self.next_token_type();
-        if let TokenKind::EOF = kind {
+        if let TokenKind::Eof = kind {
             return None;
         }
         let end = self.cursor.stopped_at.0;
         let end_byte = self.stopped_at_bidx;
         let val = &self.content[start_byte..end_byte];
         let span = Span { start, end };
+        self.current_token_idx += 1;
         Some(Token { val, span, kind })
     }
 }
@@ -47,19 +51,21 @@ impl<'a> LexerIter<'a> {
             stopped_at_bidx: 0,
             file_lines: vec![],
             current_line_start_bidx: 0,
+            errs: vec![],
+            current_token_idx: 0,
         };
         _self.cursor.next(); // Init cursor::stopped_at with first char
         _self
     }
 
-    pub fn collect_all(mut self) -> (Vec<Token<'a>>, Vec<&'a str>) {
+    pub fn collect_all(mut self) -> (Vec<Token<'a>>, Vec<&'a str>, Vec<LexerError>) {
         let tokens = self.by_ref().collect_vec();
 
         if self.file_lines.is_empty() {
             self.file_lines.push("");
         }
 
-        (tokens, self.file_lines)
+        (tokens, self.file_lines, self.errs)
     }
 
     fn next_token_type(&mut self) -> TokenKind {
@@ -163,7 +169,7 @@ impl<'a> LexerIter<'a> {
             }
             '\n' => {
                 self.next_cursor();
-                TokenKind::EOL
+                TokenKind::Eol
             }
             '0'..='9' => self.next_num_token(),
             '\'' | '\"' => self.next_str_or_char_token(),
@@ -176,7 +182,7 @@ impl<'a> LexerIter<'a> {
             }
             _ => {
                 if self.stopped_at_bidx == self.content.len() {
-                    return TokenKind::EOF;
+                    return TokenKind::Eof;
                 }
 
                 self.next_id_or_keyword()
@@ -224,23 +230,17 @@ impl<'a> LexerIter<'a> {
     fn next_token_with_slash(&mut self) -> TokenKind {
         match self.next_cursor() {
             Some((_, '/')) => {
-                let mut errs = vec![];
                 while self.next_cursor_non_eol().is_some() {
                     // Skip all until first EOL
                     if let Err(err) = self.check_is_kufr_or_unsupported_char() {
-                        errs.push(err);
+                        self.errs.push(err);
                     }
                 }
 
-                if errs.is_empty() {
-                    TokenKind::LineComment
-                } else {
-                    TokenKind::Bad(errs)
-                }
+                TokenKind::LineComment
             }
             Some((_, '*')) => {
                 let mut opened_delimted_comments = 1;
-                let mut errs = vec![];
 
                 while let Some((_, ch)) = self.next_cursor() {
                     if opened_delimted_comments == 0 {
@@ -254,23 +254,20 @@ impl<'a> LexerIter<'a> {
                     }
 
                     if let Err(err) = self.check_is_kufr_or_unsupported_char() {
-                        errs.push(err);
+                        self.errs.push(err);
                     }
                 }
 
-                if opened_delimted_comments == 0 {
-                    if errs.is_empty() {
-                        TokenKind::DelimitedComment
-                    } else {
-                        TokenKind::Bad(errs)
-                    }
-                } else {
-                    TokenKind::Bad(vec![LexerError {
+                if opened_delimted_comments != 0 {
+                    self.errs.push(LexerError {
+                        token_idx: self.current_token_idx,
                         col: self.cursor.stopped_at.0.col,
                         len: 1,
                         kind: LexerErrorKind::UnclosedDelimitedComment,
-                    }])
+                    });
                 }
+
+                TokenKind::DelimitedComment
             }
             _ => TokenKind::Symbol(SymbolKind::Slash),
         }
@@ -279,11 +276,13 @@ impl<'a> LexerIter<'a> {
     fn next_id_or_keyword(&mut self) -> TokenKind {
         if !self.cursor.stopped_at.1.is_alphabetic() {
             self.next_cursor();
-            return TokenKind::Bad(vec![LexerError {
+            self.errs.push(LexerError {
+                token_idx: self.current_token_idx,
                 col: self.cursor.stopped_at.0.col,
                 len: 1,
                 kind: LexerErrorKind::UnknownToken,
-            }]);
+            });
+            return TokenKind::Id;
         }
 
         let start = self.stopped_at_bidx;
@@ -318,6 +317,7 @@ impl<'a> LexerIter<'a> {
 
         if is_kufr_or_unsupported_character(ch) {
             Err(LexerError {
+                token_idx: self.current_token_idx,
                 col: start.col,
                 len: 1,
                 kind: LexerErrorKind::KufrOrInvalidChar,
@@ -442,7 +442,7 @@ mod tests {
 
         let lexer: LexerIter = LexerIter::new(content);
 
-        let (_, lines) = lexer.collect_all();
+        let (_, lines, _) = lexer.collect_all();
         let expected_lines = content.split('\n').collect_vec();
 
         assert_eq!(expected_lines, lines);
@@ -462,7 +462,7 @@ mod tests {
 
         let lexer: LexerIter = LexerIter::new(content);
 
-        let (_, lines) = lexer.collect_all();
+        let (_, lines, _) = lexer.collect_all();
         let expected_lines = content.split('\n').collect_vec();
 
         assert_eq!(expected_lines, lines);
@@ -578,7 +578,7 @@ mod tests {
             );
 
             assert_eq!(val, "\n");
-            assert_eq!(kind, TokenKind::EOL);
+            assert_eq!(kind, TokenKind::Eol);
             lines += 1;
         }
     }

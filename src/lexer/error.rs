@@ -2,6 +2,8 @@ use super::{Base, NumKind};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct LexerError {
+    /// The index of token that hasthe error
+    pub token_idx: usize,
     /// The index of character to start marking from
     pub col: usize,
     /// The length for marking (in characters)

@@ -1,8 +1,6 @@
-use std::rc::Rc;
-
-use super::error::LexerError;
 use documented::DocumentedVariants;
 use nazmc_diagnostics::span::*;
+use std::rc::Rc;
 use strum::EnumIter;
 
 #[derive(Clone, PartialEq, Debug, Default)]
@@ -15,8 +13,8 @@ pub struct Token<'a> {
 #[derive(Clone, PartialEq, Debug, Default)]
 pub enum TokenKind {
     #[default]
-    EOF,
-    EOL,
+    Eof,
+    Eol,
     Space,
     LineComment,
     DelimitedComment,
@@ -24,7 +22,6 @@ pub enum TokenKind {
     Id,
     Symbol(SymbolKind),
     Keyword(KeywordKind),
-    Bad(Vec<LexerError>),
 }
 
 #[derive(Clone, PartialEq, Debug)]

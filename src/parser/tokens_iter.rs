@@ -60,7 +60,7 @@ impl<'a> TokensIter<'a> {
     pub(crate) fn next_non_space_or_comment(&mut self) -> Option<&Token<'a>> {
         while let Some(Token {
             kind:
-                TokenKind::EOL | TokenKind::DelimitedComment | TokenKind::LineComment | TokenKind::Space,
+                TokenKind::Eol | TokenKind::DelimitedComment | TokenKind::LineComment | TokenKind::Space,
             ..
         }) = self.next()
         {}
