@@ -1,5 +1,3 @@
-use syntax::*;
-
 use crate::parser::*;
 
 macro_rules! generateDelimitedPunctuated {

@@ -89,19 +89,19 @@ impl NazmcParse for ParseResult<ArrayExpr> {
 }
 
 impl NazmcParse for ParseResult<ArrayExprKind> {
-    fn parse(iter: &mut TokensIter) -> Self {
+    fn parse(_iter: &mut TokensIter) -> Self {
         unreachable!()
     }
 }
 
 impl NazmcParse for ParseResult<ExplicitSizeArrayExpr> {
-    fn parse(iter: &mut TokensIter) -> Self {
+    fn parse(_iter: &mut TokensIter) -> Self {
         unreachable!()
     }
 }
 
 impl NazmcParse for ParseResult<ElementsArrayExpr> {
-    fn parse(iter: &mut TokensIter) -> Self {
+    fn parse(_iter: &mut TokensIter) -> Self {
         unreachable!()
     }
 }

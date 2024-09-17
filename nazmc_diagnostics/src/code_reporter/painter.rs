@@ -9,18 +9,18 @@ pub struct Painter<P: Clone + Display> {
 }
 
 impl<P: Clone + Display> Painter<P> {
-
     pub fn new(default_paint: P) -> Self {
         Self {
             sheet: vec![vec![default_paint.clone()]],
-            brush_pos: (0,0),
-            default_paint: default_paint
+            brush_pos: (0, 0),
+            default_paint: default_paint,
         }
     }
-    
+
     fn check_or_insert(&mut self, row_idx: usize, col_idx: usize) {
         if row_idx >= self.sheet.len() {
-            self.sheet.resize(row_idx + 1, vec![self.default_paint.clone(); col_idx + 1]);
+            self.sheet
+                .resize(row_idx + 1, vec![self.default_paint.clone(); col_idx + 1]);
             return;
         }
 
@@ -76,7 +76,7 @@ impl<P: Clone + Display> Painter<P> {
     pub fn move_left(&mut self) -> &mut Self {
         self.move_left_by(1)
     }
-    
+
     pub fn move_down(&mut self) -> &mut Self {
         self.move_down_by(1)
     }
@@ -109,18 +109,17 @@ impl<P: Clone + Display> Painter<P> {
     pub fn get_sheet(self) -> Vec<Vec<P>> {
         self.sheet
     }
-
 }
 
-impl<P: Clone + Display > Display for Painter<P> {
+impl<P: Clone + Display> Display for Painter<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let last_row = self.sheet.len()-1;
+        let last_row = self.sheet.len() - 1;
         for (i, row) in self.sheet.iter().enumerate() {
             for col in row {
-                write!(f, "{col}");
+                let _ = write!(f, "{col}");
             }
             if i != last_row {
-                writeln!(f);
+                let _ = writeln!(f);
             }
         }
         Ok(())

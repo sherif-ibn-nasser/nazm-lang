@@ -5,8 +5,8 @@ use proc_macro_error::{abort, emit_error, proc_macro_error};
 use quote::quote;
 use syn::PathArguments;
 use syn::{
-    parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::Comma, DataEnum,
-    DataStruct, DeriveInput, Field, GenericArgument, Ident, Type, TypePath,
+    parse_macro_input, spanned::Spanned, DataEnum, DataStruct, DeriveInput, Field, GenericArgument,
+    Ident, Type, TypePath,
 };
 
 #[proc_macro_error]

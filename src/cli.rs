@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::PathBuf, process::exit};
+use std::{fs, path::PathBuf, process::exit};
 
 use bpaf::Bpaf;
 
@@ -7,7 +7,7 @@ use owo_colors::OwoColorize;
 #[derive(Clone, Debug, Bpaf)]
 #[bpaf(options, version)]
 /// The official compiler of Nazm programming language
-struct CLI {
+struct Cli {
     #[bpaf(positional("FILE"))]
     /// Nazm file to compile (with *.نظم extension)
     file: PathBuf,
@@ -22,7 +22,7 @@ fn print_err(msg: String) {
 }
 
 pub fn read_file() -> (PathBuf, String) {
-    let file_path = c_l_i().fallback_to_usage().run().file;
+    let file_path = cli().fallback_to_usage().run().file;
 
     let err_msg_str = format!(
         "{} {}{}",

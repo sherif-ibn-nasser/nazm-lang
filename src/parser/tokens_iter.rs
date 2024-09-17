@@ -1,5 +1,3 @@
-use nazmc_diagnostics::span::Span;
-
 use crate::{Token, TokenKind};
 
 pub(crate) struct TokensIter<'a> {

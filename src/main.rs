@@ -21,8 +21,6 @@ fn main() {
 
     ParseCtx::new(&file_path, &file_content).parse();
 
-    // let mut bad_tokens = vec![];
-
     // for Token { span, val, kind } in tokens {
     //     let color = match kind {
     //         TokenKind::LineComment | TokenKind::DelimitedComment => XtermColors::BrightTurquoise,
@@ -45,19 +43,5 @@ fn main() {
     //     }
 
     //     print!("{}", val);
-
-    //     if let TokenKind::Bad(errs) = kind {
-    //         bad_tokens.push((val, span, errs));
-    //     }
-    // }
-
-    // if bad_tokens.is_empty() {
-    //     return;
-    // }
-
-    // println!("-----------------------------");
-
-    // for (_0, _1, _2) in bad_tokens {
-    //     println!("{}, {:?}, {:?}", _0, _1, _2)
     // }
 }
