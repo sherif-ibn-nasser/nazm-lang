@@ -2,6 +2,8 @@ use super::{Base, NumKind};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct LexerError {
+    /// The index of token that hasthe error
+    pub token_idx: usize,
     /// The index of character to start marking from
     pub col: usize,
     /// The length for marking (in characters)
@@ -24,10 +26,10 @@ pub enum LexerErrorKind {
     UnknownEscapeSequence,
     MissingDigitsAfterBasePrefix,
     MissingDigitsAfterExponent,
-    InvalidDigitForBase(Base),
     InvalidIntBasePrefix,
     InvalidNumSuffix,
     InvalidFloatSuffix,
-    InvalidIntSuffixForBase(Base),
+    InvalidIntSuffix,
+    InvalidDigitForBase(Base),
     NumIsOutOfRange(NumKind),
 }

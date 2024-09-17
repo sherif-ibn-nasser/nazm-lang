@@ -3,7 +3,7 @@ use super::*;
 #[derive(NazmcParse, Debug)]
 pub(crate) struct IfExpr {
     pub(crate) if_keyword: IfKeyword,
-    pub(crate) conditional_block: ParseResult<ConditionalBlock>,
+    pub(crate) conditional_block: ConditionalBlock,
     pub(crate) else_ifs: Vec<ElseIfClause>,
     pub(crate) else_cluase: Option<ElseClause>,
 }
@@ -12,7 +12,7 @@ pub(crate) struct IfExpr {
 pub(crate) struct ElseIfClause {
     pub(crate) else_keyword: ElseKeyword,
     pub(crate) if_keyword: IfKeyword,
-    pub(crate) conditional_block: ParseResult<ConditionalBlock>,
+    pub(crate) conditional_block: ConditionalBlock,
 }
 
 #[derive(NazmcParse, Debug)]
@@ -39,11 +39,12 @@ pub(crate) struct LoopExpr {
 #[derive(NazmcParse, Debug)]
 pub(crate) struct WhileExpr {
     pub(crate) while_keyword: WhileKeyword,
-    pub(crate) conditional_block: ParseResult<ConditionalBlock>,
+    pub(crate) conditional_block: ConditionalBlock,
 }
 
 #[derive(NazmcParse, Debug)]
 pub(crate) struct DoWhileExpr {
+    // TODO
     pub(crate) do_keyword: DoKeyword,
     /// This must be checked that it doesn't have a lambda arrow
     pub(crate) block: ParseResult<LambdaExpr>,

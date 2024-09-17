@@ -1,47 +1,46 @@
-use std::{cell::Cell, collections::HashMap, fmt::{self, Display}, path::Path, rc::Rc};
+use std::{
+    cell::Cell,
+    collections::HashMap,
+    fmt::{self, Display},
+    rc::Rc,
+};
 
 use itertools::Itertools;
-use owo_colors::{OwoColorize, Style };
+use owo_colors::{OwoColorize, Style};
 use painter::Painter;
 
-use crate::span::Span;
+use crate::{span::Span, DiagnosticPrint};
 
 mod painter;
 
-pub(crate) struct UnderConstructionCodeReporter;
-
-pub(crate) struct BuiltCodeReporter<'a> {
-    /// Lines to read from
-    file_lines: &'a [&'a str],
-    line_nums_style: Style,
-}
-
-pub(crate)  struct CodeReporter<'a, State> {
+pub(crate) struct CodeReporter<'a> {
     /// Map lines indecies and main depth line on them
     code_lines: HashMap<usize, CodeLine<'a>>,
-    state: State,
 }
 
-impl<'a> CodeReporter<'a, UnderConstructionCodeReporter> {
-
+impl<'a> CodeReporter<'a> {
     pub(crate) fn new() -> Self {
         Self {
             code_lines: HashMap::new(),
-            state: UnderConstructionCodeReporter,
         }
     }
 
-    pub(crate) fn mark(&mut self, span: Span, sign: char, style: Style, labels: &'a [&'a str]) -> &mut Self {
-
+    pub(crate) fn mark(
+        &mut self,
+        span: Span,
+        sign: char,
+        style: Style,
+        labels: Vec<String>,
+    ) -> &mut Self {
         let start_line = span.start.line;
         let start_col = span.start.col;
         let end_line = span.end.line;
         let end_col = span.end.col;
 
         if start_line == end_line {
-
-            self.code_lines.entry(start_line)
-                .or_insert( CodeLine::default() )
+            self.code_lines
+                .entry(start_line)
+                .or_insert(CodeLine::default())
                 .mark_as_one_line(start_col, end_col, sign, style, labels);
 
             return self;
@@ -49,74 +48,69 @@ impl<'a> CodeReporter<'a, UnderConstructionCodeReporter> {
 
         let connection_margin = Rc::default(); // It will be updated later
 
-        self.code_lines.entry(start_line)
-            .or_insert( CodeLine::default() )
+        self.code_lines
+            .entry(start_line)
+            .or_insert(CodeLine::default())
             .mark_as_multi_line_start(start_col, sign, style, Rc::clone(&connection_margin));
 
-        self.code_lines.entry(end_line)
-            .or_insert( CodeLine::default() )
+        self.code_lines
+            .entry(end_line)
+            .or_insert(CodeLine::default())
             .mark_as_multi_line_end(end_col, sign, style, labels, connection_margin);
 
-        for line in start_line + 1 .. end_line {
+        for line in start_line + 1..end_line {
             // Add lines in between to display them or to modify them later if markers were added to them
-            self.code_lines.entry(line).or_insert( CodeLine::default() );
+            self.code_lines.entry(line).or_insert(CodeLine::default());
         }
 
         return self;
     }
-
-    pub(crate) fn build(self, file_lines: &'a [&'a str], line_nums_style: Style) -> CodeReporter<'a, BuiltCodeReporter> {
-        CodeReporter {
-            code_lines: self.code_lines,
-            state: BuiltCodeReporter {
-                file_lines,
-                line_nums_style,
-            }
-        }
-    }
-    
 }
 
-impl<'a> Display for CodeReporter<'a, BuiltCodeReporter<'a>> {
-
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-
+impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
+    fn write(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        path: &'a str,
+        file_lines: &'a [&'a str],
+    ) -> std::fmt::Result {
         let mut free_connection_margins = vec![];
         let mut connections_painter = Painter::new(
-            Marker {sign: MarkerSign::Char(' '), style: Style::new() } // Default is space
+            Marker {
+                sign: MarkerSign::Char(' '),
+                style: Style::new(),
+            }, // Default is space
         );
         let mut big_sheet = vec![];
         let mut lines_indecies = self.code_lines.keys().sorted();
 
         let mut num_of_displayed_lines = 0;
-        
+
         let mut max_line_num = 0; // This is needed later and will be updated in the loop to not calculate it by keys.max()
 
         for line_index in lines_indecies.clone() {
-
             max_line_num = line_index + 1; // Add one
 
             let code_line = &self.code_lines[line_index];
 
-            let file_line = self.state.file_lines[*line_index];
+            let file_line = file_lines[*line_index];
 
-            big_sheet.push(vec![vec![
-                Marker {
-                    sign: MarkerSign::CodeLine(file_line),
-                    style: Style::new()
-                }
-            ]]);
+            big_sheet.push(vec![vec![Marker {
+                sign: MarkerSign::CodeLine(file_line),
+                style: Style::new(),
+            }]]);
 
             num_of_displayed_lines += 1;
 
             // This will always align the connections sheet with other sheets
-            connections_painter.move_to_zero().move_down_by(num_of_displayed_lines);
-        
-            let painter_opt = code_line
-                .draw(
-                    &mut free_connection_margins,
-                    &mut connections_painter,
-                    file_line,
+            connections_painter
+                .move_to_zero()
+                .move_down_by(num_of_displayed_lines);
+
+            let painter_opt = code_line.draw(
+                &mut free_connection_margins,
+                &mut connections_painter,
+                file_line,
             );
 
             match painter_opt {
@@ -124,61 +118,91 @@ impl<'a> Display for CodeReporter<'a, BuiltCodeReporter<'a>> {
                     let small_sheet = painter.get_sheet();
                     num_of_displayed_lines += small_sheet.len();
                     big_sheet.push(small_sheet);
-                },
-                None => {},
+                }
+                None => {}
             }
-            
         }
 
         let connections_sheet = connections_painter.get_sheet();
         let mut connections = connections_sheet.iter();
-        let max_margin = free_connection_margins.len()*2;
+        let max_margin = free_connection_margins.len() * 2;
 
         let max_line_num_indent = max_line_num.to_string().len();
 
-        let line_nums_style  = self.state.line_nums_style;
+        let line_nums_style = Style::new().blue().bold();
 
-        writeln!(f, "{} {}", " ".repeat(max_line_num_indent).style(line_nums_style), '|'.style(line_nums_style));
+        let _ = writeln!(
+            f,
+            "{}{} {}",
+            " ".repeat(max_line_num_indent).style(line_nums_style),
+            "-->".style(line_nums_style),
+            path,
+        );
 
-        // This is needed to add `...` between non-continues lines 
+        let _ = writeln!(
+            f,
+            "{} {}",
+            " ".repeat(max_line_num_indent).style(line_nums_style),
+            '|'.style(line_nums_style)
+        );
+
+        // This is needed to add `...` between non-continues lines
         // i.e., display line 5 then display `...` then display line 10
         // So we need it to compare current line with previous one
 
         let mut prev_line_num = 0; // Start with zero (This will store the line num and not the its index)
 
         for line_of_markers in big_sheet.iter().flatten() {
-
-            if line_of_markers.len() == 1 && matches!(line_of_markers[0].sign, MarkerSign::CodeLine(_)){
+            if line_of_markers.len() == 1
+                && matches!(line_of_markers[0].sign, MarkerSign::CodeLine(_))
+            {
                 let current_line_num = lines_indecies.next().unwrap() + 1;
                 if prev_line_num > 0 && prev_line_num + 1 < current_line_num {
-                    writeln!(f, "{}", "...".style(line_nums_style));
+                    if prev_line_num + 2 == current_line_num {
+                        let line_num_str = (prev_line_num + 1).to_string();
+                        let _ = writeln!(
+                            f,
+                            "{}{} {} {}{}",
+                            line_num_str.style(line_nums_style),
+                            " ".repeat(max_line_num_indent - line_num_str.len()),
+                            '|'.style(line_nums_style),
+                            " ".repeat(max_margin),
+                            file_lines[prev_line_num],
+                        );
+                    } else {
+                        let _ = writeln!(f, "{}", "...".style(line_nums_style));
+                    }
                 }
                 prev_line_num = current_line_num;
                 let line_num_str = prev_line_num.to_string();
-                write!(f, "{}{} {}",
+                let _ = write!(
+                    f,
+                    "{}{} {} ",
                     line_num_str.style(line_nums_style),
-                    " ".repeat(max_line_num_indent-line_num_str.len()),
+                    " ".repeat(max_line_num_indent - line_num_str.len()),
+                    '|'.style(line_nums_style)
+                );
+            } else {
+                let _ = write!(
+                    f,
+                    "{} {} ",
+                    " ".repeat(max_line_num_indent).style(line_nums_style),
                     '|'.style(line_nums_style)
                 );
             }
-            else {
-                write!(f, "{} {}", " ".repeat(max_line_num_indent).style(line_nums_style), '|'.style(line_nums_style));
-            }
 
             if let (Some(connection_line), true) = (connections.next(), max_margin > 0) {
-                write!(f, "{}", " ".repeat(max_margin-connection_line.len()+1));
+                let _ = write!(f, "{}", " ".repeat(max_margin - connection_line.len()));
                 for c in connection_line.iter().rev() {
-                    write!(f, "{c}");
+                    let _ = write!(f, "{c}");
                 }
-            }
-            else {
-                write!(f, "{}", " ".repeat(max_margin));
+            } else {
+                let _ = write!(f, "{}", " ".repeat(max_margin));
             }
             for marker in line_of_markers {
-                write!(f, "{marker}");
+                let _ = write!(f, "{marker}");
             }
-            writeln!(f);
-        
+            let _ = writeln!(f);
         }
 
         Ok(())
@@ -188,50 +212,97 @@ impl<'a> Display for CodeReporter<'a, BuiltCodeReporter<'a>> {
 #[derive(Default)]
 struct CodeLine<'a> {
     /// Map column indecies to markers on them
-    markers: HashMap<usize, (Marker<'a>, MarkerType<'a>)>,
+    markers: HashMap<usize, (Marker<'a>, MarkerType)>,
 }
 
 impl<'a> CodeLine<'a> {
-    
-    fn mark_as_one_line(&mut self, start_col: usize, end_col: usize, sign: char, style: Style, labels: &'a [&'a str]) {
-        let marker = Marker { sign: MarkerSign::Char(sign), style: style };
+    fn mark_as_one_line(
+        &mut self,
+        start_col: usize,
+        end_col: usize,
+        sign: char,
+        style: Style,
+        labels: Vec<String>,
+    ) {
+        let marker = Marker {
+            sign: MarkerSign::Char(sign),
+            style: style,
+        };
         self.markers.insert(
             start_col,
-            (marker, MarkerType::OneLineStart { end_col: end_col, labels: labels } )
+            (
+                marker,
+                MarkerType::OneLineStart {
+                    end_col: end_col,
+                    labels: labels,
+                },
+            ),
         );
     }
-    
-    fn mark_as_multi_line_start(&mut self, col: usize, sign: char, style: Style, connection_margin: Rc<Cell<(usize, usize)>>) {
-        let marker = Marker { sign: MarkerSign::Char(sign), style: style };
+
+    fn mark_as_multi_line_start(
+        &mut self,
+        col: usize,
+        sign: char,
+        style: Style,
+        connection_margin: Rc<Cell<(usize, usize)>>,
+    ) {
+        let marker = Marker {
+            sign: MarkerSign::Char(sign),
+            style: style,
+        };
         self.markers.insert(
             col,
-            (marker, MarkerType::StartOfMultiLine { connection_margin: connection_margin } )
+            (
+                marker,
+                MarkerType::StartOfMultiLine {
+                    connection_margin: connection_margin,
+                },
+            ),
         );
     }
-    
-    fn mark_as_multi_line_end(&mut self, col: usize, sign: char, style: Style, labels: &'a [&'a str], connection_margin: Rc<Cell<(usize, usize)>>) {
-        let marker = Marker { sign: MarkerSign::Char(sign), style: style };
+
+    fn mark_as_multi_line_end(
+        &mut self,
+        col: usize,
+        sign: char,
+        style: Style,
+        labels: Vec<String>,
+        connection_margin: Rc<Cell<(usize, usize)>>,
+    ) {
+        let marker = Marker {
+            sign: MarkerSign::Char(sign),
+            style: style,
+        };
         self.markers.insert(
             col,
-            (marker, MarkerType::EndOfMultiLine { connection_margin: connection_margin, labels: labels })
+            (
+                marker,
+                MarkerType::EndOfMultiLine {
+                    connection_margin: connection_margin,
+                    labels: labels,
+                },
+            ),
         );
     }
 
     fn draw(
-        &self,
+        &'a self,
         free_connection_margins: &mut Vec<bool>,
         connections_painter: &mut Painter<Marker<'a>>,
         file_line: &'a str,
     ) -> Option<Painter<Marker<'a>>> {
-        
         let mut painter = Painter::new(
-            Marker { sign: MarkerSign::Char(' '), style: Style::new() } // Default is space
+            Marker {
+                sign: MarkerSign::Char(' '),
+                style: Style::new(),
+            }, // Default is space
         );
 
         let painter_local_zero = painter.current_brush_pos();
 
         let connections_painter_local_zero = connections_painter.current_brush_pos();
-        
+
         // This is a special case when the multiline marker starts after spaces
         // It will make the marker starts with `/` from connections sheet not from the normal sheet
         /*
@@ -242,7 +313,8 @@ impl<'a> CodeLine<'a> {
 
         let min_col_opt = self.markers.keys().min();
 
-        if min_col_opt.is_none() { // No markers
+        if min_col_opt.is_none() {
+            // No markers
             return None; // No markers to draw in the main sheet
         }
 
@@ -250,14 +322,13 @@ impl<'a> CodeLine<'a> {
 
         let mut min_col_is_after_spaces = false;
 
-        if let
-            (MarkerType::StartOfMultiLine { connection_margin }, true)
-            = 
-            (&self.markers[min_col].1 , file_line.starts_with(&" ".repeat(*min_col)))
-        {
+        if let (MarkerType::StartOfMultiLine { connection_margin }, true) = (
+            &self.markers[min_col].1,
+            file_line.starts_with(&" ".repeat(*min_col)),
+        ) {
             min_col_is_after_spaces = true;
-            
-            connections_painter.move_up(); // To align with the code line    
+
+            connections_painter.move_up(); // To align with the code line
 
             let brush_pos = connections_painter.current_brush_pos();
 
@@ -279,16 +350,15 @@ impl<'a> CodeLine<'a> {
 
             (*connection_margin).set((brush_pos.0, found_margin));
 
-            connections_painter.move_right_by(2*found_margin+1).paint(
-                self.markers[min_col].0.clone_with_char('/')
-            );
+            connections_painter
+                .move_right_by(2 * found_margin + 1)
+                .paint(self.markers[min_col].0.clone_with_char('/'));
 
             if self.markers.len() == 1 {
                 connections_painter.move_down(); // To reset the line 208
                 return None; // No markers to draw in the main sheet
             }
         }
-
 
         // The number of bars (`|`) between the code and the next label (of one-line markers and multiline end markers)
         let mut next_labels_margin = 0;
@@ -297,7 +367,6 @@ impl<'a> CodeLine<'a> {
         let mut next_multline_margin = 0;
 
         for col in self.markers.keys().sorted().rev() {
-
             painter.move_to(painter_local_zero);
             connections_painter.move_to(connections_painter_local_zero);
 
@@ -307,10 +376,10 @@ impl<'a> CodeLine<'a> {
                 MarkerType::OneLineStart { end_col, labels } => {
                     painter.move_right_by(*end_col);
                     let brush_pos = painter.current_brush_pos();
-                    for _ in 0 .. *end_col - col {
+                    for _ in 0..*end_col - col {
                         painter.move_left().paint(marker.clone());
                     }
-                    if !labels.is_empty(){
+                    if !labels.is_empty() {
                         // Check if this label margin will be less than the next multiline marker margin
                         // This will prevent labels to be above the next multiline margin
                         // But they may have the same margins
@@ -326,8 +395,7 @@ impl<'a> CodeLine<'a> {
                         }
                         if next_labels_margin == 0 {
                             painter.move_to(brush_pos);
-                        }
-                        else {
+                        } else {
                             for _depth in 0..next_labels_margin {
                                 painter.move_down().paint(marker.clone_with_char('|'));
                             }
@@ -336,16 +404,17 @@ impl<'a> CodeLine<'a> {
 
                         // Increase the labels margin by number of labels and if it's greater than one subtract one
                         /*
-                         *
-                         * احجز متغير س = 555؛
-                            ^^^^_^^^^^___~ ---من الممكن عدم جعل القيمة متغيرة
-                            |    |       |    من الممكن عدم جعل القيمة متغيرة  (remove extra one margin if they're more than one and we are on the first label in reverse)
-                            |    |       من الممكن عدم جعل القيمة متغيرة
-                            |    من الممكن عدم جعل القيمة متغيرة
-                            من الممكن عدم جعل القيمة متغيرة
- 
-                         */
-                        next_labels_margin += labels.len() - (labels.len() > 1 && next_labels_margin == 0) as usize;
+                        *
+                        * احجز متغير س = 555؛
+                           ^^^^_^^^^^___~ ---من الممكن عدم جعل القيمة متغيرة
+                           |    |       |    من الممكن عدم جعل القيمة متغيرة  (remove extra one margin if they're more than one and we are on the first label in reverse)
+                           |    |       من الممكن عدم جعل القيمة متغيرة
+                           |    من الممكن عدم جعل القيمة متغيرة
+                           من الممكن عدم جعل القيمة متغيرة
+
+                        */
+                        next_labels_margin +=
+                            labels.len() - (labels.len() > 1 && next_labels_margin == 0) as usize;
 
                         for (i, label) in labels.iter().enumerate() {
                             if i != 0 {
@@ -353,38 +422,40 @@ impl<'a> CodeLine<'a> {
                             }
                             painter.paint(marker.clone_with_str(label));
                         }
-                    }
-                    else if next_labels_margin == 0{
+                    } else if next_labels_margin == 0 {
                         // Increase the labels margin if we are on the first marker from reverse and there is no labels found
                         next_labels_margin += 1;
                     }
-                },
-                MarkerType::EndOfMultiLine { connection_margin, labels } => {
-
+                }
+                MarkerType::EndOfMultiLine {
+                    connection_margin,
+                    labels,
+                } => {
                     painter.move_right_by(*col);
-                    
+
                     let brush_pos = painter.current_brush_pos();
 
                     painter.move_left().paint(marker.clone());
 
-                    if !labels.is_empty(){
+                    if !labels.is_empty() {
                         // Note it increase the labels depth if they're equal
                         // as labels of multiline end markers have at least one depth greater than it's depth
-                        if next_labels_margin <= next_multline_margin && next_multline_margin != 0 { // This happen if it is not the first multiline
+                        if next_labels_margin <= next_multline_margin && next_multline_margin != 0 {
+                            // This happen if it is not the first multiline
                             next_labels_margin = next_multline_margin + 1; // Labels should be below
                         }
                         if next_labels_margin == 0 {
                             painter.move_to(brush_pos);
-                        }
-                        else {
+                        } else {
                             for _depth in 0..next_labels_margin {
                                 painter.move_down().paint(marker.clone_with_char('|'));
                             }
                             painter.move_down();
                         }
-                        
+
                         // Increase the labels margin by number of labels and if it's greater than one subtract one
-                        next_labels_margin += labels.len() - (labels.len() > 1 && next_labels_margin == 0) as usize;
+                        next_labels_margin +=
+                            labels.len() - (labels.len() > 1 && next_labels_margin == 0) as usize;
 
                         for (i, label) in labels.iter().enumerate() {
                             if i != 0 {
@@ -394,57 +465,56 @@ impl<'a> CodeLine<'a> {
                         }
                     }
 
-                    painter.move_to(brush_pos).move_down_by(next_multline_margin).move_left();
+                    painter
+                        .move_to(brush_pos)
+                        .move_down_by(next_multline_margin)
+                        .move_left();
 
-                    for _ in 0 .. *col {
+                    for _ in 0..*col {
                         painter.move_left().paint(marker.clone_with_char('_'));
                     }
-
 
                     connections_painter.move_down_by(next_multline_margin);
 
                     let margin = connection_margin.get().1;
-                    
+
                     free_connection_margins[margin] = true; // free this margin
 
                     let brush_pos = connections_painter.current_brush_pos();
 
-                    for _ in 0..=margin*2 {
-                        connections_painter.paint(
-                            marker.clone_with_char('_')
-                        ).move_right();
+                    for _ in 0..=margin * 2 {
+                        connections_painter
+                            .paint(marker.clone_with_char('_'))
+                            .move_right();
                     }
 
                     for _ in connection_margin.get().0..brush_pos.0 {
-                        connections_painter.paint(
-                            marker.clone_with_char('|')
-                        ).move_up();
+                        connections_painter
+                            .paint(marker.clone_with_char('|'))
+                            .move_up();
                     }
 
                     next_multline_margin += 1;
-                },
+                }
                 MarkerType::StartOfMultiLine { connection_margin } => {
-
                     // This is a special case when the multiline marker starts after spaces
                     // It will make the marker starts with `/` from connections sheet not from the normal sheet
                     /*
-                    * /      Code
-                    * | Code Code
-                    * |_________^
-                    */
+                     * /      Code
+                     * | Code Code
+                     * |_________^
+                     */
                     if col == min_col && min_col_is_after_spaces {
                         break; // No more iterations as it is the last column
                     }
 
-                    painter.move_right_by(*col).paint(
-                        marker.clone()
-                    );
+                    painter.move_right_by(*col).paint(marker.clone());
 
                     for _depth in 0..next_multline_margin {
                         painter.move_down().paint(marker.clone_with_char('|'));
                     }
 
-                    for _ in 0 .. *col {
+                    for _ in 0..*col {
                         painter.move_left().paint(marker.clone_with_char('_'));
                     }
 
@@ -470,23 +540,19 @@ impl<'a> CodeLine<'a> {
 
                     (*connection_margin).set((brush_pos.0, found_margin));
 
-                    for _ in 0..=found_margin*2 {
-                        connections_painter.paint(
-                            marker.clone_with_char('_')
-                        ).move_right();
+                    for _ in 0..=found_margin * 2 {
+                        connections_painter
+                            .paint(marker.clone_with_char('_'))
+                            .move_right();
                     }
 
                     next_multline_margin += 1;
-
-                },
+                }
             }
-
         }
 
         return Some(painter);
-
     }
-
 }
 
 #[derive(Clone)]
@@ -496,15 +562,20 @@ struct Marker<'a> {
 }
 
 impl<'a> Marker<'a> {
-
     #[inline]
     fn new_char(ch: char, style: Style) -> Self {
-        Self { sign: MarkerSign::Char(ch), style: style }
+        Self {
+            sign: MarkerSign::Char(ch),
+            style: style,
+        }
     }
 
     #[inline]
     fn new_str(s: &'a str, style: Style) -> Self {
-        Self { sign: MarkerSign::Str(s), style: style }
+        Self {
+            sign: MarkerSign::Str(s),
+            style: style,
+        }
     }
 
     #[inline]
@@ -516,7 +587,6 @@ impl<'a> Marker<'a> {
     fn clone_with_str(&self, s: &'a str) -> Self {
         Self::new_str(s, self.style)
     }
-
 }
 
 impl<'a> Display for Marker<'a> {
@@ -537,161 +607,248 @@ enum MarkerSign<'a> {
 }
 
 #[derive(Clone)]
-enum MarkerType<'a> {
-    OneLineStart { end_col: usize, labels: &'a [&'a str] },
+enum MarkerType {
+    OneLineStart {
+        end_col: usize,
+        labels: Vec<String>,
+    },
     StartOfMultiLine {
         /// This margin and the end marker counter-part should agree on the same margin to connect between them correctly
-        /// 
+        ///
         /// The first is the current row index of the brush of the connection painter
-        /// 
+        ///
         /// The second is the margin index found in the free connection margins array
-        /// 
+        ///
         /// The end counter-part is responsible to draw the connections from it to the position of the start counter-part
-        connection_margin: Rc<Cell<(usize, usize)>>
+        connection_margin: Rc<Cell<(usize, usize)>>,
     },
     EndOfMultiLine {
         /// This margin and the start marker counter-part should agree on the same margin to connect between them correctly
-        /// 
+        ///
         /// The first is the row index of the brush of the connection painter at the start counter-part
-        /// 
+        ///
         /// The second is the margin index found in the free connection margins array
-        /// 
+        ///
         /// The end counter-part is responsible to draw the connections from it to the position of the start counter-part
         connection_margin: Rc<Cell<(usize, usize)>>,
-        labels: &'a [&'a str],
+        labels: Vec<String>,
     },
+}
+
+#[cfg(test)]
+impl<'a> fmt::Debug for CodeReporter<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.writeln(
+            f,
+            "اختبار.نظم",
+            &[
+                "حجز متغير أ = 555؛",
+                "حجز متغير ب = 555؛",
+                "حجز متغير ج = 555؛",
+                "حجز متغير د = 555؛",
+                "حجز متغير ه = 555؛",
+                "حجز متغير و = 555؛",
+                "حجز متغير ز = 555؛",
+                "حجز متغير ح = 555؛",
+                "حجز متغير ك = 555؛",
+                "حجز متغير ل = 555؛",
+                "حجز متغير م = 555؛",
+                "حجز متغير ن = 555؛",
+                "حجز متغير ز = 555؛",
+            ],
+        )
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use std::{io::{self, Write}, process::Command};
+    use std::{
+        fmt::Debug,
+        io::{self, Write},
+        process::Command,
+    };
 
     use owo_colors::{Style, XtermColors};
 
-    use crate::span::Span;
+    use crate::{span::Span, DiagnosticPrint};
 
     use super::CodeReporter;
 
-    #[test]
-    fn test_reporting() {
-
-
+    fn rtl() {
         // RTL printing
         let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
-        io::stdout().write_all(&output.stdout[1..output.stdout.len()-1]).unwrap();
-        
-        let reporter = CodeReporter::new()
+        io::stdout()
+            .write_all(&output.stdout[1..output.stdout.len() - 1])
+            .unwrap();
+    }
+
+    #[test]
+    fn test_one_line() {
+        rtl();
+        let mut reporter = CodeReporter::new();
+
+        reporter.mark(
+            Span::new((0, 0), (0, 4)),
+            '?',
+            Style::new().blue().cyan(),
+            vec!["القيمة ليست متغيرة".to_string()],
+        );
+
+        println!("{:?}", reporter)
+    }
+
+    #[test]
+    fn test_multi_line() {
+        rtl();
+        let mut reporter = CodeReporter::new();
+
+        reporter.mark(
+            Span::new((0, 4), (1, 5)),
+            '^',
+            Style::new().red().bold(),
+            vec!["القيمة ليست متغيرة".to_string()],
+        );
+
+        println!("{:?}", reporter)
+    }
+
+    #[test]
+    fn test_reporting_complex() {
+        rtl();
+        let mut reporter = CodeReporter::new();
+
+        reporter
             .mark(
-                Span::new((0,0), (0,4)),
+                Span::new((0, 0), (0, 4)),
                 '?',
                 Style::new().blue().cyan(),
-                &["القيمة ليست متغيرة"],
+                vec!["القيمة ليست متغيرة".to_string()],
             )
             .mark(
-                Span::new((0,15), (0,18)),
+                Span::new((0, 15), (0, 18)),
                 '~',
                 Style::new().blue().green(),
-                &["القيمة ليست متغيرة", "القيمة ليست متغيرة", "القيمة ليست متغيرة"],
+                vec![
+                    "القيمة ليست متغيرة".to_string(),
+                    "القيمة ليست متغيرة".to_string(),
+                    "القيمة ليست متغيرة".to_string(),
+                ],
             )
             .mark(
-                Span::new((0,5), (0,10)),
+                Span::new((0, 5), (0, 10)),
                 '-',
                 Style::new().blue().bold(),
-                &["القيمة ليست متغيرة"],
+                vec!["القيمة ليست متغيرة".to_string()],
             )
             .mark(
-                Span::new((2,5), (2,10)),
+                Span::new((2, 5), (2, 10)),
                 '^',
                 Style::new().yellow().bold(),
-                &["القيمة ليست متغيرة", "القيمة ليست متغيرة"],
+                vec![
+                    "القيمة ليست متغيرة".to_string(),
+                    "القيمة ليست متغيرة".to_string(),
+                ],
             )
             .mark(
-                Span::new((1,5), (2,4)),
+                Span::new((1, 5), (2, 4)),
                 '^',
                 Style::new().red().bold(),
-                &["علامة طويلة", "علامة طويلة", "علامة طويلة", "علامة طويلة", "ما قولتلك يا بني علامة طويلة"],
+                vec![
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                    "ما قولتلك يا بني علامة طويلة".to_string(),
+                ],
             )
             .mark(
-                Span::new((1,15), (2,19)),
+                Span::new((1, 15), (2, 19)),
                 '^',
                 Style::new().color(XtermColors::FlushOrange).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
-                Span::new((0,13), (2,13)),
+                Span::new((0, 13), (2, 13)),
                 '^',
                 Style::new().color(XtermColors::PinkFlamingo).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
-                Span::new((1,0), (2,0)),
+                Span::new((1, 0), (2, 0)),
                 '^',
                 Style::new().color(XtermColors::Brown).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
-                Span::new((0,11), (1,4)),
+                Span::new((0, 11), (1, 4)),
                 '^',
                 Style::new().magenta().bold(),
-                &["علامة طويلة","علامة طويلة","علامة طويلة"],
+                vec![
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                ],
             )
             .mark(
-                Span::new((1,8), (1,10)),
+                Span::new((1, 8), (1, 10)),
                 '^',
                 Style::new().color(XtermColors::Bermuda).bold(),
-                &["علامة طويلة","علامة طويلة","علامة طويلة"],
+                vec![
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                    "علامة طويلة".to_string(),
+                ],
             )
             .mark(
-                Span::new((3,5), (6,10)),
+                Span::new((3, 5), (6, 10)),
                 '^',
                 Style::new().color(XtermColors::GreenYellow).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
-                Span::new((4,11), (5,5)),
+                Span::new((4, 11), (5, 5)),
                 '^',
                 Style::new().color(XtermColors::BayLeaf).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
-                Span::new((7,15), (7,19)),
+                Span::new((7, 15), (7, 19)),
                 '^',
                 Style::new().color(XtermColors::Dandelion).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
-                Span::new((7,0), (9,4)),
+                Span::new((7, 0), (9, 4)),
                 '^',
                 Style::new().color(XtermColors::Caramel).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
-                Span::new((7,5), (9,9)),
+                Span::new((7, 5), (9, 9)),
                 '^',
                 Style::new().color(XtermColors::CanCanPink).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
-                Span::new((7,10), (9,15)),
+                Span::new((7, 10), (9, 15)),
                 '^',
                 Style::new().color(XtermColors::DarkRose).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
-                Span::new((7,12), (9,19)),
+                Span::new((7, 12), (9, 19)),
                 '^',
                 Style::new().color(XtermColors::Dandelion).bold(),
-                &["علامة طويلة"],
+                vec!["علامة طويلة".to_string()],
             )
             .mark(
-                Span::new((11,5), (12,5)),
+                Span::new((11, 5), (12, 5)),
                 '^',
                 Style::new().color(XtermColors::Dandelion).bold(),
-                &["علامة طويلة"],
-            )
-        ;
+                vec!["علامة طويلة".to_string()],
+            );
 
-        println!("{}", reporter);
+        println!("{:?}", reporter);
     }
 }

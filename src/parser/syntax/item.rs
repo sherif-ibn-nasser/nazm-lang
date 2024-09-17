@@ -1,13 +1,19 @@
 use super::*;
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct Item {
-    pub(crate) visibility: Option<VisModifier>,
-    pub(crate) kind: ItemKind,
+pub(crate) enum FileItem {
+    WithVisModifier(ItemWithVisibility),
+    WithoutModifier(Item),
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) enum ItemKind {
+pub(crate) struct ItemWithVisibility {
+    pub(crate) visibility: VisModifier,
+    pub(crate) item: ParseResult<Item>,
+}
+
+#[derive(NazmcParse, Debug)]
+pub(crate) enum Item {
     Struct(Struct),
     Fn(Fn),
 }
@@ -30,8 +36,7 @@ pub(crate) enum StructKind {
 pub(crate) struct StructField {
     pub(crate) visibility: Option<VisModifier>,
     pub(crate) name: Id,
-    pub(crate) colon: ParseResult<ColonSymbol>,
-    pub(crate) typ: ParseResult<Type>,
+    pub(crate) typ: ParseResult<ColonWithType>,
 }
 
 generatePunctuatedItem!(StructField);
@@ -48,8 +53,9 @@ pub(crate) struct Fn {
     pub(crate) fn_keyword: FnKeyword,
     pub(crate) name: ParseResult<Id>,
     pub(crate) params_decl: ParseResult<FnParams>,
+    pub(crate) return_type: Option<ColonWithType>,
     /// This must be checked that it doesn't have a lambda arrow
-    pub(crate) block: ParseResult<LambdaExpr>,
+    pub(crate) body: ParseResult<LambdaExpr>,
 }
 
 #[derive(NazmcParse, Debug)]

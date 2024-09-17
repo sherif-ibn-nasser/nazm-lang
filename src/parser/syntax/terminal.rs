@@ -248,7 +248,7 @@ pub(crate) type BinOp = Terminal<BinOpToken>;
 pub(crate) type UnaryOp = Terminal<UnaryOpToken>;
 pub(crate) type LiteralExpr = Terminal<LiteralKind>;
 pub(crate) type VisModifier = Terminal<VisModifierToken>;
-pub(crate) type EOF = Terminal<EOFToken>;
+pub(crate) type Eof = Terminal<EOFToken>;
 
 macro_rules! match_peek_symbols {
     ($iter:ident, $symbol0:ident, $symbol1:ident, $symbol2:ident) => {
@@ -564,18 +564,26 @@ impl NazmcParse for ParseResult<VisModifier> {
                 span,
                 kind: TokenKind::Keyword(KeywordKind::Public),
                 ..
-            }) => Ok(Terminal {
-                span: *span,
-                data: VisModifierToken::Public,
-            }),
+            }) => {
+                let ok = Ok(Terminal {
+                    span: *span,
+                    data: VisModifierToken::Public,
+                });
+                iter.next_non_space_or_comment();
+                ok
+            }
             Some(Token {
                 span,
                 kind: TokenKind::Keyword(KeywordKind::Private),
                 ..
-            }) => Ok(Terminal {
-                span: *span,
-                data: VisModifierToken::Private,
-            }),
+            }) => {
+                let ok = Ok(Terminal {
+                    span: *span,
+                    data: VisModifierToken::Private,
+                });
+                iter.next_non_space_or_comment();
+                ok
+            }
             Some(_) => Err(ParseErr {
                 found_token_index: iter.peek_idx - 1,
             }),
@@ -584,13 +592,13 @@ impl NazmcParse for ParseResult<VisModifier> {
     }
 }
 
-impl NazmcParse for ParseResult<EOF> {
+impl NazmcParse for ParseResult<Eof> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(_) => Err(ParseErr {
                 found_token_index: iter.peek_idx - 1,
             }),
-            None => Ok(EOF {
+            None => Ok(Eof {
                 span: Span::default(),
                 data: EOFToken,
             }),

@@ -1,4 +1,4 @@
-use crate::{SymbolKind, Token};
+use crate::{SymbolKind, Token, TokenKind};
 
 use super::*;
 

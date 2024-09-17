@@ -5,9 +5,8 @@ pub(crate) enum Type {
     Path(SimplePath),
     Ptr(Box<PtrType>),
     Ref(Box<RefType>),
-    Paren(Box<ParenType>),
     Slice(Box<SliceType>),
-    Tuple(Box<TupleType>),
+    Paren(Box<ParenType>),
 }
 
 #[derive(NazmcParse, Debug)]
@@ -25,13 +24,6 @@ pub(crate) struct RefType {
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct ParenType {
-    pub(crate) open_paren: OpenParenthesisSymbol,
-    pub(crate) typ: ParseResult<Type>,
-    pub(crate) close_paren: ParseResult<CloseParenthesisSymbol>,
-}
-
-#[derive(NazmcParse, Debug)]
 pub(crate) struct SliceType {
     pub(crate) open_bracket: OpenSquareBracketSymbol,
     pub(crate) typ: ParseResult<Type>,
@@ -43,6 +35,18 @@ pub(crate) struct SliceType {
 pub(crate) struct ArraySizeExpr {
     pub(crate) semicolon: SemicolonSymbol,
     pub(crate) expr: ParseResult<Expr>,
+}
+
+#[derive(NazmcParse, Debug)]
+pub(crate) struct ParenType {
+    pub(crate) tuple: TupleType,
+    pub(crate) lambda: Option<LambdaType>,
+}
+
+#[derive(NazmcParse, Debug)]
+pub(crate) struct LambdaType {
+    pub(crate) r_arrow: RArrowSymbol,
+    pub(crate) typ: ParseResult<Type>,
 }
 
 generatePunctuatedItem!(Type);
