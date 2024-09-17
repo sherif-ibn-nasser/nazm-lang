@@ -62,6 +62,7 @@ impl<'a> LexerIter<'a> {
 
         if self.cursor.stopped_at.1 == '#' {
             let digits_len = self.cursor.stopped_at.0.col - start_col;
+            self.next_cursor(); // Skip "#" and stop on next digit
             let _ = self.next_hex_num_token(); // Fabricate and skip any hex digits and any suffixes
             return Err(LexerError {
                 token_idx: self.current_token_idx,
