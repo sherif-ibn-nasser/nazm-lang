@@ -1,4 +1,4 @@
-pub(crate) mod error;
+pub mod error;
 mod lexing_methods;
 mod token;
 
@@ -10,7 +10,7 @@ use std::str::Chars;
 use strum::IntoEnumIterator;
 pub use token::*;
 
-pub(crate) struct LexerIter<'a> {
+pub struct LexerIter<'a> {
     content: &'a str,
     cursor: CharsCursor<'a>,
     /// The byte index the cursor stopped at

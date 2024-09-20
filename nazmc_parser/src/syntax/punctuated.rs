@@ -1,5 +1,3 @@
-use crate::parser::*;
-
 macro_rules! generateDelimitedPunctuated {
     ($name:ident, $open_delim:ident, $item:ident, $close_delim:ident ) => {
         paste! {

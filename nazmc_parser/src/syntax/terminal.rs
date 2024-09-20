@@ -1,5 +1,5 @@
 use super::*;
-use crate::lexer::*;
+use nazmc_lexer::*;
 use paste::paste;
 use std::fmt::Debug;
 

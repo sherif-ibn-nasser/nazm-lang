@@ -1,10 +1,7 @@
 mod cli;
-mod lexer;
-mod parser;
 
-use lexer::*;
+use nazmc_parser::ParseCtx;
 use owo_colors::{OwoColorize, XtermColors};
-use parser::{syntax::File, tokens_iter::TokensIter, NazmcParse, ParseCtx, ParseResult};
 use std::{
     io::{self, Write},
     process::Command,

@@ -1,4 +1,4 @@
-use crate::{Token, TokenKind};
+use nazmc_lexer::{Token, TokenKind};
 
 pub(crate) struct TokensIter<'a> {
     pub(crate) peek_idx: usize,

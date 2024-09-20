@@ -1,8 +1,6 @@
 use std::rc::Rc;
 
-use error::*;
-
-use crate::lexer::*;
+use crate::*;
 
 impl<'a> LexerIter<'a> {
     pub(crate) fn next_str_or_char_token(&mut self) -> TokenKind {

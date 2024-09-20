@@ -1,4 +1,6 @@
+use error::*;
 use nazmc_diagnostics::{span::SpanCursor, CodeWindow, Diagnostic};
+use nazmc_lexer::*;
 use std::path::Path;
 use syntax::File;
 
@@ -6,8 +8,6 @@ pub(crate) mod parse_methods;
 pub(crate) mod syntax;
 pub(crate) mod tokens_iter;
 
-pub(crate) use crate::LexerIter;
-use crate::{error::*, NumKind, SymbolKind, Token, TokenKind};
 pub(crate) use nazmc_diagnostics::{span::Span, PhaseDiagnostics};
 pub(crate) use nazmc_parse_derive::*;
 pub(crate) use parse_methods::*;

@@ -8,9 +8,4 @@ edition = "2021"
 [dependencies]
 bpaf = { version = "*", features = ["derive"] }
 owo-colors = "*"
-documented = "*"
-strum = { version = "*", features = ["derive"] }
-itertools = "*"
-nazmc_diagnostics = { path = "nazmc_diagnostics" }
-paste = "*"
-nazmc_parse_derive = { path = "nazmc_parse_derive" }
+nazmc_parser = { path = "nazmc_parser" }
