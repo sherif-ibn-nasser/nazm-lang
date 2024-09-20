@@ -360,7 +360,7 @@ impl<'a> ParseErrorsReporter<'a> {
         let expected = if comma_err.found_token_index > err.found_token_index {
             expected
         } else {
-            "يُتوقع فاصلة `،`"
+            "فاصلة `،`"
         };
 
         self.report_expected(expected, &comma_err, secondary_labels);
@@ -448,7 +448,40 @@ impl<'a> ParseErrorsReporter<'a> {
 
         match kind {
             StructKind::Unit(_) => {}
-            StructKind::Tuple(tuple_type) => self.check_tuple_type(tuple_type),
+            StructKind::Tuple(TupleStructFields {
+                open_delim,
+                items,
+                close_delim,
+            }) => {
+                if let Some(PunctuatedTupleStructField {
+                    first_item,
+                    rest_items,
+                    trailing_comma: _,
+                }) = items
+                {
+                    match first_item {
+                        Ok(TupleStructField { visibility: _, typ }) => self.check_type_result(typ),
+                        Err(err) => {
+                            self.report_expected("نوع", err, vec![]);
+                        }
+                    }
+
+                    for field in rest_items {
+                        match field {
+                            Ok(CommaWithTupleStructField {
+                                comma: _,
+                                item: TupleStructField { visibility: _, typ },
+                            }) => self.check_type_result(typ),
+                            Err(err) => {
+                                self.report_expected_comma_or_item("نوع", err, vec![]);
+                            }
+                        }
+                    }
+                }
+                if close_delim.is_err() {
+                    self.report_unclosed_delimiter(open_delim.span);
+                }
+            }
             StructKind::Fields(StructFields {
                 open_delim,
                 items,
@@ -461,11 +494,7 @@ impl<'a> ParseErrorsReporter<'a> {
                 }) = &items
                 {
                     match first_item {
-                        Ok(StructField {
-                            visibility: _,
-                            name: _,
-                            typ,
-                        }) => match typ {
+                        Ok(StructField { typ, .. }) => match typ {
                             Ok(ColonWithType { colon: _, typ }) => self.check_type_result(typ),
                             Err(err) => self.report_expected("`:` ثم نوع الحقل", err, vec![]),
                         },
@@ -477,13 +506,8 @@ impl<'a> ParseErrorsReporter<'a> {
                     for field in rest_items {
                         match field {
                             Ok(CommaWithStructField {
-                                comma: _,
-                                item:
-                                    StructField {
-                                        visibility: _,
-                                        name: _,
-                                        typ,
-                                    },
+                                item: StructField { typ, .. },
+                                ..
                             }) => match typ {
                                 Ok(ColonWithType { colon: _, typ }) => self.check_type_result(typ),
                                 Err(err) => self.report_expected("`:` ثم نوع الحقل", err, vec![]),
@@ -555,15 +579,24 @@ impl<'a> ParseErrorsReporter<'a> {
                         Err(err) => self.report_expected("مُعامِل دالة", err, vec![]),
                     }
 
+                    let mut last_was_ok = true; // To not report errors that are next to each other
+
                     for param in rest_items {
                         match param {
-                            Ok(node) => match &node.item.typ {
-                                Ok(node) => self.check_type_result(&node.typ),
-                                Err(err) => self.report_expected("نوع لمُعامِل الدالة", err, vec![]),
-                            },
-                            Err(err) => {
-                                self.report_expected_comma_or_item("مُعامِل دالة", err, vec![])
+                            Ok(node) => {
+                                match &node.item.typ {
+                                    Ok(node) => self.check_type_result(&node.typ),
+                                    Err(err) => {
+                                        self.report_expected("نوع لمُعامِل الدالة", err, vec![])
+                                    }
+                                };
+                                last_was_ok = true;
                             }
+                            Err(err) if last_was_ok => {
+                                self.report_expected_comma_or_item("مُعامِل دالة", err, vec![]);
+                                last_was_ok = false;
+                            }
+                            _ => {}
                         }
                     }
                 }

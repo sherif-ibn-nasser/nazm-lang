@@ -28,9 +28,24 @@ pub(crate) struct Struct {
 #[derive(NazmcParse, Debug)]
 pub(crate) enum StructKind {
     Unit(SemicolonSymbol),
-    Tuple(TupleType),
+    Tuple(TupleStructFields),
     Fields(StructFields),
 }
+
+#[derive(NazmcParse, Debug)]
+pub(crate) struct TupleStructField {
+    pub(crate) visibility: Option<VisModifier>,
+    pub(crate) typ: ParseResult<Type>,
+}
+
+generatePunctuatedItem!(TupleStructField);
+
+generateDelimitedPunctuated!(
+    TupleStructFields,
+    OpenParenthesisSymbol,
+    TupleStructField,
+    CloseParenthesisSymbol
+);
 
 #[derive(NazmcParse, Debug)]
 pub(crate) struct StructField {
