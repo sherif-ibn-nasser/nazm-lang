@@ -1,5 +1,6 @@
 mod cli;
 
+use nazmc_display_table::DisplayTable;
 use nazmc_parser::ParseCtx;
 use owo_colors::{OwoColorize, XtermColors};
 use std::{
@@ -16,7 +17,9 @@ fn main() {
         .write_all(&output.stdout[1..output.stdout.len() - 1])
         .unwrap();
 
-    ParseCtx::new(&file_path, &file_content).parse();
+    let mut display_table = DisplayTable::new();
+
+    ParseCtx::new(&file_path, &file_content).parse(&mut display_table);
 
     // for Token { span, val, kind } in tokens {
     //     let color = match kind {

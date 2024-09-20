@@ -81,6 +81,7 @@ name = "nazmc"
 version = "0.1.0"
 dependencies = [
  "bpaf",
+ "nazmc_display_table",
  "nazmc_parser",
  "owo-colors",
 ]
@@ -94,12 +95,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nazmc_display_table"
+version = "0.1.0"
+
+[[package]]
 name = "nazmc_lexer"
 version = "0.1.0"
 dependencies = [
  "documented",
  "itertools",
  "nazmc_diagnostics",
+ "nazmc_display_table",
  "strum",
 ]
 
@@ -118,6 +124,7 @@ name = "nazmc_parser"
 version = "0.1.0"
 dependencies = [
  "nazmc_diagnostics",
+ "nazmc_display_table",
  "nazmc_lexer",
  "nazmc_parse_derive",
  "paste",

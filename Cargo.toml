@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 bpaf = { version = "*", features = ["derive"] }
 owo-colors = "*"
+nazmc_display_table = { path = "nazmc_display_table" }
 nazmc_parser = { path = "nazmc_parser" }

@@ -8,3 +8,4 @@ itertools = "*"
 documented = "*"
 strum = { version = "*", features = ["derive"] }
 nazmc_diagnostics = { path = "../nazmc_diagnostics" }
+nazmc_display_table = { path = "../nazmc_display_table" }

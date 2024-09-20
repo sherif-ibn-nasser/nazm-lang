@@ -1,5 +1,5 @@
 use super::*;
-use nazmc_lexer::*;
+use nazmc_display_table::DisplayIdx;
 use paste::paste;
 use std::fmt::Debug;
 
@@ -153,7 +153,7 @@ create_symbol_parser!(Hash);
 
 #[derive(Debug)]
 pub(crate) struct IdToken {
-    val: String,
+    display_idx: DisplayIdx,
 }
 
 #[derive(Debug)]
@@ -277,14 +277,14 @@ impl NazmcParse for ParseResult<Terminal<IdToken>> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(Token {
-                val,
+                val: _,
                 span,
-                kind: TokenKind::Id,
+                kind: TokenKind::Id(display_idx),
             }) => {
                 let ok = Ok(Terminal {
                     span: *span,
                     data: IdToken {
-                        val: val.to_string(),
+                        display_idx: *display_idx,
                     },
                 });
                 iter.next_non_space_or_comment();
@@ -616,8 +616,9 @@ mod tests {
     #[test]
     fn test() {
         let content = "دالة البداية(/* تعليق */){}";
+        let mut display_table = DisplayTable::new();
 
-        let lexer = LexerIter::new(content);
+        let lexer = LexerIter::new(content, &mut display_table);
         let (tokens, ..) = lexer.collect_all();
         let mut iter = TokensIter::new(&tokens);
         iter.next(); // Initialize the value of recent
@@ -641,7 +642,8 @@ mod tests {
     fn test_fail() {
         let content = "دالة البداية(عدد: ص8){}";
 
-        let lexer = LexerIter::new(content);
+        let mut display_table = DisplayTable::new();
+        let lexer = LexerIter::new(content, &mut display_table);
 
         let (tokens, ..) = lexer.collect_all();
         let mut iter = TokensIter::new(&tokens);

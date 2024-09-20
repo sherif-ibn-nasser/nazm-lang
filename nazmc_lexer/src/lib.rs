@@ -6,6 +6,7 @@ use documented::DocumentedVariants;
 use error::{LexerError, LexerErrorKind};
 use itertools::Itertools;
 use nazmc_diagnostics::span::{Span, SpanCursor};
+use nazmc_display_table::{DisplayTable, Init};
 use std::str::Chars;
 use strum::IntoEnumIterator;
 pub use token::*;
@@ -22,6 +23,7 @@ pub struct LexerIter<'a> {
     /// Errors
     errs: Vec<LexerError>,
     current_token_idx: usize,
+    display_table: &'a mut DisplayTable<Init>,
 }
 
 impl<'a> Iterator for LexerIter<'a> {
@@ -44,7 +46,7 @@ impl<'a> Iterator for LexerIter<'a> {
 }
 
 impl<'a> LexerIter<'a> {
-    pub fn new(content: &'a str) -> Self {
+    pub fn new(content: &'a str, display_table: &'a mut DisplayTable<Init>) -> Self {
         let mut _self = Self {
             content,
             cursor: CharsCursor::new(content),
@@ -53,6 +55,7 @@ impl<'a> LexerIter<'a> {
             current_line_start_bidx: 0,
             errs: vec![],
             current_token_idx: 0,
+            display_table,
         };
         _self.cursor.next(); // Init cursor::stopped_at with first char
         _self
@@ -275,6 +278,8 @@ impl<'a> LexerIter<'a> {
 
     fn next_id_or_keyword(&mut self) -> TokenKind {
         if !self.cursor.stopped_at.1.is_alphabetic() {
+            let c = self.cursor.stopped_at.1;
+            let display_idx = self.display_table.get(&c.to_string());
             self.next_cursor();
             self.errs.push(LexerError {
                 token_idx: self.current_token_idx,
@@ -282,7 +287,7 @@ impl<'a> LexerIter<'a> {
                 len: 1,
                 kind: LexerErrorKind::UnknownToken,
             });
-            return TokenKind::Id;
+            return TokenKind::Id(display_idx);
         }
 
         let start = self.stopped_at_bidx;
@@ -308,7 +313,9 @@ impl<'a> LexerIter<'a> {
             }
         }
 
-        TokenKind::Id
+        let display_idx = self.display_table.get(id);
+
+        TokenKind::Id(display_idx)
     }
 
     #[inline]
@@ -422,11 +429,16 @@ mod tests {
     use documented::DocumentedVariants;
     use itertools::Itertools;
     use nazmc_diagnostics::span::{Span, SpanCursor};
+    use nazmc_display_table::DisplayTable;
     use strum::IntoEnumIterator;
 
     #[test]
     fn test_lines() {
-        assert_eq!(vec![""], LexerIter::new("").collect_all().1);
+        let mut display_table = DisplayTable::new();
+        assert_eq!(
+            vec![""],
+            LexerIter::new("", &mut display_table).collect_all().1
+        );
 
         let content = concat!(
             "\n",
@@ -440,7 +452,7 @@ mod tests {
             "a\n",
         );
 
-        let lexer: LexerIter = LexerIter::new(content);
+        let lexer: LexerIter = LexerIter::new(content, &mut display_table);
 
         let (_, lines, _) = lexer.collect_all();
         let expected_lines = content.split('\n').collect_vec();
@@ -460,7 +472,7 @@ mod tests {
             "a",
         );
 
-        let lexer: LexerIter = LexerIter::new(content);
+        let lexer: LexerIter = LexerIter::new(content, &mut display_table);
 
         let (_, lines, _) = lexer.collect_all();
         let expected_lines = content.split('\n').collect_vec();
@@ -470,9 +482,12 @@ mod tests {
 
     #[test]
     fn test_symbols_lexing() {
+        let mut display_table = DisplayTable::new();
         for symbol in SymbolKind::iter() {
             let symbol_val = symbol.get_variant_docs().unwrap();
-            let Token { span, val, kind } = LexerIter::new(symbol_val).next().unwrap();
+            let Token { span, val, kind } = LexerIter::new(symbol_val, &mut display_table)
+                .next()
+                .unwrap();
             assert_eq!(
                 span,
                 Span {
@@ -493,7 +508,7 @@ mod tests {
             symbols_line.push_str(symbol_val);
         }
 
-        let tokens = LexerIter::new(&symbols_line);
+        let tokens = LexerIter::new(&symbols_line, &mut display_table);
         let mut symbols_iter = SymbolKind::iter();
         let mut columns = 0;
 
@@ -531,7 +546,7 @@ mod tests {
             symbols_line.push('\n');
         }
 
-        let mut tokens = LexerIter::new(&symbols_line);
+        let mut tokens = LexerIter::new(&symbols_line, &mut display_table);
         let mut symbols_iter = SymbolKind::iter();
         let mut lines = 0;
 
@@ -585,9 +600,12 @@ mod tests {
 
     #[test]
     fn test_keywords_lexing() {
+        let mut display_table = DisplayTable::new();
         for keyword in KeywordKind::iter() {
             let keyword_val = keyword.get_variant_docs().unwrap();
-            let Token { span, val, kind } = LexerIter::new(keyword_val).next().unwrap();
+            let Token { span, val, kind } = LexerIter::new(keyword_val, &mut display_table)
+                .next()
+                .unwrap();
             assert_eq!(
                 span,
                 Span {

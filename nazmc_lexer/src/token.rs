@@ -1,5 +1,6 @@
 use documented::DocumentedVariants;
 use nazmc_diagnostics::span::*;
+use nazmc_display_table::DisplayIdx;
 use std::rc::Rc;
 use strum::EnumIter;
 
@@ -19,7 +20,7 @@ pub enum TokenKind {
     LineComment,
     DelimitedComment,
     Literal(LiteralKind),
-    Id,
+    Id(DisplayIdx),
     Symbol(SymbolKind),
     Keyword(KeywordKind),
 }
