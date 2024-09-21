@@ -1,0 +1,12 @@
+[book]
+authors = ["sherif-ibn-nasser"]
+language = "ar"
+multilingual = false
+src = "src"
+title = "لغة نظم"
+
+[build]
+build-dir = "../docs"
+
+[output.html]
+additional-css = ["css/language-nazm.css"]

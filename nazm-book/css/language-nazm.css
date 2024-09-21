@@ -1,0 +1,9 @@
+
+pre.language-nazm > .buttons {
+    left: 0px;
+    right: inherit;
+}
+
+pre.language-nazm > code {
+    direction: rtl !important;
+}
