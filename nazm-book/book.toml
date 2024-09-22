@@ -12,6 +12,15 @@ use-default-preprocessors = true
 
 [output.html]
 additional-css = ["css/language-nazm.css"]
+additional-js = ["book.js", "change-titles.js"]
 
+[output.html.code.hidelines]
+"nazm" = "~"
+
+[output.html.print]
+enable = false
+
+[output.html.search]
+enable = false
 
 [preprocessor.nazm]
