@@ -1,18 +1,9 @@
-# Chapter 1
+# الفصل الأول
 
 ```نظم
-دالة البداية
-```
+تصنيف س؛
 
-```rust
-fn main(){
+دالة البداية(){
 
 }
 ```
-
-<pre class="language-nazm" data-highlighted="yes">
-    <code class="hljs"><span class ="hljs-keyword">دالة</span> <span class ="hljs-title">البداية</span>(){
-
-<span class ="hljs-title"> </span><span class ="hljs-title">⁠</span><span class ="hljs-title">⁠</span><span class ="hljs-title">⁠</span><span class ="hljs-title">⁠</span><span class ="hljs-title">⁠</span><span class ="hljs-title">⁠</span><span class ="hljs-title">⁠</span> <span class ="hljs-title"> </span> <span class ="hljs-title">اطبع</span>(<span class ="hljs-string">"هذا أول برنامج لي بلغة نظم"</span>)
-
-}</code></pre>

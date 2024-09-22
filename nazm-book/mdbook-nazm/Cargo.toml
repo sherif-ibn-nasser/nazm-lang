@@ -4,5 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+nazmc_display_table = { path = "../../nazmc_display_table" }
 nazmc_lexer = { path = "../../nazmc_lexer" }
 mdbook = "*"
+pulldown-cmark = "*"
+pulldown-cmark-to-cmark = "*"
+serde_json = "*"

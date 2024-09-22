@@ -3,7 +3,7 @@ pre.language-nazm > .buttons {
     position: absolute;
     left: 0px;
     right: unset;
-    top: 22px;
+    /* top: 22px; */
 }
 
 pre.language-nazm > code {

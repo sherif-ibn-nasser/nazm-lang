@@ -5,8 +5,13 @@ multilingual = false
 src = "src"
 title = "لغة نظم"
 
+
 [build]
 build-dir = "../docs"
+use-default-preprocessors = true
 
 [output.html]
 additional-css = ["css/language-nazm.css"]
+
+
+[preprocessor.nazm]
