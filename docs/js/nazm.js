@@ -7,6 +7,7 @@
     uni_b_s = `(?<=^|${symbols.source})`, // Start of a unicode word boundary
     uni_b_e = `(?=$|${symbols.source})`, // End of a unicode word boundary
     num_suffix = "([صط](1|2|4|8)?|ع(4|8))?" + uni_b_e,
+    escaped_char = /\\([\\0"'خفسرصج$]|ي[0-9a-fA-F]{4})/,
     keywords = [
       "تصدير",
       "تخصيص",
@@ -25,6 +26,7 @@
       "أرجع",
       "مؤكد",
       "محال",
+      "على",
     ],
     non_keywords = XRegExp(
       "(?!" + `(?:${keywords.join("|")})` + uni_b_e + ")",
@@ -37,6 +39,8 @@
         conjunction: "none",
       }
     );
+
+  console.log(`(${escaped_char.source}|.)`);
 
   var e = (() => {
     "use strict";
@@ -72,31 +76,45 @@
         contains: [
           e.C_LINE_COMMENT_MODE,
           e.COMMENT("/\\*", "\\*/"),
-          e.inherit(e.QUOTE_STRING_MODE, { begin: /b?"/, illegal: null }),
           {
-            className: "string",
-            variants: [
-              { begin: /b?r(#*)"(.|\n)*?"\1(?!#)/ },
+            scope: "string",
+            begin: '"',
+            end: '"',
+            illegal: ["\\n"],
+            contains: [
               {
-                begin: /b?'\\?(x\w{2}|u\w{4}|U\w{8}|.)'/,
+                scope: "char.escape",
+                match: escaped_char,
               },
             ],
           },
           {
-            className: "number",
+            scope: "string",
             variants: [
               {
-                begin: uni_b_s + "1#([01_]+)" + num_suffix,
+                begin: [/'/, escaped_char, /'/],
+                beginScope: { 2: "char.escape" },
               },
-              { begin: uni_b_s + "8#([0-7_]+)" + num_suffix },
-              { begin: uni_b_s + "10#([0-7_]+)" + num_suffix },
               {
-                begin: uni_b_s + "16#([A-Fa-f0-9_]+)" + num_suffix,
+                begin: /'.'/,
+              },
+            ],
+          },
+          {
+            scope: "number",
+            variants: [
+              {
+                begin: uni_b_s + "1#([01,]+)" + num_suffix,
+              },
+              { begin: uni_b_s + "8#([0-7,]+)" + num_suffix },
+              { begin: uni_b_s + "10#([0-7,]+)" + num_suffix },
+              {
+                begin: uni_b_s + "16#([A-Fa-f0-9,]+)" + num_suffix,
               },
               {
                 begin:
                   uni_b_s +
-                  "(\\d[\\d_]*(\\.[0-9_]+)?(\\^\\^[+-]?[0-9_]+)?)" +
+                  "(\\d[\\d,]*(\\.[0-9,]+)?(\\^\\^[+-]?[0-9,]+)?)" +
                   num_suffix,
               },
             ],
@@ -104,22 +122,21 @@
           },
           {
             begin: [/تصنيف/, /\s+/, _ident],
-            className: { 1: "keyword", 3: "title.class" },
+            beginScope: { 1: "keyword", 3: "title.class" },
           },
           {
             begin: [/دالة/, /\s+/, _ident],
-            className: { 1: "keyword", 3: "title.function" },
+            beginScope: { 1: "keyword", 3: "title.function" },
           },
           {
             begin: [/احجز/, /\s+/, /(?:متغير\s+)?/, _ident],
-            className: { 1: "keyword", 3: "keyword", 4: "variable" },
+            beginScope: { 1: "keyword", 3: "keyword", 4: "variable" },
           },
           {
-            className: "title.function.invoke",
+            scope: "title.function.invoke",
             relevance: 0,
             begin: invoke,
           },
-          // { className: "symbol", begin: symbols },
         ],
       };
     };
