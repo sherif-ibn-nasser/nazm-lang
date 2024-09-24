@@ -218,7 +218,7 @@ impl<'a> ParseErrorsReporter<'a> {
                     );
 
                     self.diagnostics.chain_on_last(Diagnostic::help(
-                        "اللاحقات الصالحة للعدد هى (ص، ص1، ص2، ص4، ص8، م، م1، م2، م4، م8، ع4، ع8)"
+                        "اللاحقات الصالحة للعدد هى (ص، ص1، ص2، ص4، ص8، ط، ط1، ط2، ط4، ط8، ع4، ع8)"
                             .to_string(),
                         None,
                     ));
@@ -245,7 +245,7 @@ impl<'a> ParseErrorsReporter<'a> {
                     );
 
                     self.diagnostics.chain_on_last(Diagnostic::help(
-                        "اللاحقات الصالحة للعدد الصحيح هى (ص، ص1، ص2، ص4، ص8، م، م1، م2، م4، م8)"
+                        "اللاحقات الصالحة للعدد الصحيح هى (ص، ص1، ص2، ص4، ص8، ط، ط1، ط2، ط4، ط8)"
                             .to_string(),
                         None,
                     ));
