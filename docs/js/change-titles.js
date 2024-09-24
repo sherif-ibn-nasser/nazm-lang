@@ -1,3 +1,4 @@
+// hljs.highlightAll();
 var themeToggle = document.getElementById("theme-toggle");
 
 if (themeToggle) {

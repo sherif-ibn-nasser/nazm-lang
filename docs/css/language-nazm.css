@@ -1,11 +1,10 @@
-
-pre.language-nazm > .buttons {
+.buttons:has( + code.language-nazm) {
     position: absolute;
     left: 0px;
     right: unset;
     /* top: 22px; */
 }
 
-pre.language-nazm > code {
+code.language-nazm {
     direction: rtl !important;
 }
