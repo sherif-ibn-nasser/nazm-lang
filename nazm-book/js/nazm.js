@@ -11,7 +11,7 @@
     keywords = [
       "تصدير",
       "تخصيص",
-      "تصنيف",
+      "هيكل",
       "دالة",
       "احجز",
       "متغير",
@@ -121,7 +121,7 @@
             relevance: 0,
           },
           {
-            begin: [/تصنيف/, /\s+/, _ident],
+            begin: [/هيكل/, /\s+/, _ident],
             beginScope: { 1: "keyword", 3: "title.class" },
           },
           {
