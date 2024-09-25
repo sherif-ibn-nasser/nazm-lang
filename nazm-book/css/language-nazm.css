@@ -2,9 +2,18 @@
     position: absolute;
     left: 0px;
     right: unset;
-    /* top: 22px; */
 }
 
 code.language-nazm {
+    direction: rtl !important;
+}
+
+.buttons:has( + code.rtl) {
+    position: absolute;
+    left: 0px;
+    right: unset;
+}
+
+code.rtl {
     direction: rtl !important;
 }
