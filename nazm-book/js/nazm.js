@@ -40,8 +40,6 @@
       }
     );
 
-  console.log(`(${escaped_char.source}|.)`);
-
   var e = (() => {
     "use strict";
 
@@ -104,10 +102,9 @@
             scope: "number",
             variants: [
               {
-                begin: uni_b_s + "1#([01,]+)" + num_suffix,
+                begin: uni_b_s + "2#([01,]+)" + num_suffix,
               },
               { begin: uni_b_s + "8#([0-7,]+)" + num_suffix },
-              { begin: uni_b_s + "10#([0-7,]+)" + num_suffix },
               {
                 begin: uni_b_s + "16#([A-Fa-f0-9,]+)" + num_suffix,
               },

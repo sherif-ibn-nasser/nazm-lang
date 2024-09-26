@@ -26,3 +26,5 @@ enable = false
 
 [output.html.search]
 enable = false
+
+[preprocessor.alerts]

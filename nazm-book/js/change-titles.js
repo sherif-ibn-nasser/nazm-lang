@@ -18,3 +18,20 @@ document.getElementById("rust").textContent = "بني";
 document.getElementById("coal").textContent = "كُحلي";
 document.getElementById("navy").textContent = "نيلي";
 document.getElementById("ayu").textContent = "غامق";
+
+const alerts = [
+  ["ملحوظة", "note"],
+  ["إرشاد", "tip"],
+  ["مهم", "important"],
+  ["تحذير", "warning"],
+  ["تنبيه", "caution"],
+];
+
+for (alert of alerts) {
+  document.querySelectorAll(`.mdbook-alerts-${alert[0]}`).forEach((e) => {
+    e.classList.replace(
+      `mdbook-alerts-${alert[0]}`,
+      `mdbook-alerts-${alert[1]}`
+    );
+  });
+}

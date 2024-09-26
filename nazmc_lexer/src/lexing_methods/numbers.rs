@@ -38,14 +38,6 @@ impl<'a> LexerIter<'a> {
             return self.next_num_sys_token(Base::Oct, |d| matches!(d, b'0'..=b'7'));
         }
 
-        if prefix.starts_with("10#") {
-            self.next_cursor();
-            self.next_cursor();
-            self.next_cursor();
-            self.next_cursor(); // Skip "10#" and stop on next digit
-            return self.next_num_sys_token(Base::Dec, |d| d.is_ascii_digit());
-        }
-
         if prefix.starts_with("16#") {
             self.next_cursor();
             self.next_cursor();
