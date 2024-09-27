@@ -10,6 +10,7 @@ title = "لغة نظم"
 build-dir = "../docs"
 
 [output.html]
+mathjax-support = true
 additional-css = ["css/language-nazm.css"]
 additional-js = [
     "highlight.js",

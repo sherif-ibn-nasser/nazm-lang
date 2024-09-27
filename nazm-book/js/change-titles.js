@@ -35,3 +35,7 @@ for (alert of alerts) {
     );
   });
 }
+
+document.querySelectorAll(".mdbook-alerts").forEach((e) => {
+  e.style.borderLeft = "none";
+});

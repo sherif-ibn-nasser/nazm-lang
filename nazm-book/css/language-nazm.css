@@ -17,3 +17,7 @@ code.language-nazm {
 code.rtl {
     direction: rtl !important;
 }
+
+.mdbook-alerts {
+    border-right: 0.25em solid  var(--mdbook-alerts-color);
+}
