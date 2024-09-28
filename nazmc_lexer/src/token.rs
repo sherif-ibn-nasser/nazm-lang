@@ -123,7 +123,7 @@ pub enum KeywordKind {
     Mut,
     /// ثابت
     Const,
-    /// تصنيف
+    /// هيكل
     Struct,
     /// تصدير
     Public,

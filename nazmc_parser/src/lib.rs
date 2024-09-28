@@ -218,7 +218,7 @@ impl<'a> ParseErrorsReporter<'a> {
                     );
 
                     self.diagnostics.chain_on_last(Diagnostic::help(
-                        "اللاحقات الصالحة للعدد هى (ص، ص1، ص2، ص4، ص8، م، م1، م2، م4، م8، ع4، ع8)"
+                        "اللاحقات الصالحة للعدد هى (ص، ص1، ص2، ص4، ص8، ط، ط1، ط2، ط4، ط8، ع4، ع8)"
                             .to_string(),
                         None,
                     ));
@@ -245,7 +245,7 @@ impl<'a> ParseErrorsReporter<'a> {
                     );
 
                     self.diagnostics.chain_on_last(Diagnostic::help(
-                        "اللاحقات الصالحة للعدد الصحيح هى (ص، ص1، ص2، ص4، ص8، م، م1، م2، م4، م8)"
+                        "اللاحقات الصالحة للعدد الصحيح هى (ص، ص1، ص2، ص4، ص8، ط، ط1، ط2، ط4، ط8)"
                             .to_string(),
                         None,
                     ));
@@ -376,7 +376,7 @@ impl<'a> ParseErrorsReporter<'a> {
     }
 
     fn check_file_items(&mut self, items: &[ParseResult<FileItem>]) {
-        let expected = "عنصر ملف (دالة أو تصنيف)";
+        let expected = "عنصر ملف (دالة أو هيكل)";
         for item in items {
             let node = match item {
                 Ok(node) => node,
@@ -391,7 +391,7 @@ impl<'a> ParseErrorsReporter<'a> {
                     Ok(item) => item,
                     Err(_) => {
                         self.report(
-                            "يُتوقع عنصر ملف (دالة أو تصنيف) بعد مُعامِل الوصول".to_string(),
+                            "يُتوقع عنصر ملف (دالة أو هيكل) بعد مُعامِل الوصول".to_string(),
                             visibility.span,
                             "مُعامِل الوصول".to_string(),
                             vec![],
@@ -421,7 +421,7 @@ impl<'a> ParseErrorsReporter<'a> {
 
         if missing_name && missing_decl {
             self.report(
-                "لم يتم تعريف التصنيف".to_string(),
+                "لم يتم تعريف الهيكل".to_string(),
                 struct_keyword.span,
                 "".to_string(),
                 vec![],
@@ -431,7 +431,7 @@ impl<'a> ParseErrorsReporter<'a> {
 
         if missing_name {
             self.report(
-                "يجب إعطاء اسم للتصنيف".to_string(),
+                "يجب إعطاء اسم للهيكل".to_string(),
                 struct_keyword.span,
                 "".to_string(),
                 vec![],
@@ -441,7 +441,7 @@ impl<'a> ParseErrorsReporter<'a> {
         let kind = match kind {
             Ok(kind) => kind,
             Err(err) => {
-                self.report_expected("بعد التصنيف `؛` أو `{` أو `(`", err, vec![]);
+                self.report_expected("بعد الهيكل `؛` أو `{` أو `(`", err, vec![]);
                 return;
             }
         };
@@ -937,7 +937,7 @@ impl<'a> ParseErrorsReporter<'a> {
             AtomicExpr::Struct(StructExpr { dot: _, path, init }) => {
                 match path {
                     Ok(simple_path) => self.check_simple_path(simple_path),
-                    Err(err) => self.report_expected("اسم تصنيف أو مساره", err, vec![]),
+                    Err(err) => self.report_expected("اسم هيكل أو مساره", err, vec![]),
                 }
 
                 match init {

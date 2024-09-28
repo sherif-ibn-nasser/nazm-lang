@@ -38,14 +38,6 @@ impl<'a> LexerIter<'a> {
             return self.next_num_sys_token(Base::Oct, |d| matches!(d, b'0'..=b'7'));
         }
 
-        if prefix.starts_with("10#") {
-            self.next_cursor();
-            self.next_cursor();
-            self.next_cursor();
-            self.next_cursor(); // Skip "10#" and stop on next digit
-            return self.next_num_sys_token(Base::Dec, |d| d.is_ascii_digit());
-        }
-
         if prefix.starts_with("16#") {
             self.next_cursor();
             self.next_cursor();
@@ -278,7 +270,7 @@ impl<'a> LexerIter<'a> {
         let id = &self.content[start..end];
 
         match id {
-            "ص1" | "ص2" | "ص4" | "ص8" | "ص" | "م1" | "م2" | "م4" | "م8" | "م" | "ع4" | "ع8" => {
+            "ص1" | "ص2" | "ص4" | "ص8" | "ص" | "ط1" | "ط2" | "ط4" | "ط8" | "ط" | "ع4" | "ع8" => {
                 Ok(id)
             }
             _ => Err(LexerError {
@@ -342,35 +334,35 @@ fn to_int_token(
         };
     }
 
-    if suffix_str == "م" {
+    if suffix_str == "ط" {
         return match usize::from_str_radix(digits, radix) {
             Ok(num) => Ok(NumKind::U(num)),
             Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::U(0)),
         };
     }
 
-    if suffix_str == "م1" {
+    if suffix_str == "ط1" {
         return match u8::from_str_radix(digits, radix) {
             Ok(num) => Ok(NumKind::U1(num)),
             Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::U1(0)),
         };
     }
 
-    if suffix_str == "م2" {
+    if suffix_str == "ط2" {
         return match u16::from_str_radix(digits, radix) {
             Ok(num) => Ok(NumKind::U2(num)),
             Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::U2(0)),
         };
     }
 
-    if suffix_str == "م4" {
+    if suffix_str == "ط4" {
         return match u32::from_str_radix(digits, radix) {
             Ok(num) => Ok(NumKind::U4(num)),
             Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::U4(0)),
         };
     }
 
-    if suffix_str == "م8" {
+    if suffix_str == "ط8" {
         return match u64::from_str_radix(digits, radix) {
             Ok(num) => Ok(NumKind::U8(num)),
             Err(_) => num_is_out_of_range_bad_token(start_col, len, NumKind::U8(0)),

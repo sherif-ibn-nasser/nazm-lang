@@ -301,9 +301,9 @@ impl<'a> LexerIter<'a> {
 
         let id = &self.content[start..end];
 
-        if id == "مؤكد" {
+        if id == "صحيح" {
             return TokenKind::Literal(LiteralKind::Bool(true));
-        } else if id == "محال" {
+        } else if id == "فاسد" {
             return TokenKind::Literal(LiteralKind::Bool(false));
         }
 
