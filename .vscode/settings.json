@@ -1,6 +1,0 @@
-{
-    "rust-analyzer.linkedProjects": [
-        "${workspaceFolder}/Cargo.toml",
-        "${workspaceFolder}/nazm-book/mdbook-nazm/Cargo.toml",
-    ]
-}
