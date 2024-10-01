@@ -17,7 +17,7 @@ document.getElementById("light").textContent = "فاتح";
 document.getElementById("rust").textContent = "بني";
 document.getElementById("coal").textContent = "كُحلي";
 document.getElementById("navy").textContent = "نيلي";
-document.getElementById("ayu").textContent = "غامق";
+document.getElementById("ayu").textContent = "داكن";
 
 const alerts = [
   ["ملحوظة", "note"],
