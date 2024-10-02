@@ -125,6 +125,8 @@ pub enum KeywordKind {
     Const,
     /// هيكل
     Struct,
+    /// تصنيف
+    Enum,
     /// تصدير
     Public,
     /// تخصيص
