@@ -118,13 +118,11 @@ create_keyword_parser!(On);
 create_keyword_parser!(If);
 create_keyword_parser!(Else);
 create_keyword_parser!(When);
-create_keyword_parser!(Loop);
 create_keyword_parser!(While);
 create_keyword_parser!(Do);
 create_keyword_parser!(Break);
 create_keyword_parser!(Continue);
 create_keyword_parser!(Return);
-create_keyword_parser!(Run);
 
 create_symbol_parser!(Comma);
 create_symbol_parser!(Semicolon);

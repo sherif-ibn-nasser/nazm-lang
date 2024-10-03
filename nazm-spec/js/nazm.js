@@ -20,7 +20,6 @@
       "لو",
       "وإلا",
       "عندما",
-      "تكرار",
       "طالما",
       "وصل",
       "قطع",
@@ -34,7 +33,7 @@
       "u"
     ),
     invoke = XRegExp.union(
-      [XRegExp(uni_b_s), non_keywords, _ident, XRegExp(uni_b_e), /(?=\s*[{(])/],
+      [XRegExp(uni_b_s), non_keywords, _ident, XRegExp(uni_b_e), /(?=\s*\()/],
       "u",
       {
         conjunction: "none",

@@ -139,8 +139,6 @@ pub enum KeywordKind {
     Else,
     /// عندما
     When,
-    /// تكرار
-    Loop,
     /// طالما
     While,
     /// افعل
@@ -151,6 +149,4 @@ pub enum KeywordKind {
     Continue,
     /// أرجع
     Return,
-    /// تشغيل
-    Run,
 }

@@ -29,3 +29,8 @@
   - [تعبيرات الاستدعاء](expressions/call_expressions.md)
   - [تعبيرات العمليات](expressions/operators_expressions.md)
   - [تعبيرات بين قوسين](expressions/parens_expressions.md)
+  - [تعبيرات لو](expressions/if_expressions.md)
+  - [تعبيرات طالما](expressions/while_expressions.md)
+  - [تعبيرات الوصل](expressions/continue_expressions.md)
+  - [تعبيرات القطع](expressions/break_expressions.md)
+  - [تعبيرات إرجاع القيم](expressions/return_expressions.md)

@@ -989,8 +989,9 @@ impl<'a> ParseErrorsReporter<'a> {
     fn check_expr_with_block(&mut self, expr: &ExprWithBlock) {
         match expr {
             ExprWithBlock::If(if_expr) => {
-                if let Err(err) = &if_expr.conditional_block.condition {
-                    self.report_expected("تعبير برمجي (شرط `لو`)", err, vec![]);
+                match &if_expr.conditional_block.condition {
+                    Ok(expr) => self.check_expr(expr),
+                    Err(err) => self.report_expected("تعبير برمجي (شرط `لو`)", err, vec![]),
                 }
 
                 match &if_expr.conditional_block.block {
@@ -1002,8 +1003,11 @@ impl<'a> ParseErrorsReporter<'a> {
                     conditional_block, ..
                 } in &if_expr.else_ifs
                 {
-                    if let Err(err) = &conditional_block.condition {
-                        self.report_expected("تعبير برمجي (شرط `وإلا لو`)", err, vec![]);
+                    match &conditional_block.condition {
+                        Ok(expr) => self.check_expr(expr),
+                        Err(err) => {
+                            self.report_expected("تعبير برمجي (شرط `وإلا لو`)", err, vec![])
+                        }
                     }
 
                     match &conditional_block.block {
@@ -1023,13 +1027,13 @@ impl<'a> ParseErrorsReporter<'a> {
                     }
                 }
             }
-
             ExprWithBlock::While(WhileExpr {
                 while_keyword: _,
                 conditional_block,
             }) => {
-                if let Err(err) = &conditional_block.condition {
-                    self.report_expected("تعبير برمجي (شرط `طالما`)", err, vec![]);
+                match &conditional_block.condition {
+                    Ok(expr) => self.check_expr(expr),
+                    Err(err) => self.report_expected("تعبير برمجي (شرط `طالما`)", err, vec![]),
                 }
 
                 match &conditional_block.block {
@@ -1037,17 +1041,6 @@ impl<'a> ParseErrorsReporter<'a> {
                     Err(err) => self.report_expected("محتوى `طالما`", err, vec![]),
                 }
             }
-            ExprWithBlock::Loop(LoopExpr {
-                loop_keyword: _,
-                block,
-            }) => match &block {
-                Ok(block) => self.check_non_lambda_expr(block),
-                Err(err) => self.report_expected("محتوى `تكرار`", err, vec![]),
-            },
-            ExprWithBlock::Run(RunExpr { run: _, block }) => match &block {
-                Ok(block) => self.check_non_lambda_expr(block),
-                Err(err) => self.report_expected("محتوى `تشغيل`", err, vec![]),
-            },
             ExprWithBlock::When(_) => todo!(),    // TODO
             ExprWithBlock::DoWhile(_) => todo!(), // TODO
         }
