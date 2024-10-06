@@ -284,7 +284,7 @@ impl<'a> LexerIter<'a> {
             self.next_cursor();
             self.errs.push(LexerError {
                 token_idx: self.current_token_idx,
-                col: self.cursor.stopped_at.0.col,
+                col: self.cursor.stopped_at.0.col - 1,
                 len: 1,
                 kind: LexerErrorKind::UnknownToken,
             });

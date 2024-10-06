@@ -112,13 +112,7 @@ impl<'a> LexerIter<'a> {
             digits.push('.');
 
             // Append digits after the dot
-            while let Some((_, ch)) = self.next_cursor_non_eol() {
-                if ch.is_ascii_digit() {
-                    digits.push(ch);
-                } else if ch != ',' {
-                    break;
-                } // Skip commas
-            }
+            self.skip_digits_and_commas(&mut digits);
         }
 
         let dot_or_exp = &self.content[self.stopped_at_bidx..];
@@ -136,15 +130,10 @@ impl<'a> LexerIter<'a> {
 
             match self.cursor.stopped_at.1 {
                 '0'..='9' => {
-                    digits.push(self.cursor.stopped_at.1); // Append the first digit
-                                                           // Append digits after the exponent
-                    while let Some((_, ch)) = self.next_cursor_non_eol() {
-                        if ch.is_ascii_digit() {
-                            digits.push(ch);
-                        } else if ch != ',' {
-                            break;
-                        } // Skip commas
-                    }
+                    // Append the first digit
+                    digits.push(self.cursor.stopped_at.1);
+                    // Append digits after the exponent
+                    self.skip_digits_and_commas(&mut digits);
                 }
                 _ => {
                     return Err(LexerError {
@@ -164,6 +153,58 @@ impl<'a> LexerIter<'a> {
         to_float_token(&digits, suffix_str, start_col, digits_len)
     }
 
+    fn skip_hexdigits_and_commas(&mut self, digits: &mut String) {
+        let mut last_commas_len = 0;
+
+        while let Some((_, ch)) = self.next_cursor_non_eol() {
+            if ch.is_ascii_hexdigit() {
+                digits.push(ch);
+                last_commas_len = 0;
+            }
+            // Skip commas
+            else if ch == ',' {
+                last_commas_len += 1;
+            } else {
+                break;
+            }
+        }
+
+        if last_commas_len > 0 {
+            self.errs.push(LexerError {
+                token_idx: self.current_token_idx,
+                col: self.cursor.stopped_at.0.col - last_commas_len,
+                len: last_commas_len,
+                kind: LexerErrorKind::DigitsEndWithCommma,
+            });
+        }
+    }
+
+    fn skip_digits_and_commas(&mut self, digits: &mut String) {
+        let mut last_commas_len = 0;
+
+        while let Some((_, ch)) = self.next_cursor_non_eol() {
+            if ch.is_ascii_digit() {
+                digits.push(ch);
+                last_commas_len = 0;
+            }
+            // Skip commas
+            else if ch == ',' {
+                last_commas_len += 1;
+            } else {
+                break;
+            }
+        }
+
+        if last_commas_len > 0 {
+            self.errs.push(LexerError {
+                token_idx: self.current_token_idx,
+                col: self.cursor.stopped_at.0.col - last_commas_len,
+                len: last_commas_len,
+                kind: LexerErrorKind::DigitsEndWithCommma,
+            });
+        }
+    }
+
     fn next_digits_array(&mut self) -> String {
         let stopped_char = self.cursor.stopped_at.1;
         let mut digits = String::new();
@@ -174,13 +215,7 @@ impl<'a> LexerIter<'a> {
 
         digits.push(stopped_char);
 
-        while let Some((_, ch)) = self.next_cursor_non_eol() {
-            if ch.is_ascii_digit() {
-                digits.push(ch);
-            } else if ch != ',' {
-                break;
-            } // Skip commas
-        }
+        self.skip_digits_and_commas(&mut digits);
 
         digits
     }
@@ -229,13 +264,7 @@ impl<'a> LexerIter<'a> {
 
         digits.push(stopped_char);
 
-        while let Some((_, ch)) = self.next_cursor_non_eol() {
-            if ch.is_ascii_hexdigit() {
-                digits.push(ch);
-            } else if ch != ',' {
-                break;
-            } // Skip commas
-        }
+        self.skip_hexdigits_and_commas(&mut digits);
 
         let digits_len = self.cursor.stopped_at.0.col - prefix_end_col;
         let suffix = self.next_valid_num_suffix();

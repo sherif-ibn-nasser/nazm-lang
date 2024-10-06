@@ -32,4 +32,5 @@ pub enum LexerErrorKind {
     InvalidIntSuffix,
     InvalidDigitForBase(Base),
     NumIsOutOfRange(NumKind),
+    DigitsEndWithCommma,
 }

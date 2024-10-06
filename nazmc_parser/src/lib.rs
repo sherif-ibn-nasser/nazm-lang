@@ -292,6 +292,20 @@ impl<'a> ParseErrorsReporter<'a> {
                         None,
                     ));
                 }
+                LexerErrorKind::DigitsEndWithCommma => {
+                    let (msg, label) = if err.len > 1 {
+                        (
+                            "تم العثور على فواصل `,` بعد الأرقام",
+                            "قُم بإزالة هذه الفواصل",
+                        )
+                    } else {
+                        (
+                            "تم العثور على فاصلة `,` بعد الأرقام",
+                            "قُم بإزالة هذه الفاصلة",
+                        )
+                    };
+                    self.report(msg.to_string(), err_span, label.to_string(), vec![]);
+                }
             };
         }
     }
