@@ -110,6 +110,7 @@ create_keyword_parser!(Fn);
 create_keyword_parser!(Let);
 create_keyword_parser!(Mut);
 create_keyword_parser!(Const);
+create_keyword_parser!(Static);
 create_keyword_parser!(Struct);
 create_keyword_parser!(Enum);
 create_keyword_parser!(Public);

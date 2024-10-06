@@ -21,16 +21,35 @@
 
 # التحليل النحوي
 
+- [الأنواع]()
+
 - [التعبيرات البرمجية](expressions.md)
+
   - [تعبيرات القيم](expressions/literal_expressions.md)
   - [تعبيرات المسار](expressions/paths_expressions.md)
-  - [تعبيرات الهياكل](expressions/struct_expressions.md)
   - [تعبيرات لامدا](expressions/lambda_expressions.md)
   - [تعبيرات الاستدعاء](expressions/call_expressions.md)
+  - [تعبيرات الهياكل](expressions/struct_expressions.md)
+  - [تعبيرات الوصول إلى الحقول](expressions/fields_expressions.md)
+  - [تعبيرات 'على']()
+  - [تعبيرات المصفوفات](expressions/arrays_expressions.md)
+  - [تعبيرات الفهارس](expressions/indexing_expressions.md)
+  - [تعبيرات التراتيب](expressions/tuples_expressions.md)
   - [تعبيرات العمليات](expressions/operators_expressions.md)
   - [تعبيرات بين قوسين](expressions/parens_expressions.md)
-  - [تعبيرات لو](expressions/if_expressions.md)
-  - [تعبيرات طالما](expressions/while_expressions.md)
-  - [تعبيرات الوصل](expressions/continue_expressions.md)
-  - [تعبيرات القطع](expressions/break_expressions.md)
-  - [تعبيرات إرجاع القيم](expressions/return_expressions.md)
+  - [تعبيرات 'لو'](expressions/if_expressions.md)
+  - [تعبيرات 'عندما']()
+  - [تعبيرات 'وصل'](expressions/continue_expressions.md)
+  - [تعبيرات 'قطع'](expressions/break_expressions.md)
+  - [تعبيرات 'أرجع'](expressions/return_expressions.md)
+
+- [الجُمَل البرمجية]()
+
+- [العناصر]()
+
+  - [الدوال]()
+  - [الهياكل]()
+  - [التصانيف]()
+  - [الاتحادات]()
+  - [الثوابت]()
+  - [المتغيرات المشتركة]()
