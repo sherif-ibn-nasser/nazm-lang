@@ -123,8 +123,12 @@ pub enum KeywordKind {
     Mut,
     /// ثابت
     Const,
+    /// مشترك
+    Static,
     /// هيكل
     Struct,
+    /// تصنيف
+    Enum,
     /// تصدير
     Public,
     /// تخصيص
@@ -137,8 +141,6 @@ pub enum KeywordKind {
     Else,
     /// عندما
     When,
-    /// تكرار
-    Loop,
     /// طالما
     While,
     /// افعل
@@ -149,6 +151,4 @@ pub enum KeywordKind {
     Continue,
     /// أرجع
     Return,
-    /// تشغيل
-    Run,
 }

@@ -176,11 +176,12 @@ impl<'a> LexerIter<'a> {
             }
             '0'..='9' => self.next_num_token(),
             '\'' | '\"' => self.next_str_or_char_token(),
-            '\t' | '\x0C' | '\r' | ' ' => {
+            '\t' | '\x0b' | '\x0C' | '\r' | ' ' => {
                 while self
                     .next_cursor()
-                    .is_some_and(|(_, ch)| ch.is_ascii_whitespace() && ch != '\n')
-                {} // Skip whitespaces
+                    .is_some_and(|(_, ch)| (ch == '\x0b' || ch.is_ascii_whitespace()) && ch != '\n')
+                {
+                } // Skip whitespaces
                 TokenKind::Space
             }
             _ => {

@@ -100,10 +100,8 @@ pub(crate) enum StructInit {
 pub(crate) enum ExprWithBlock {
     If(IfExpr),
     When(WhenExpr),
-    Loop(LoopExpr),
     While(WhileExpr),
     DoWhile(DoWhileExpr),
-    Run(RunExpr),
 }
 
 #[derive(NazmcParse, Debug)]
