@@ -1,195 +1,126 @@
-use std::rc::Rc;
-
 use crate::*;
 
 impl<'a> LexerIter<'a> {
-    pub(crate) fn next_str_or_char_token(&mut self) -> TokenKind {
-        let (start, quote) = self.cursor.stopped_at;
-
-        let is_char = quote == '\'';
-
-        let mut rust_str_lit = String::new();
-
-        let mut errs = vec![];
+    pub fn next_valid_nazm_rust_char_in_str(
+        &mut self,
+        mut chars: Chars,
+        mut start_col: usize,
+    ) -> String {
+        let mut str = String::new();
 
         loop {
-            match self.next_valid_nazm_rust_char_in_str(quote) {
-                Err(mut err) => {
-                    if err.kind == LexerErrorKind::UnclosedStr {
-                        if is_char {
-                            err.kind = LexerErrorKind::UnclosedChar;
-                        }
-                        self.errs.push(err);
+            let Some(ch) = chars.next() else {
+                break;
+            };
 
-                        return if is_char {
-                            TokenKind::Literal(LiteralKind::Char('\0'))
-                        } else {
-                            TokenKind::Literal(LiteralKind::Str(Rc::new("".to_string())))
-                        }; // Return unclosed delimiter errors early before validation of typed chars
-                    }
+            start_col += 1;
 
-                    errs.push(err);
+            if ch != '\\' {
+                if is_kufr_or_unsupported_character(ch) {
+                    self.errs.push(LexerError {
+                        token_idx: self.current_token_idx,
+                        col: start_col,
+                        len: 1,
+                        kind: LexerErrorKind::KufrOrInvalidChar,
+                    });
+                } else {
+                    str.push(ch);
+                };
+                continue;
+            }
+
+            start_col += 1;
+
+            match chars.next() {
+                Some('خ') => str.push('\x08'), // مسافة للخلف
+                Some('ر') => str.push('\x0b'), // مسافة رأسية
+                Some('ص') => str.push('\x0c'), // الصفحة التالية
+                Some('ف') => str.push('\t'),   // مسافة أفقية
+                Some('س') => str.push('\n'),   // سطر جديد
+                Some('ج') => str.push('\r'),   // إرجاع المؤشر إلى بداية السطر، وبدء الكتابة منه
+                Some('\\') => str.push('\\'),
+                Some('\'') => str.push('\''),
+                Some('\"') => str.push('\"'),
+                Some('0') => str.push('\0'),
+                Some('ي') => {
+                    start_col += 1;
+                    let ch = self.next_unicode_char(&mut chars, start_col);
+                    start_col += 3;
+                    str.push(ch);
                 }
-                Ok(option) => match option {
-                    Some(ch) => rust_str_lit.push(ch),
-                    None => {
-                        self.next_cursor();
-                        break;
-                    } // The string is closed
-                },
+                _ => {
+                    str.push('\0');
+                    self.errs.push(LexerError {
+                        token_idx: self.current_token_idx,
+                        col: start_col,
+                        len: 1,
+                        kind: LexerErrorKind::UnknownEscapeSequence,
+                    });
+                }
             }
         }
 
-        if !is_char {
-            self.errs.append(&mut errs);
-            return TokenKind::Literal(LiteralKind::Str(Rc::new(rust_str_lit)));
-        }
-
-        let mut iter = rust_str_lit.chars();
-
-        let ch = match iter.next() {
-            None => {
-                self.errs.push(LexerError {
-                    token_idx: self.current_token_idx,
-                    col: start.col,
-                    len: 1,
-                    kind: LexerErrorKind::ZeroChars,
-                }); // Skip literal errors and show only this error
-                return TokenKind::Literal(LiteralKind::Char('\0'));
-            }
-            Some(ch) => ch,
-        };
-
-        if iter.next().is_some() {
-            self.errs.push(LexerError {
-                token_idx: self.current_token_idx,
-                col: start.col,
-                len: 1,
-                kind: LexerErrorKind::ManyChars,
-            }); // Skip literal errors and show only this error
-            return TokenKind::Literal(LiteralKind::Char('\0'));
-        }
-
-        self.errs.append(&mut errs); // Append literal errors
-        TokenKind::Literal(LiteralKind::Char(ch))
+        return str;
     }
 
-    fn next_valid_nazm_rust_char_in_str(
-        &mut self,
-        quote: char,
-    ) -> Result<Option<char>, LexerError> {
-        let ch = match self.next_cursor_non_eol() {
-            Some((_, ch)) => {
-                if ch == quote {
-                    return Ok(None);
-                }
-                ch
-            }
-            None => return self.unclosed_delimiter_err(),
-        };
-
-        if ch != '\\' {
-            return self.check_is_kufr_or_unsupported_char();
-        }
-
-        let ch = match self.next_cursor_non_eol() {
-            Some((_, ch)) => ch,
-            None => return self.unclosed_delimiter_err(),
-        };
-
-        if ch != 'ي' {
-            return self.check_is_escape_sequence();
-        }
-
-        let start = self.cursor.stopped_at.0;
-
+    fn next_unicode_char(&mut self, chars: &mut Chars, start_col: usize) -> char {
         let mut code_point_str = String::new();
+        let mut err = false;
+        let mut len = 0;
 
         for _ in 0..4 {
-            match self.next_cursor_non_eol() {
-                Some((_, ch)) => code_point_str.push(ch),
-                None => return self.unclosed_delimiter_err(),
+            match chars.next() {
+                Some(ch) if ch.is_ascii_hexdigit() => code_point_str.push(ch),
+                Some(_) => {
+                    err = true;
+                }
+                None => {
+                    err = true;
+                    break;
+                }
             }
+            len += 1;
         }
 
-        if code_point_str.len() != 4 || !code_point_str.chars().all(|ch| ch.is_ascii_hexdigit()) {
-            return Err(LexerError {
+        if err {
+            let (col, len) = if len == 0 {
+                // Mark starting from the slash if no digits found
+                (start_col - 2, 2)
+            } else {
+                (start_col, len)
+            };
+
+            self.errs.push(LexerError {
                 token_idx: self.current_token_idx,
-                col: start.col + 1, // To start marking after `ي`
-                len: code_point_str.len(),
+                col,
+                len,
                 kind: LexerErrorKind::UnicodeCodePointHexDigitOnly,
             });
+            return '\0';
         }
 
         let code_point = u32::from_str_radix(&code_point_str, 16).unwrap();
 
-        match char::from_u32(code_point) {
-            Some(ch) => self.check_is_kufr_or_unsupported_char_unicode(ch, start),
-            None => Err(LexerError {
-                token_idx: self.current_token_idx,
-                col: start.col + 1, // To start marking after `ي`
-                len: 4,             // The 4 digits
-                kind: LexerErrorKind::InvalidUnicodeCodePoint,
-            }),
-        }
-    }
-
-    #[inline]
-    fn unclosed_delimiter_err(&self) -> Result<Option<char>, LexerError> {
-        Err(LexerError {
-            token_idx: self.current_token_idx,
-            col: self.cursor.stopped_at.0.col,
-            len: 1,
-            kind: LexerErrorKind::UnclosedStr,
-        })
-    }
-
-    #[inline]
-    fn check_is_kufr_or_unsupported_char_unicode(
-        &self,
-        ch: char,
-        start: SpanCursor,
-    ) -> Result<Option<char>, LexerError> {
-        if is_kufr_or_unsupported_character(ch) {
-            Err(LexerError {
-                token_idx: self.current_token_idx,
-                col: start.col + 1, // To start marking after `ي`
-                len: 4,             // The 4 digits
-                kind: LexerErrorKind::KufrOrInvalidChar,
-            })
-        } else {
-            Ok(Some(ch))
-        }
-    }
-
-    #[inline]
-    fn check_is_escape_sequence(&self) -> Result<Option<char>, LexerError> {
-        let (start, ch) = self.cursor.stopped_at;
-
-        match to_escape_sequence(ch) {
-            None => Err(LexerError {
-                token_idx: self.current_token_idx,
-                col: start.col,
-                len: 1,
-                kind: LexerErrorKind::UnknownEscapeSequence,
-            }),
-            some => Ok(some),
-        }
-    }
-}
-
-fn to_escape_sequence(c: char) -> Option<char> {
-    match c {
-        'خ' => Some('\x08'), // مسافة للخلف
-        'ر' => Some('\x0b'), // مسافة رأسية
-        'ص' => Some('\x0c'), // الصفحة التالية
-        'ف' => Some('\t'),   // مسافة أفقية
-        'س' => Some('\n'),   // سطر جديد
-        'ج' => Some('\r'),   // إرجاع المؤشر إلى بداية السطر، وبدء الكتابة منه
-        '\\' => Some('\\'),
-        '\'' => Some('\''),
-        '\"' => Some('\"'),
-        '0' => Some('\0'),
-        _ => None,
+        return match char::from_u32(code_point) {
+            Some(ch) if is_kufr_or_unsupported_character(ch) => {
+                self.errs.push(LexerError {
+                    token_idx: self.current_token_idx,
+                    col: start_col - 2, // mark starting from the slash
+                    len: 6,
+                    kind: LexerErrorKind::KufrOrInvalidChar,
+                });
+                '\0'
+            }
+            Some(ch) => ch,
+            None => {
+                self.errs.push(LexerError {
+                    token_idx: self.current_token_idx,
+                    col: start_col - 2, // mark starting from the slash
+                    len: 6,
+                    kind: LexerErrorKind::InvalidUnicodeCodePoint,
+                });
+                '\0'
+            }
+        };
     }
 }

@@ -27,7 +27,7 @@ pub enum TokenKind {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LiteralKind {
-    Str(Rc<String>),
+    Str(usize),
     Char(char),
     Bool(bool),
     Num(NumKind),

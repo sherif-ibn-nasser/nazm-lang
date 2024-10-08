@@ -175,7 +175,96 @@ impl<'a> LexerIter<'a> {
                 TokenKind::Eol
             }
             '0'..='9' => self.next_num_token(),
-            '\'' | '\"' => self.next_str_or_char_token(),
+            '\'' => {
+                let start = self.cursor.stopped_at.0;
+                let start_byte = self.stopped_at_bidx;
+
+                let mut last_is_backslash = false;
+
+                loop {
+                    let Some((_, ch)) = self.next_cursor_non_eol() else {
+                        self.errs.push(LexerError {
+                            token_idx: self.current_token_idx,
+                            col: self.cursor.stopped_at.0.col,
+                            len: 1,
+                            kind: LexerErrorKind::UnclosedChar,
+                        });
+                        return TokenKind::Literal(LiteralKind::Char('\0'));
+                    };
+
+                    if ch == '\'' && !last_is_backslash {
+                        self.next_cursor();
+                        break;
+                    }
+
+                    last_is_backslash = ch == '\\';
+                }
+
+                let end = self.cursor.stopped_at.0;
+                let end_byte = self.stopped_at_bidx;
+
+                let chars = self.content[start_byte + 1..end_byte - 1].chars();
+                let str = self.next_valid_nazm_rust_char_in_str(chars, start.col);
+                let mut exact_chars = str.chars();
+
+                let ch = match exact_chars.next() {
+                    Some(ch) => {
+                        if exact_chars.next().is_some() {
+                            self.errs.push(LexerError {
+                                token_idx: self.current_token_idx,
+                                col: start.col + 1,
+                                len: end.col - start.col - 2,
+                                kind: LexerErrorKind::ManyChars,
+                            });
+                        }
+                        ch
+                    }
+                    None => {
+                        self.errs.push(LexerError {
+                            token_idx: self.current_token_idx,
+                            col: start.col,
+                            len: 2,
+                            kind: LexerErrorKind::ZeroChars,
+                        });
+                        '\0'
+                    }
+                };
+
+                TokenKind::Literal(LiteralKind::Char(ch))
+            }
+            '\"' => {
+                let start = self.cursor.stopped_at.0;
+                let start_byte = self.stopped_at_bidx;
+
+                let mut last_is_backslash = false;
+
+                loop {
+                    let Some((_, ch)) = self.next_cursor_non_eol() else {
+                        self.errs.push(LexerError {
+                            token_idx: self.current_token_idx,
+                            col: self.cursor.stopped_at.0.col,
+                            len: 1,
+                            kind: LexerErrorKind::UnclosedStr,
+                        });
+                        return TokenKind::Literal(LiteralKind::Str(0));
+                    };
+
+                    if ch == '\"' && !last_is_backslash {
+                        self.next_cursor();
+                        break;
+                    }
+
+                    last_is_backslash = ch == '\\';
+                }
+
+                let end_byte = self.stopped_at_bidx;
+
+                let chars = self.content[start_byte + 1..end_byte - 1].chars();
+
+                let str = self.next_valid_nazm_rust_char_in_str(chars, start.col);
+
+                TokenKind::Literal(LiteralKind::Str(0))
+            }
             '\t' | '\x0b' | '\x0C' | '\r' | ' ' => {
                 while self
                     .next_cursor()
