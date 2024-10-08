@@ -2,7 +2,7 @@ use crate::{SymbolKind, Token, TokenKind};
 
 use super::*;
 
-#[derive(SpannedAndCheck, Debug)]
+#[derive(Debug)]
 pub(crate) struct LambdaExpr {
     pub(crate) open_curly: OpenCurlyBraceSymbol,
     pub(crate) lambda_arrow: Option<LambdaArrow>,
@@ -25,7 +25,7 @@ pub(crate) enum LambdaArrow {
     WithParams(LambdaParams),
 }
 
-#[derive(SpannedAndCheck, Debug)]
+#[derive(Debug)]
 pub(crate) struct LambdaParams {
     pub(crate) first: Binding,
     pub(crate) rest: Vec<CommaWithBinding>,

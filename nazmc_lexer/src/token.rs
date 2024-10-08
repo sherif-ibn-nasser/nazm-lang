@@ -1,7 +1,6 @@
 use documented::DocumentedVariants;
 use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::*;
-use std::rc::Rc;
 use strum::EnumIter;
 
 #[derive(Clone, PartialEq, Debug, Default)]

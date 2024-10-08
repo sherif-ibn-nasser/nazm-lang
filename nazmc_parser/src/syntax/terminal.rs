@@ -18,20 +18,6 @@ where
     pub(crate) data: T,
 }
 
-impl<T: TerminalGuard> Spanned for Terminal<T> {
-    #[inline]
-    fn span(&self) -> Option<Span> {
-        Some(self.span)
-    }
-}
-
-impl<T: TerminalGuard> Check for Terminal<T> {
-    #[inline]
-    fn is_broken(&self) -> bool {
-        false
-    }
-}
-
 macro_rules! create_keyword_parser {
     ($keyword: ident) => {
         paste! {

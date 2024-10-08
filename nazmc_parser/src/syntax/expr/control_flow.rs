@@ -47,22 +47,22 @@ pub(crate) struct DoWhileExpr {
 
 #[derive(NazmcParse, Debug)]
 pub(crate) struct BreakExpr {
-    pub(crate) break_keyowrd: BreakKeyword,
+    pub(crate) break_keyword: BreakKeyword,
     pub(crate) expr: Option<Expr>,
 }
 
 #[derive(NazmcParse, Debug)]
 pub(crate) struct ContinueExpr {
-    pub(crate) continue_keyowrd: ContinueKeyword,
+    pub(crate) continue_keyword: ContinueKeyword,
 }
 
 #[derive(NazmcParse, Debug)]
 pub(crate) struct ReturnExpr {
-    pub(crate) return_keyowrd: ReturnKeyword,
+    pub(crate) return_keyword: ReturnKeyword,
     pub(crate) expr: Option<Expr>,
 }
 
-#[derive(SpannedAndCheck, Debug)]
+#[derive(Debug)]
 pub(crate) struct ConditionalBlock {
     pub(crate) condition: ParseResult<Expr>,
     /// This must be checked that it doesn't have a lambda arrow

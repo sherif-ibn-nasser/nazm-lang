@@ -630,7 +630,55 @@ impl<'a> ParseErrorsReporter<'a> {
         }
 
         match body {
-            Ok(body) => self.check_non_lambda_expr(body),
+            Ok(body) => {
+                let Some(lambda_arrow) = &body.lambda_arrow else {
+                    self.check_block(body);
+                    return;
+                };
+
+                let span = match lambda_arrow {
+                    LambdaArrow::NoParams(r_arrow) => r_arrow.span,
+                    LambdaArrow::WithParams(LambdaParams {
+                        first,
+                        rest,
+                        trailing_comma,
+                        r_arrow,
+                    }) => {
+                        let first_span = match &first.kind {
+                            BindingKind::Id(terminal) => terminal.span,
+                            BindingKind::Destructed(destructed_tuple) => {
+                                destructed_tuple.open_delim.span
+                            }
+                        };
+
+                        let start = first_span.start;
+
+                        let end = if let Ok(Terminal { span, .. }) = r_arrow {
+                            span.end
+                        } else if let Some(Terminal { span, .. }) = trailing_comma {
+                            span.end
+                        } else if !rest.is_empty() {
+                            match &rest[rest.len() - 1].item.kind {
+                                BindingKind::Id(terminal) => terminal.span.end,
+                                BindingKind::Destructed(destructed_tuple) => {
+                                    destructed_tuple.open_delim.span.end
+                                }
+                            }
+                        } else {
+                            first_span.end
+                        };
+
+                        Span { start, end }
+                    }
+                };
+
+                self.report(
+                    "يُتوقع محتوى الدالة وليس مُعاملات لامدا".to_string(),
+                    span,
+                    "قٌم بإزالة هذا".to_string(),
+                    vec![],
+                );
+            }
             Err(err) if !missing_params || !no_return_type => {
                 self.report_expected("محتوى الدالة", err, vec![]);
             }
@@ -901,11 +949,11 @@ impl<'a> ParseErrorsReporter<'a> {
             AtomicExpr::WithBlock(expr_with_block) => self.check_expr_with_block(expr_with_block),
             AtomicExpr::Lambda(lambda_expr) => self.check_lambda_expr(lambda_expr),
             AtomicExpr::Break(BreakExpr {
-                break_keyowrd: _,
+                break_keyword: _,
                 expr,
             })
             | AtomicExpr::Return(ReturnExpr {
-                return_keyowrd: _,
+                return_keyword: _,
                 expr,
             }) => match &expr {
                 Some(expr) => self.check_expr(expr),
@@ -1009,7 +1057,7 @@ impl<'a> ParseErrorsReporter<'a> {
                 }
 
                 match &if_expr.conditional_block.block {
-                    Ok(block) => self.check_non_lambda_expr(block),
+                    Ok(block) => self.check_block(block),
                     Err(err) => self.report_expected("محتوى `لو`", err, vec![]),
                 }
 
@@ -1025,7 +1073,7 @@ impl<'a> ParseErrorsReporter<'a> {
                     }
 
                     match &conditional_block.block {
-                        Ok(block) => self.check_non_lambda_expr(block),
+                        Ok(block) => self.check_block(block),
                         Err(err) => self.report_expected("محتوى `وإلا لو`", err, vec![]),
                     }
                 }
@@ -1036,7 +1084,7 @@ impl<'a> ParseErrorsReporter<'a> {
                 }) = &if_expr.else_cluase
                 {
                     match block {
-                        Ok(block) => self.check_non_lambda_expr(block),
+                        Ok(block) => self.check_block(block),
                         Err(err) => self.report_expected("محتوى `وإلا`", err, vec![]),
                     }
                 }
@@ -1051,26 +1099,13 @@ impl<'a> ParseErrorsReporter<'a> {
                 }
 
                 match &conditional_block.block {
-                    Ok(block) => self.check_non_lambda_expr(block),
+                    Ok(block) => self.check_block(block),
                     Err(err) => self.report_expected("محتوى `طالما`", err, vec![]),
                 }
             }
             ExprWithBlock::When(_) => todo!(),    // TODO
             ExprWithBlock::DoWhile(_) => todo!(), // TODO
         }
-    }
-
-    fn check_non_lambda_expr(&mut self, lambda: &LambdaExpr) {
-        if let Some(arrow) = &lambda.lambda_arrow {
-            self.report(
-                "يُتوقع محتوى غير لامدا".to_string(),
-                arrow.span().unwrap(),
-                "تم العثور على تعبير لامدا".to_string(),
-                vec![],
-            );
-        }
-
-        self.check_block(lambda);
     }
 
     fn check_lambda_expr(&mut self, lambda: &LambdaExpr) {

@@ -1,26 +1,26 @@
 use super::*;
 
-#[derive(SpannedAndCheck, Debug)]
+#[derive(Debug)]
 pub(crate) struct ArrayExpr {
     pub(crate) open_bracket: OpenSquareBracketSymbol,
     pub(crate) expr_kind: Option<ArrayExprKind>,
     pub(crate) close_bracket: ParseResult<CloseSquareBracketSymbol>,
 }
 
-#[derive(SpannedAndCheck, Debug)]
+#[derive(Debug)]
 pub(crate) enum ArrayExprKind {
     ExplicitSize(ExplicitSizeArrayExpr),
     Elements(ElementsArrayExpr),
 }
 
-#[derive(SpannedAndCheck, Debug)]
+#[derive(Debug)]
 pub(crate) struct ExplicitSizeArrayExpr {
     pub(crate) repeated_expr: ParseResult<Expr>,
     pub(crate) semicolon: SemicolonSymbol,
     pub(crate) size_expr: ParseResult<Expr>,
 }
 
-#[derive(SpannedAndCheck, Debug)]
+#[derive(Debug)]
 pub(crate) struct ElementsArrayExpr {
     pub(crate) first: ParseResult<Expr>,
     pub(crate) rest: Vec<ParseResult<CommaWithExpr>>,

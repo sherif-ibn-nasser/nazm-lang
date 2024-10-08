@@ -2,7 +2,7 @@ macro_rules! generateDelimitedPunctuated {
     ($name:ident, $open_delim:ident, $item:ident, $close_delim:ident ) => {
         paste! {
 
-            #[derive(SpannedAndCheck, Debug)]
+            #[derive(Debug)]
             pub(crate) struct $name {
                 pub(crate) open_delim: $open_delim,
                 pub(crate) items: Option<[<Punctuated $item>]>,
@@ -78,7 +78,7 @@ macro_rules! generatePunctuatedItem {
     ($item:ident) => {
         paste! {
 
-            #[derive(SpannedAndCheck, Debug)]
+            #[derive(Debug)]
             pub(crate) struct [<Punctuated $item>] {
                 pub(crate) first_item: ParseResult<$item>,
                 pub(crate) rest_items: Vec<ParseResult<[<CommaWith $item>]>>,
