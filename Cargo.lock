@@ -81,10 +81,14 @@ name = "nazmc"
 version = "0.1.0"
 dependencies = [
  "bpaf",
- "nazmc_display_table",
+ "nazmc_data_pool",
  "nazmc_parser",
  "owo-colors",
 ]
+
+[[package]]
+name = "nazmc_data_pool"
+version = "0.1.0"
 
 [[package]]
 name = "nazmc_diagnostics"
@@ -95,17 +99,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "nazmc_display_table"
-version = "0.1.0"
-
-[[package]]
 name = "nazmc_lexer"
 version = "0.1.0"
 dependencies = [
  "documented",
  "itertools",
+ "nazmc_data_pool",
  "nazmc_diagnostics",
- "nazmc_display_table",
  "strum",
 ]
 
@@ -123,8 +123,8 @@ dependencies = [
 name = "nazmc_parser"
 version = "0.1.0"
 dependencies = [
+ "nazmc_data_pool",
  "nazmc_diagnostics",
- "nazmc_display_table",
  "nazmc_lexer",
  "nazmc_parse_derive",
  "paste",

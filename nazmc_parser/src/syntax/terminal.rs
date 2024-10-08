@@ -1,5 +1,5 @@
 use super::*;
-use nazmc_display_table::DisplayIdx;
+use nazmc_data_pool::PoolIdx;
 use paste::paste;
 use std::fmt::Debug;
 
@@ -153,7 +153,7 @@ create_symbol_parser!(Hash);
 
 #[derive(Debug)]
 pub(crate) struct IdToken {
-    display_idx: DisplayIdx,
+    pool_idx: PoolIdx,
 }
 
 #[derive(Debug)]
@@ -284,7 +284,7 @@ impl NazmcParse for ParseResult<Terminal<IdToken>> {
                 let ok = Ok(Terminal {
                     span: *span,
                     data: IdToken {
-                        display_idx: *display_idx,
+                        pool_idx: *display_idx,
                     },
                 });
                 iter.next_non_space_or_comment();
@@ -616,9 +616,10 @@ mod tests {
     #[test]
     fn test() {
         let content = "دالة البداية(/* تعليق */){}";
-        let mut display_table = DisplayTable::new();
+        let mut id_pool = DataPool::new();
+        let mut str_pool = DataPool::new();
 
-        let lexer = LexerIter::new(content, &mut display_table);
+        let lexer = LexerIter::new(content, &mut id_pool, &mut str_pool);
         let (tokens, ..) = lexer.collect_all();
         let mut iter = TokensIter::new(&tokens);
         iter.next(); // Initialize the value of recent
@@ -642,8 +643,9 @@ mod tests {
     fn test_fail() {
         let content = "دالة البداية(عدد: ص8){}";
 
-        let mut display_table = DisplayTable::new();
-        let lexer = LexerIter::new(content, &mut display_table);
+        let mut id_pool = DataPool::new();
+        let mut str_pool = DataPool::new();
+        let lexer = LexerIter::new(content, &mut id_pool, &mut str_pool);
 
         let (tokens, ..) = lexer.collect_all();
         let mut iter = TokensIter::new(&tokens);

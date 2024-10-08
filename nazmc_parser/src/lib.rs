@@ -1,6 +1,6 @@
 use error::*;
+use nazmc_data_pool::{DataPool, Init};
 use nazmc_diagnostics::{span::SpanCursor, CodeWindow, Diagnostic};
-use nazmc_display_table::{DisplayTable, Init};
 use nazmc_lexer::*;
 use std::path::Path;
 use syntax::File;
@@ -28,9 +28,9 @@ impl<'a> ParseCtx<'a> {
         }
     }
 
-    pub fn parse(&mut self, display_table: &mut DisplayTable<Init>) {
+    pub fn parse(&mut self, id_pool: &mut DataPool<Init>, str_pool: &mut DataPool<Init>) {
         let (tokens, file_lines, lexer_errors) =
-            LexerIter::new(self.file_content, display_table).collect_all();
+            LexerIter::new(self.file_content, id_pool, str_pool).collect_all();
 
         let mut reporter = ParseErrorsReporter::new(self.file_path, &file_lines, &tokens);
 

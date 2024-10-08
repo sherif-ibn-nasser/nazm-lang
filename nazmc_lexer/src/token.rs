@@ -1,6 +1,6 @@
 use documented::DocumentedVariants;
+use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::*;
-use nazmc_display_table::DisplayIdx;
 use std::rc::Rc;
 use strum::EnumIter;
 
@@ -20,14 +20,14 @@ pub enum TokenKind {
     LineComment,
     DelimitedComment,
     Literal(LiteralKind),
-    Id(DisplayIdx),
+    Id(PoolIdx),
     Symbol(SymbolKind),
     Keyword(KeywordKind),
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LiteralKind {
-    Str(usize),
+    Str(PoolIdx),
     Char(char),
     Bool(bool),
     Num(NumKind),
