@@ -9,3 +9,4 @@ nazmc_lexer = { path = "../nazmc_lexer" }
 nazmc_diagnostics = { path = "../nazmc_diagnostics" }
 nazmc_parse_derive = { path = "../nazmc_parse_derive" }
 paste = "*"
+thin-vec = "*"

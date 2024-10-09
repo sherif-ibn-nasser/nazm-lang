@@ -128,6 +128,7 @@ dependencies = [
  "nazmc_lexer",
  "nazmc_parse_derive",
  "paste",
+ "thin-vec",
 ]
 
 [[package]]
@@ -306,6 +307,12 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "thin-vec"
+version = "0.2.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a38c90d48152c236a3ab59271da4f4ae63d678c5d7ad6b7714d7cb9760be5e4b"
 
 [[package]]
 name = "thiserror"
