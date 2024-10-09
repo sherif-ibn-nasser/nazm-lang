@@ -5,6 +5,8 @@ use nazmc_lexer::*;
 use std::path::Path;
 use syntax::File;
 
+mod ast;
+
 pub(crate) mod parse_methods;
 pub(crate) mod syntax;
 pub(crate) mod tokens_iter;
