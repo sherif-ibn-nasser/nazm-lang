@@ -23,6 +23,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bumpalo"
+version = "3.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
+
+[[package]]
 name = "convert_case"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -123,12 +129,12 @@ dependencies = [
 name = "nazmc_parser"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "nazmc_data_pool",
  "nazmc_diagnostics",
  "nazmc_lexer",
  "nazmc_parse_derive",
  "paste",
- "thin-vec",
 ]
 
 [[package]]
@@ -307,12 +313,6 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
-
-[[package]]
-name = "thin-vec"
-version = "0.2.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a38c90d48152c236a3ab59271da4f4ae63d678c5d7ad6b7714d7cb9760be5e4b"
 
 [[package]]
 name = "thiserror"

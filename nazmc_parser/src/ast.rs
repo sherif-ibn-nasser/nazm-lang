@@ -1,136 +1,157 @@
+use bumpalo::collections::Vec as BumpVec;
 use nazmc_data_pool::PoolIdx;
-use thin_vec::ThinVec;
 
-pub(crate) enum Type {
-    Path(Box<PathType>),
-    Ptr(Box<Type>),
-    Ref(Box<Type>),
-    Slice(Box<Type>),
-    Array(Box<ArrayType>),
+pub struct AST<'a> {
+    types: Types<'a>,
+    structs: BumpVec<'a, ()>,
+    fns: BumpVec<'a, ()>,
+    scopes: BumpVec<'a, Scope<'a>>,
+    stms: Stms<'a>,
+    exprs: Exprs<'a>,
 }
 
-pub(crate) struct PathType {
-    path: ThinVec<PoolIdx>,
-    name: PoolIdx,
+pub struct Ty {
+    pub kind_and_index: u64,
 }
 
-pub(crate) struct ArrayType {
-    typ: Box<Type>,
-    size: usize,
+pub struct Stm {
+    pub kind_and_index: u64,
 }
 
-pub(crate) struct Scope {
-    stms: ThinVec<Stm>,
+pub struct Expr {
+    pub kind_and_index: u64,
+}
+
+pub struct Types<'a> {
+    pub paths: BumpVec<'a, PathType<'a>>,
+    pub ptrs: BumpVec<'a, Ty>,
+    pub refs: BumpVec<'a, Ty>,
+    pub slices: BumpVec<'a, Ty>,
+    pub arrays: BumpVec<'a, ArrayType>,
+}
+
+pub struct Stms<'a> {
+    pub lets: BumpVec<'a, LetStm<'a>>,
+    pub exprs: BumpVec<'a, Expr>,
+    // pub whiles: BumpVec<'a, ()>,
+}
+
+pub struct Exprs<'a> {
+    pub str_lits: BumpVec<'a, PoolIdx>,
+    pub char_lits: BumpVec<'a, char>,
+    pub bool_lits: BumpVec<'a, bool>,
+    pub f32_lits: BumpVec<'a, f32>,
+    pub f64_lits: BumpVec<'a, f64>,
+    pub i_lits: BumpVec<'a, isize>,
+    pub i1_lits: BumpVec<'a, i8>,
+    pub i2_lits: BumpVec<'a, i16>,
+    pub i4_lits: BumpVec<'a, i32>,
+    pub i8_lits: BumpVec<'a, i64>,
+    pub usize_lits: BumpVec<'a, usize>,
+    pub u1_lits: BumpVec<'a, u8>,
+    pub u2_lits: BumpVec<'a, u16>,
+    pub u4_lits: BumpVec<'a, u32>,
+    pub u8_lits: BumpVec<'a, u64>,
+    pub unspecified_u_lits: BumpVec<'a, u64>,
+    pub unspecified_f_lits: BumpVec<'a, f64>,
+    pub paths: BumpVec<'a, PathExpr<'a>>,
+    pub calls: BumpVec<'a, CallExpr<'a>>,
+    pub unit_structs: BumpVec<'a, UnitStructExpr<'a>>,
+    pub tuple_structs: BumpVec<'a, TupleStructExpr<'a>>,
+    pub fields_structs: BumpVec<'a, FieldsStructExpr<'a>>,
+    pub fields: BumpVec<'a, FieldExpr>,
+    pub indecies: BumpVec<'a, IndexExpr>,
+    pub array_elements: BumpVec<'a, BumpVec<'a, Expr>>,
+    pub array_elements_sized: BumpVec<'a, ArrayElementsSized>,
+    pub tuples: BumpVec<'a, BumpVec<'a, Expr>>,
+    pub parens: BumpVec<'a, Expr>,
+    pub returns_w_exprs: BumpVec<'a, Expr>,
+    pub ifs: BumpVec<'a, IfExpr<'a>>,
+    pub lambdas: BumpVec<'a, LambdaExpr<'a>>,
+}
+
+pub struct Scope<'a> {
+    stms: BumpVec<'a, Stm>,
     return_expr: Option<Expr>,
 }
 
-pub(crate) enum Stm {
-    Let(Box<LetStm>),
-    Expr(Box<Expr>),
-}
-
-pub(crate) struct LetStm {
-    binding: Binding,
-    typ: Option<Type>,
+pub struct LetStm<'a> {
+    binding: Binding<'a>,
+    typ: Option<Ty>,
     init: Option<Expr>,
 }
 
-pub(crate) enum Binding {
+pub enum Binding<'a> {
     Name(PoolIdx),
-    TupleDestruction(ThinVec<Binding>),
+    TupleDestruction(BumpVec<'a, Binding<'a>>),
 }
 
-pub(crate) enum Expr {
-    StrLit(PoolIdx),
-    CharLit(char),
-    BoolLit(bool),
-    F4Lit(f32),
-    F8Lit(f64),
-    ILit(isize),
-    I1Lit(i8),
-    I2Lit(i16),
-    I4Lit(i32),
-    I8Lit(i64),
-    ULit(usize),
-    U1Lit(u8),
-    U2Lit(u16),
-    U4Lit(u32),
-    U8Lit(u64),
-    UnspecifiedIntLit(u64),
-    UnspecifiedFloatLit(f64),
-    Path(Box<PathExpr>),
-    Call(Box<CallExpr>),
-    UnitStruct(Box<UnitStructExpr>),
-    TupleStruct(Box<TupleStructExpr>),
-    FieldsStruct(Box<FieldsStructExpr>),
-    Field(Box<FieldExpr>),
-    Index(Box<IndexExpr>),
-    ArrayElements(ThinVec<Expr>),
-    ArrayElementsSized(Box<ArrayElementsSized>),
-    Tuple(ThinVec<Expr>),
-    Paren(Box<Expr>),
-    Break,
-    Continue,
-    Return(Box<Option<Expr>>),
-    If(Box<IfExpr>),
-    Lambda(Box<LambdaExpr>),
-}
-
-pub(crate) struct PathExpr {
-    dist: ThinVec<PoolIdx>,
+pub struct PathType<'a> {
+    dist: BumpVec<'a, PoolIdx>,
     name: PoolIdx,
 }
 
-pub(crate) struct CallExpr {
-    dist: ThinVec<PoolIdx>,
-    name: PoolIdx,
-    args: ThinVec<Expr>,
+pub struct ArrayType {
+    pub ty: Ty,
+    pub size: usize,
 }
 
-pub(crate) struct UnitStructExpr {
-    dist: ThinVec<PoolIdx>,
+pub struct PathExpr<'a> {
+    dist: BumpVec<'a, PoolIdx>,
     name: PoolIdx,
 }
 
-pub(crate) struct TupleStructExpr {
-    dist: ThinVec<PoolIdx>,
-    name: PoolIdx,
-    args: ThinVec<Expr>,
+pub struct CallExpr<'a> {
+    path: PathExpr<'a>,
+    args: BumpVec<'a, Expr>,
 }
 
-pub(crate) struct FieldsStructExpr {
-    dist: ThinVec<PoolIdx>,
-    name: PoolIdx,
-    fields: ThinVec<Expr>,
+pub struct UnitStructExpr<'a> {
+    path: PathExpr<'a>,
 }
 
-pub(crate) struct FieldExpr {
+pub struct TupleStructExpr<'a> {
+    path: PathExpr<'a>,
+    args: BumpVec<'a, Expr>,
+}
+
+pub struct FieldsStructExpr<'a> {
+    path: PathExpr<'a>,
+    fields: BumpVec<'a, FieldInStructExpr>,
+}
+
+pub struct FieldInStructExpr {
+    name: PoolIdx,
+    val: Expr,
+}
+
+pub struct FieldExpr {
     on: Expr,
     name: PoolIdx,
 }
 
-pub(crate) struct IndexExpr {
+pub struct IndexExpr {
     on: Expr,
     idx: Expr,
 }
 
-pub(crate) struct ArrayElementsSized {
+pub struct ArrayElementsSized {
     repeat: Expr,
     size: Expr,
 }
 
-pub(crate) struct IfExpr {
-    if_: (Expr, Scope),
-    else_ifs: ThinVec<(Expr, Scope)>,
-    else_: Option<Scope>,
+pub struct IfExpr<'a> {
+    if_: (Expr, Scope<'a>),
+    else_ifs: BumpVec<'a, (Expr, Scope<'a>)>,
+    else_: Option<Scope<'a>>,
 }
 
-pub(crate) struct LambdaExpr {
-    param: ThinVec<LambdaParam>,
-    body: Scope,
+pub struct LambdaExpr<'a> {
+    param: BumpVec<'a, LambdaParam<'a>>,
+    body: Scope<'a>,
 }
 
-pub(crate) struct LambdaParam {
-    binding: Binding,
-    typ: Option<Type>,
+pub struct LambdaParam<'a> {
+    binding: Binding<'a>,
+    ty: Option<Ty>,
 }
