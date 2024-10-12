@@ -1,29 +1,29 @@
 use super::*;
 
 #[derive(NazmcParse, Debug)]
-pub(crate) enum Stm {
+pub enum Stm {
     Semicolon(SemicolonSymbol),
     Let(LetStm),
     Expr(ExprStm),
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct LetStm {
-    pub(crate) let_keyword: LetKeyword,
-    pub(crate) mut_keyword: Option<MutKeyword>,
-    pub(crate) binding: ParseResult<Binding>,
-    pub(crate) let_assign: Option<LetAssign>,
-    pub(crate) semicolon: ParseResult<SemicolonSymbol>,
+pub struct LetStm {
+    pub let_keyword: LetKeyword,
+    pub mut_keyword: Option<MutKeyword>,
+    pub binding: ParseResult<Binding>,
+    pub let_assign: Option<LetAssign>,
+    pub semicolon: ParseResult<SemicolonSymbol>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct Binding {
-    pub(crate) kind: BindingKind,
-    pub(crate) typ: Option<ColonWithType>,
+pub struct Binding {
+    pub kind: BindingKind,
+    pub typ: Option<ColonWithType>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) enum BindingKind {
+pub enum BindingKind {
     Id(Id),
     Destructed(Box<DestructedTuple>), // Box for the large size
 }
@@ -40,31 +40,31 @@ generateDelimitedPunctuated!(
 );
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct ColonWithType {
-    pub(crate) colon: ColonSymbol,
-    pub(crate) typ: ParseResult<Type>,
+pub struct ColonWithType {
+    pub colon: ColonSymbol,
+    pub typ: ParseResult<Type>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct LetAssign {
-    pub(crate) equal: EqualSymbol,
-    pub(crate) expr: ParseResult<Expr>,
+pub struct LetAssign {
+    pub equal: EqualSymbol,
+    pub expr: ParseResult<Expr>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) enum ExprStm {
+pub enum ExprStm {
     WithBlock(ExprWithBlockStm),
     Any(AnyExprStm),
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct ExprWithBlockStm {
-    pub(crate) expr: ExprWithBlock,
-    pub(crate) semicolon: Option<SemicolonSymbol>,
+pub struct ExprWithBlockStm {
+    pub expr: ExprWithBlock,
+    pub semicolon: Option<SemicolonSymbol>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct AnyExprStm {
-    pub(crate) expr: Expr,
-    pub(crate) semicolon: ParseResult<SemicolonSymbol>,
+pub struct AnyExprStm {
+    pub expr: Expr,
+    pub semicolon: ParseResult<SemicolonSymbol>,
 }

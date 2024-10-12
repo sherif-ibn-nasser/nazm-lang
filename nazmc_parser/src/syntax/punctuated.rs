@@ -3,28 +3,28 @@ macro_rules! generateDelimitedPunctuated {
         paste! {
 
             #[derive(Debug)]
-            pub(crate) struct $name {
-                pub(crate) open_delim: $open_delim,
-                pub(crate) items: Option<[<Punctuated $item>]>,
-                pub(crate) close_delim: ParseResult<$close_delim>,
+            pub struct $name {
+                pub open_delim: $open_delim,
+                pub items: Option<[<Punctuated $item>]>,
+                pub close_delim: ParseResult<$close_delim>,
             }
 
             #[derive(NazmcParse, Debug)]
-            pub(crate) struct [<$open_delim With $item With $close_delim>] {
-                pub(crate) open_delim: $open_delim,
-                pub(crate) parsed_item_with_close_delim: ParseResult<[<Parsed $item With $close_delim>]>,
+            pub struct [<$open_delim With $item With $close_delim>] {
+                pub open_delim: $open_delim,
+                pub parsed_item_with_close_delim: ParseResult<[<Parsed $item With $close_delim>]>,
             }
 
             #[derive(NazmcParse, Debug)]
-            pub(crate) enum [<Parsed $item With $close_delim>] {
+            pub enum [<Parsed $item With $close_delim>] {
                 NoItems($close_delim),
                 WithItems(Box<[<$item sWith $close_delim>]>),
             }
 
             #[derive(NazmcParse, Debug)]
-            pub(crate) struct [<$item sWith $close_delim>] {
-                pub(crate) first_item: ParseResult<$item>,
-                pub(crate) items_with_terminator: ZeroOrMany<[<CommaWith $item>], [<CommaWith $close_delim>]>,
+            pub struct [<$item sWith $close_delim>] {
+                pub first_item: ParseResult<$item>,
+                pub items_with_terminator: ZeroOrMany<[<CommaWith $item>], [<CommaWith $close_delim>]>,
             }
 
             impl NazmcParse for ParseResult<$name> {
@@ -79,10 +79,10 @@ macro_rules! generatePunctuatedItem {
         paste! {
 
             #[derive(Debug)]
-            pub(crate) struct [<Punctuated $item>] {
-                pub(crate) first_item: ParseResult<$item>,
-                pub(crate) rest_items: Vec<ParseResult<[<CommaWith $item>]>>,
-                pub(crate) trailing_comma: Option<CommaSymbol>,
+            pub struct [<Punctuated $item>] {
+                pub first_item: ParseResult<$item>,
+                pub rest_items: Vec<ParseResult<[<CommaWith $item>]>>,
+                pub trailing_comma: Option<CommaSymbol>,
             }
 
             impl NazmcParse for ParseResult<[<Punctuated $item>]> {
@@ -92,9 +92,9 @@ macro_rules! generatePunctuatedItem {
             }
 
             #[derive(NazmcParse, Debug)]
-            pub(crate) struct [<CommaWith $item>] {
-                pub(crate) comma: CommaSymbol,
-                pub(crate) item: $item,
+            pub struct [<CommaWith $item>] {
+                pub comma: CommaSymbol,
+                pub item: $item,
             }
         }
     };
@@ -104,7 +104,7 @@ macro_rules! generateTrailingCommaWithCloseDelimiter {
     ($close_delim: ident) => {
         paste! {
             #[derive(NazmcParse, Debug)]
-            pub(crate) struct [<CommaWith $close_delim>] {
+            pub struct [<CommaWith $close_delim>] {
                 comma: Option<CommaSymbol>,
                 close_delim: $close_delim,
             }

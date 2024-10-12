@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(NazmcParse, Debug)]
-pub(crate) enum Type {
+pub enum Type {
     Path(SimplePath),
     Ptr(Box<PtrType>),
     Ref(Box<RefType>),
@@ -10,43 +10,43 @@ pub(crate) enum Type {
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct PtrType {
-    pub(crate) star: StarSymbol,
-    pub(crate) mut_keyword: Option<MutKeyword>,
-    pub(crate) typ: ParseResult<Type>,
+pub struct PtrType {
+    pub star: StarSymbol,
+    pub mut_keyword: Option<MutKeyword>,
+    pub typ: ParseResult<Type>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct RefType {
-    pub(crate) hash: HashSymbol,
-    pub(crate) mut_keyword: Option<MutKeyword>,
-    pub(crate) typ: ParseResult<Type>,
+pub struct RefType {
+    pub hash: HashSymbol,
+    pub mut_keyword: Option<MutKeyword>,
+    pub typ: ParseResult<Type>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct SliceType {
-    pub(crate) open_bracket: OpenSquareBracketSymbol,
-    pub(crate) typ: ParseResult<Type>,
-    pub(crate) array_size: Option<ArraySizeExpr>,
-    pub(crate) close_bracket: ParseResult<CloseSquareBracketSymbol>,
+pub struct SliceType {
+    pub open_bracket: OpenSquareBracketSymbol,
+    pub typ: ParseResult<Type>,
+    pub array_size: Option<ArraySizeExpr>,
+    pub close_bracket: ParseResult<CloseSquareBracketSymbol>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct ArraySizeExpr {
-    pub(crate) semicolon: SemicolonSymbol,
-    pub(crate) expr: ParseResult<Expr>,
+pub struct ArraySizeExpr {
+    pub semicolon: SemicolonSymbol,
+    pub expr: ParseResult<Expr>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct ParenType {
-    pub(crate) tuple: TupleType,
-    pub(crate) lambda: Option<LambdaType>,
+pub struct ParenType {
+    pub tuple: TupleType,
+    pub lambda: Option<LambdaType>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct LambdaType {
-    pub(crate) r_arrow: RArrowSymbol,
-    pub(crate) typ: ParseResult<Type>,
+pub struct LambdaType {
+    pub r_arrow: RArrowSymbol,
+    pub typ: ParseResult<Type>,
 }
 
 generatePunctuatedItem!(Type);

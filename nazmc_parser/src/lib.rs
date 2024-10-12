@@ -5,10 +5,9 @@ use nazmc_lexer::*;
 use std::path::Path;
 use syntax::File;
 
-mod ast;
+pub mod syntax;
 
 pub(crate) mod parse_methods;
-pub(crate) mod syntax;
 pub(crate) mod tokens_iter;
 
 pub(crate) use nazmc_diagnostics::{span::Span, PhaseDiagnostics};
@@ -17,42 +16,33 @@ pub(crate) use parse_methods::*;
 pub(crate) use syntax::*;
 pub(crate) use tokens_iter::TokensIter;
 
-pub struct ParseCtx<'a> {
-    file_path: &'a Path,
-    file_content: &'a str,
-}
+pub fn parse(
+    file_path: &Path,
+    file_content: &str,
+    id_pool: &mut DataPool<Init>,
+    str_pool: &mut DataPool<Init>,
+) {
+    let (tokens, file_lines, lexer_errors) =
+        LexerIter::new(file_content, id_pool, str_pool).collect_all();
 
-impl<'a> ParseCtx<'a> {
-    pub fn new(file_path: &'a Path, file_content: &'a str) -> Self {
-        Self {
-            file_path,
-            file_content,
-        }
-    }
+    let mut reporter = ParseErrorsReporter::new(file_path, &file_lines, &tokens);
 
-    pub fn parse(&mut self, id_pool: &mut DataPool<Init>, str_pool: &mut DataPool<Init>) {
-        let (tokens, file_lines, lexer_errors) =
-            LexerIter::new(self.file_content, id_pool, str_pool).collect_all();
+    reporter.report_lexer_errors(&lexer_errors);
 
-        let mut reporter = ParseErrorsReporter::new(self.file_path, &file_lines, &tokens);
+    let mut tokens_iter = TokensIter::new(&tokens);
 
-        reporter.report_lexer_errors(&lexer_errors);
+    tokens_iter.next_non_space_or_comment(); // To init recent()
 
-        let mut tokens_iter = TokensIter::new(&tokens);
+    let ZeroOrMany {
+        items,
+        terminator: _,
+    } = ParseResult::<File>::parse(&mut tokens_iter)
+        .unwrap()
+        .content;
 
-        tokens_iter.next_non_space_or_comment(); // To init recent()
+    reporter.check_file_items(&items);
 
-        let ZeroOrMany {
-            items,
-            terminator: _,
-        } = ParseResult::<File>::parse(&mut tokens_iter)
-            .unwrap()
-            .content;
-
-        reporter.check_file_items(&items);
-
-        println!("{}", reporter.diagnostics);
-    }
+    println!("{}", reporter.diagnostics);
 }
 
 struct ParseErrorsReporter<'a> {

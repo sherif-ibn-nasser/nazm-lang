@@ -1,7 +1,6 @@
 mod cli;
 
 use nazmc_data_pool::DataPool;
-use nazmc_parser::ParseCtx;
 use owo_colors::{OwoColorize, XtermColors};
 use std::{
     io::{self, Write},
@@ -20,7 +19,7 @@ fn main() {
     let mut id_pool = DataPool::new();
     let mut str_pool = DataPool::new();
 
-    ParseCtx::new(&file_path, &file_content).parse(&mut id_pool, &mut str_pool);
+    nazmc_parser::parse(&file_path, &file_content, &mut id_pool, &mut str_pool);
 
     // for Token { span, val, kind } in tokens {
     //     let color = match kind {

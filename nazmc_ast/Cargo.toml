@@ -1,0 +1,8 @@
+[package]
+name = "nazmc_ast"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nazmc_data_pool = { path = "../nazmc_data_pool" }
+bumpalo = { version = "*", features = ["collections", "boxed"] }

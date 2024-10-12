@@ -1,41 +1,41 @@
 use super::*;
 
 #[derive(NazmcParse, Debug)]
-pub(crate) enum FileItem {
+pub enum FileItem {
     WithVisModifier(ItemWithVisibility),
     WithoutModifier(Item),
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct ItemWithVisibility {
-    pub(crate) visibility: VisModifier,
-    pub(crate) item: ParseResult<Item>,
+pub struct ItemWithVisibility {
+    pub visibility: VisModifier,
+    pub item: ParseResult<Item>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) enum Item {
+pub enum Item {
     Struct(Struct),
     Fn(Fn),
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct Struct {
-    pub(crate) struct_keyword: StructKeyword,
-    pub(crate) name: ParseResult<Id>,
-    pub(crate) kind: ParseResult<StructKind>,
+pub struct Struct {
+    pub struct_keyword: StructKeyword,
+    pub name: ParseResult<Id>,
+    pub kind: ParseResult<StructKind>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) enum StructKind {
+pub enum StructKind {
     Unit(SemicolonSymbol),
     Tuple(TupleStructFields),
     Fields(StructFields),
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct TupleStructField {
-    pub(crate) visibility: Option<VisModifier>,
-    pub(crate) typ: ParseResult<Type>,
+pub struct TupleStructField {
+    pub visibility: Option<VisModifier>,
+    pub typ: ParseResult<Type>,
 }
 
 generatePunctuatedItem!(TupleStructField);
@@ -48,10 +48,10 @@ generateDelimitedPunctuated!(
 );
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct StructField {
-    pub(crate) visibility: Option<VisModifier>,
-    pub(crate) name: Id,
-    pub(crate) typ: ParseResult<ColonWithType>,
+pub struct StructField {
+    pub visibility: Option<VisModifier>,
+    pub name: Id,
+    pub typ: ParseResult<ColonWithType>,
 }
 
 generatePunctuatedItem!(StructField);
@@ -64,19 +64,19 @@ generateDelimitedPunctuated!(
 );
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct Fn {
-    pub(crate) fn_keyword: FnKeyword,
-    pub(crate) name: ParseResult<Id>,
-    pub(crate) params_decl: ParseResult<FnParams>,
-    pub(crate) return_type: Option<ColonWithType>,
+pub struct Fn {
+    pub fn_keyword: FnKeyword,
+    pub name: ParseResult<Id>,
+    pub params_decl: ParseResult<FnParams>,
+    pub return_type: Option<ColonWithType>,
     /// This must be checked that it doesn't have a lambda arrow
-    pub(crate) body: ParseResult<LambdaExpr>,
+    pub body: ParseResult<LambdaExpr>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct FnParam {
-    pub(crate) name: Id,
-    pub(crate) typ: ParseResult<ColonWithType>,
+pub struct FnParam {
+    pub name: Id,
+    pub typ: ParseResult<ColonWithType>,
 }
 
 generatePunctuatedItem!(FnParam);
