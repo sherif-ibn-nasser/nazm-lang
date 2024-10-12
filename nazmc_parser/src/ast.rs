@@ -3,11 +3,32 @@ use nazmc_data_pool::PoolIdx;
 
 pub struct AST<'a> {
     types: Types<'a>,
-    structs: BumpVec<'a, ()>,
-    fns: BumpVec<'a, ()>,
-    scopes: BumpVec<'a, Scope<'a>>,
+    structs: BumpVec<'a, Struct<'a>>,
+    fns: BumpVec<'a, Fn<'a>>,
+    scopes: BumpVec<'a, ScopeBody<'a>>,
     stms: Stms<'a>,
     exprs: Exprs<'a>,
+}
+
+pub struct Struct<'a> {
+    pub name: PoolIdx,
+    pub fields: BumpVec<'a, (PoolIdx, Ty)>,
+}
+
+pub struct Fn<'a> {
+    pub name: PoolIdx,
+    pub params: BumpVec<'a, (PoolIdx, Ty)>,
+    pub return_ty: Ty,
+    pub scope: Scope,
+}
+
+pub struct ScopeBody<'a> {
+    pub stms: BumpVec<'a, Stm>,
+    pub return_expr: Option<Expr>,
+}
+
+pub struct Scope {
+    pub index: u64,
 }
 
 pub struct Ty {
@@ -68,11 +89,6 @@ pub struct Exprs<'a> {
     pub returns_w_exprs: BumpVec<'a, Expr>,
     pub ifs: BumpVec<'a, IfExpr<'a>>,
     pub lambdas: BumpVec<'a, LambdaExpr<'a>>,
-}
-
-pub struct Scope<'a> {
-    stms: BumpVec<'a, Stm>,
-    return_expr: Option<Expr>,
 }
 
 pub struct LetStm<'a> {
@@ -141,14 +157,14 @@ pub struct ArrayElementsSized {
 }
 
 pub struct IfExpr<'a> {
-    if_: (Expr, Scope<'a>),
-    else_ifs: BumpVec<'a, (Expr, Scope<'a>)>,
-    else_: Option<Scope<'a>>,
+    if_: (Expr, Scope),
+    else_ifs: BumpVec<'a, (Expr, Scope)>,
+    else_: Option<Scope>,
 }
 
 pub struct LambdaExpr<'a> {
     param: BumpVec<'a, LambdaParam<'a>>,
-    body: Scope<'a>,
+    body: Scope,
 }
 
 pub struct LambdaParam<'a> {
