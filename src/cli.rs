@@ -16,9 +16,8 @@ struct Cli {
 pub fn print_err(msg: String) {
     let err = "خطأ".bold();
     let err_col = ":".bold();
-    let err_dot = ".".bold();
 
-    println!("{}{} {}{}", err.bright_red(), err_col, msg, err_dot)
+    println!("{}{} {}", err.bright_red(), err_col, msg)
 }
 
 pub fn read_file() -> (PathBuf, String) {

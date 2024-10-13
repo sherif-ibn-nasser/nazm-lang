@@ -1,74 +1,106 @@
 mod cli;
 
+use bpaf::doc;
 use cli::print_err;
 use nazmc_data_pool::DataPool;
 use owo_colors::{OwoColorize, XtermColors};
+use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 use std::{
     fs,
     io::{self, Write},
     process::{exit, Command},
 };
-use yaml_rust2::{Yaml, YamlLoader};
 
-fn collect_paths(paths: &Vec<Yaml>, prefix: &str, collected_paths: &mut Vec<String>) {
+fn collect_paths(paths: Vec<Value>, prefix: &str, collected_paths: &mut Vec<String>) {
     for path in paths {
         match path {
-            Yaml::String(s) => {
+            Value::String(s) => {
                 if prefix.is_empty() {
                     collected_paths.push(s.clone());
                 } else {
                     collected_paths.push(format!("{}/{}", prefix, s));
                 }
             }
-            Yaml::Hash(map) => {
-                for (key, value) in map {
-                    if let Yaml::String(key_str) = key {
+            Value::Mapping(mapping) => {
+                for (key, value) in mapping {
+                    if let Value::String(key_str) = key {
                         let new_prefix = if prefix.is_empty() {
                             key_str.clone()
                         } else {
                             format!("{}/{}", prefix, key_str)
                         };
 
-                        if let Yaml::Array(nested_paths) = value {
+                        if let Value::Sequence(nested_paths) = value {
                             collect_paths(nested_paths, &new_prefix, collected_paths);
                         }
                     }
                 }
             }
-            _ => {}
+            s => todo!("{:?}", s),
         }
     }
 }
 
-fn main() {
-    // let (file_path, file_content) = cli::read_file();
+#[derive(Deserialize)]
+struct NazmYaml {
+    الاسم: Option<String>,
+    الإصدار: Option<String>,
+    المسارات: Vec<Value>,
+}
 
-    let config = match fs::read_to_string("config.yaml") {
+fn get_file_paths() -> Vec<String> {
+    let nazm_yaml = match fs::read_to_string("nazm.yaml") {
         Ok(content) => content,
         Err(_) => {
-            print_err(format!("{}", "لم يتم العثور على ملف config.yaml".bold(),));
+            print_err(format!("{}", "لم يتم العثور على ملف nazm.yaml".bold(),));
             exit(1);
         }
     };
 
-    let config = &YamlLoader::load_from_str(&config).unwrap()[0];
+    let mut val = serde_yaml::from_str::<Value>(&nazm_yaml).unwrap();
 
-    let name = config["الاسم"].as_str().unwrap_or("");
+    val.apply_merge().unwrap();
 
-    let version = config["الإصدار"].as_str().unwrap_or("0.0.0");
+    let Ok(NazmYaml {
+        الاسم,
+        الإصدار,
+        المسارات,
+    }) = serde_yaml::from_value(val)
+    else {
+        print_err(format!(
+            "{}",
+            "ملف nazm.yaml يجب أن يحتوي على خاصية `المسارات` مع مسار ملف واحد على الأقل".bold(),
+        ));
+        exit(1)
+    };
 
-    // Initialize a vector to hold the paths
     let mut collected_paths = Vec::new();
 
-    // Extract and collect paths recursively
-    if let Some(paths) = config["المسارات"].as_vec() {
-        collect_paths(paths, "", &mut collected_paths);
-    }
+    collect_paths(المسارات, "", &mut collected_paths);
 
-    // Output the collected paths
-    for path in collected_paths {
-        println!("{}", path);
-    }
+    if collected_paths.is_empty() {
+        print_err(format!(
+            "{}",
+            "ملف nazm.yaml يجب أن يحتوي على خاصية `المسارات` مع مسار ملف واحد على الأقل".bold(),
+        ));
+        exit(1)
+    };
+
+    // println!("الاسم: {}", الاسم.unwrap_or("".to_string()));
+    // println!("الإصدار: {}", الإصدار.unwrap_or("".to_string()));
+    // println!("المسارات:");
+    // for path in &collected_paths {
+    //     println!("\t{}", path);
+    // }
+
+    collected_paths
+}
+
+fn main() {
+    let files_paths = get_file_paths();
+
+    // let (file_path, file_content) = cli::read_file();
 
     // RTL printing
     let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
