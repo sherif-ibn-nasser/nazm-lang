@@ -13,7 +13,7 @@ struct Cli {
     file: PathBuf,
 }
 
-fn print_err(msg: String) {
+pub fn print_err(msg: String) {
     let err = "خطأ".bold();
     let err_col = ":".bold();
     let err_dot = ".".bold();

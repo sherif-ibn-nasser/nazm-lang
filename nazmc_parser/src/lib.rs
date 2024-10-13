@@ -1,12 +1,14 @@
 use error::*;
-use nazmc_data_pool::{DataPool, Init};
+use nazmc_data_pool::{DataPool, Init, PoolIdx};
 use nazmc_diagnostics::{span::SpanCursor, CodeWindow, Diagnostic};
 use nazmc_lexer::*;
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 use syntax::File;
 
+pub mod ast;
 pub mod syntax;
 
+pub(crate) mod lower_to_ast;
 pub(crate) mod parse_methods;
 pub(crate) mod tokens_iter;
 
@@ -16,7 +18,19 @@ pub(crate) use parse_methods::*;
 pub(crate) use syntax::*;
 pub(crate) use tokens_iter::TokensIter;
 
+/// FIXME
 pub fn parse(
+    // map file mod path to its path and content
+    files: HashMap<Vec<PoolIdx>, (&Path, &str)>,
+    id_pool: &mut DataPool<Init>,
+    str_pool: &mut DataPool<Init>,
+) {
+    for (file_mod_path, (file_path, file_content)) in &files {
+        parse_file(file_path, file_content, id_pool, str_pool);
+    }
+}
+
+pub fn parse_file(
     file_path: &Path,
     file_content: &str,
     id_pool: &mut DataPool<Init>,
