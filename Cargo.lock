@@ -23,6 +23,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bumpalo"
+version = "3.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
+
+[[package]]
 name = "convert_case"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -81,9 +87,19 @@ name = "nazmc"
 version = "0.1.0"
 dependencies = [
  "bpaf",
+ "nazmc_ast",
  "nazmc_data_pool",
  "nazmc_parser",
  "owo-colors",
+]
+
+[[package]]
+name = "nazmc_ast"
+version = "0.1.0"
+dependencies = [
+ "bumpalo",
+ "nazmc_data_pool",
+ "nazmc_diagnostics",
 ]
 
 [[package]]

@@ -1,23 +1,49 @@
 use bumpalo::collections::Vec as BumpVec;
 use nazmc_data_pool::PoolIdx;
+use nazmc_diagnostics::span::Span;
 
-pub struct AST<'a> {
-    types: Types<'a>,
-    structs: BumpVec<'a, Struct<'a>>,
-    fns: BumpVec<'a, Fn<'a>>,
-    scopes: BumpVec<'a, ScopeBody<'a>>,
-    stms: Stms<'a>,
-    exprs: Exprs<'a>,
+pub struct ASTId {
+    pub span: Span,
+    pub id: PoolIdx,
 }
 
-pub struct Struct<'a> {
-    pub name: PoolIdx,
-    pub fields: BumpVec<'a, (PoolIdx, Ty)>,
+pub struct AST<'a> {
+    pub mods: BumpVec<'a, Mod<'a>>,
+    pub types: Types<'a>,
+    pub unit_structs: BumpVec<'a, UnitStruct>,
+    pub tuple_structs: BumpVec<'a, TupleStruct<'a>>,
+    pub fields_structs: BumpVec<'a, FieldsStruct<'a>>,
+    pub fns: BumpVec<'a, Fn<'a>>,
+    pub scopes: BumpVec<'a, ScopeBody<'a>>,
+    pub stms: Stms<'a>,
+    pub exprs: Exprs<'a>,
+}
+
+pub struct Mod<'a> {
+    pub path: BumpVec<'a, PoolIdx>,
+}
+
+pub struct UnitStruct {
+    pub mod_index: usize,
+    pub name: ASTId,
+}
+
+pub struct TupleStruct<'a> {
+    pub mod_index: usize,
+    pub name: ASTId,
+    pub parmas: BumpVec<'a, Ty>,
+}
+
+pub struct FieldsStruct<'a> {
+    pub mod_index: usize,
+    pub name: ASTId,
+    pub fields: BumpVec<'a, (ASTId, Ty)>,
 }
 
 pub struct Fn<'a> {
-    pub name: PoolIdx,
-    pub params: BumpVec<'a, (PoolIdx, Ty)>,
+    pub mod_index: usize,
+    pub name: ASTId,
+    pub params: BumpVec<'a, (ASTId, Ty)>,
     pub return_ty: Ty,
     pub scope: Scope,
 }
@@ -33,6 +59,7 @@ pub struct Scope {
 
 pub struct Ty {
     pub kind_and_index: u64,
+    pub span: Span,
 }
 
 pub struct Stm {
@@ -41,6 +68,7 @@ pub struct Stm {
 
 pub struct Expr {
     pub kind_and_index: u64,
+    pub span: Span,
 }
 
 pub struct Types<'a> {
@@ -98,23 +126,23 @@ pub struct LetStm<'a> {
 }
 
 pub enum Binding<'a> {
-    Name(PoolIdx),
+    Name(ASTId),
     TupleDestruction(BumpVec<'a, Binding<'a>>),
 }
 
 pub struct PathType<'a> {
-    dist: BumpVec<'a, PoolIdx>,
-    name: PoolIdx,
+    dist: BumpVec<'a, ASTId>,
+    name: ASTId,
 }
 
 pub struct ArrayType {
     pub ty: Ty,
-    pub size: usize,
+    pub size: Expr,
 }
 
 pub struct PathExpr<'a> {
-    dist: BumpVec<'a, PoolIdx>,
-    name: PoolIdx,
+    dist: BumpVec<'a, ASTId>,
+    name: ASTId,
 }
 
 pub struct CallExpr<'a> {
@@ -137,13 +165,13 @@ pub struct FieldsStructExpr<'a> {
 }
 
 pub struct FieldInStructExpr {
-    name: PoolIdx,
+    name: ASTId,
     val: Expr,
 }
 
 pub struct FieldExpr {
     on: Expr,
-    name: PoolIdx,
+    name: ASTId,
 }
 
 pub struct IndexExpr {

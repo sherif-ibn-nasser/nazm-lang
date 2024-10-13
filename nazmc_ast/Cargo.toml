@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 nazmc_data_pool = { path = "../nazmc_data_pool" }
+nazmc_diagnostics = { path = "../nazmc_diagnostics" }
 bumpalo = { version = "*", features = ["collections", "boxed"] }
