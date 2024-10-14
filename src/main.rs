@@ -115,14 +115,13 @@ fn main() {
         .map(|file_path| {
             std::thread::spawn(move || {
                 let Ok(file_content) = fs::read_to_string(format!("{file_path}.نظم")) else {
-                    panic::set_hook(Box::new(move |_| {
-                        print_err(format!(
-                            "{} {}{}",
-                            "لا يمكن قراءة الملف".bold(),
-                            file_path.bright_red().bold(),
-                            ".نظم أو أنه غير موجود".bold()
-                        ))
-                    }));
+                    panic::set_hook(Box::new(|_| {}));
+                    print_err(format!(
+                        "{} {}{}",
+                        "لا يمكن قراءة الملف".bold(),
+                        file_path.bright_red().bold(),
+                        ".نظم أو أنه غير موجود".bold()
+                    ));
                     panic!()
                 };
             })
