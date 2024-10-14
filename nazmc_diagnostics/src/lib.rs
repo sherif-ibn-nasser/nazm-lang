@@ -1,4 +1,4 @@
-use std::{fmt::Display, path::Path};
+use std::fmt::Display;
 
 use owo_colors::{OwoColorize, Style};
 use span::{Span, SpanCursor};
@@ -14,13 +14,13 @@ trait DiagnosticPrint<'a> {
         &self,
         f: &mut std::fmt::Formatter<'_>,
         path: &'a str,
-        file_lines: &'a [&'a str],
+        file_lines: &'a [String],
     ) -> std::fmt::Result;
     fn writeln(
         &self,
         f: &mut std::fmt::Formatter<'_>,
         path: &'a str,
-        file_lines: &'a [&'a str],
+        file_lines: &'a [String],
     ) -> std::fmt::Result {
         let _ = writeln!(f, "");
         self.write(f, path, file_lines)
@@ -28,14 +28,14 @@ trait DiagnosticPrint<'a> {
 }
 
 /// Represents the diagnostics for any compiler phase
-pub struct PhaseDiagnostics<'a> {
-    file_path: &'a Path,
-    file_lines: &'a [&'a str],
+pub struct FileDiagnostics<'a> {
+    file_path: &'a str,
+    file_lines: &'a [String],
     diagnostics: Vec<Diagnostic<'a>>,
 }
 
-impl<'a> PhaseDiagnostics<'a> {
-    pub fn new(file_path: &'a Path, file_lines: &'a [&'a str]) -> Self {
+impl<'a> FileDiagnostics<'a> {
+    pub fn new(file_path: &'a str, file_lines: &'a [String]) -> Self {
         Self {
             file_path,
             file_lines,
@@ -61,10 +61,10 @@ impl<'a> PhaseDiagnostics<'a> {
     }
 }
 
-impl<'a> Display for PhaseDiagnostics<'a> {
+impl<'a> Display for FileDiagnostics<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for d in &self.diagnostics {
-            let _ = d.writeln(f, self.file_path.to_str().unwrap_or(""), self.file_lines);
+            let _ = d.writeln(f, self.file_path, self.file_lines);
         }
         Ok(())
     }
@@ -115,7 +115,7 @@ impl<'a> DiagnosticPrint<'a> for Diagnostic<'a> {
         &self,
         f: &mut std::fmt::Formatter<'_>,
         path: &'a str,
-        file_lines: &'a [&'a str],
+        file_lines: &'a [String],
     ) -> std::fmt::Result {
         let _ = match self.level {
             DiagnosticLevel::Error => write!(f, "{}", "خطأ".bold().red()),
@@ -201,7 +201,7 @@ impl<'a> DiagnosticPrint<'a> for CodeWindow<'a> {
         &self,
         f: &mut std::fmt::Formatter<'_>,
         path: &'a str,
-        file_lines: &'a [&'a str],
+        file_lines: &'a [String],
     ) -> std::fmt::Result {
         let path = format!("{}:{}:{}", path, self.cursor.line + 1, self.cursor.col + 1);
 

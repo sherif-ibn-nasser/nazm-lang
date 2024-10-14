@@ -3,10 +3,22 @@ mod cli;
 use bpaf::doc;
 use cli::{format_err, print_err};
 use nazmc_data_pool::DataPool;
+use nazmc_data_pool::Init;
+use nazmc_data_pool::PoolIdx;
+use nazmc_diagnostics::span::Span;
+use nazmc_diagnostics::CodeWindow;
+use nazmc_diagnostics::Diagnostic;
+use nazmc_diagnostics::FileDiagnostics;
 use nazmc_parser::parse;
+use nazmc_parser::parse_methods::ParseResult;
+use nazmc_parser::syntax;
+use nazmc_parser::syntax::Id;
+use nazmc_parser::syntax::IdToken;
+use nazmc_parser::syntax::Terminal;
 use owo_colors::{OwoColorize, XtermColors};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
+use std::borrow::Borrow;
 use std::{
     arch::x86_64::__m128i,
     cell::RefCell,
@@ -116,7 +128,17 @@ fn main() {
     let mut id_pool = DataPool::new();
     let mut str_pool = DataPool::new();
 
-    let _ = files_paths
+    #[derive(Default)]
+    struct ASTItemsCounter {
+        unit_structs: usize,
+        tuple_structs: usize,
+        fields_structs: usize,
+        fns: usize,
+    }
+
+    let mut ast_items_counter = ASTItemsCounter::default();
+
+    files_paths
         .into_iter()
         .map(|file_path| {
             let mod_path = file_path
@@ -125,21 +147,21 @@ fn main() {
                 .collect::<Vec<_>>();
 
             std::thread::spawn(move || {
-                let path = format!("{file_path}.نظم");
-                let Ok(file_content) = fs::read_to_string(&path) else {
+                let file_path = format!("{file_path}.نظم");
+                let Ok(file_content) = fs::read_to_string(&file_path) else {
                     panic::set_hook(Box::new(|_| {}));
                     print_err(format!(
                         "{} {}{}",
                         "لا يمكن قراءة الملف".bold(),
                         file_path.bright_red().bold(),
-                        ".نظم أو أنه غير موجود".bold()
+                        " أو أنه غير موجود".bold()
                     ));
                     panic!()
                 };
 
-                let file = parse(Path::new(&path), &file_content);
+                let (file, file_lines) = parse(&file_path, &file_content);
 
-                (mod_path, file)
+                (mod_path, file_path, file_lines, file)
             })
         })
         .collect::<Vec<_>>()
@@ -148,7 +170,133 @@ fn main() {
         .collect::<Vec<_>>()
         .into_iter()
         .map(|r| {
-            let Ok((mod_path, file)) = r else { exit(1) };
+            let Ok((mod_path, file_path, file_lines, file)) = r else {
+                exit(1)
+            };
+
+            let mut file_diagnostics = FileDiagnostics::new(&file_path, &file_lines);
+
+            let mut mod_items_map = HashMap::new();
+
+            let _ = &file
+                .content
+                .items
+                .iter()
+                .map(|item| {
+                    let Ok(item) = item else {
+                        unreachable!();
+                    };
+
+                    enum VisModifier {
+                        Default = 0,
+                        Pub = 1,
+                        Priv = 2,
+                    }
+
+                    enum ItemKind {
+                        UnitSruct = 0,
+                        TupleSruct = 1,
+                        FieldsSruct = 2,
+                        Fn = 3,
+                    }
+
+                    struct ModItemsEncoderDecoder;
+
+                    impl ModItemsEncoderDecoder {
+                        pub fn encode(kind: ItemKind, vis: VisModifier, idx: usize) -> u64 {
+                            (kind as u64) << 62 | (vis as u64) << 60 | (idx as u64)
+                        }
+                    }
+
+                    fn get_item_kind_and_name(item: &syntax::Item) -> (ItemKind, &ParseResult<Id>) {
+                        match item {
+                            syntax::Item::Struct(s) => (
+                                match &s.kind {
+                                    Ok(syntax::StructKind::Unit(_)) => ItemKind::UnitSruct,
+                                    Ok(syntax::StructKind::Tuple(_)) => ItemKind::TupleSruct,
+                                    Ok(syntax::StructKind::Fields(_)) => ItemKind::FieldsSruct,
+                                    _ => unreachable!(),
+                                },
+                                &s.name,
+                            ),
+                            syntax::Item::Fn(f) => (ItemKind::Fn, &f.name),
+                        }
+                    }
+
+                    let (item, vis) = match item {
+                        syntax::FileItem::WithVisModifier(item_with_vis) => {
+                            let Ok(item) = &item_with_vis.item else {
+                                unreachable!()
+                            };
+
+                            (
+                                item,
+                                match item_with_vis.visibility.data {
+                                    syntax::VisModifierToken::Public => VisModifier::Pub,
+                                    syntax::VisModifierToken::Private => VisModifier::Priv,
+                                },
+                            )
+                        }
+                        syntax::FileItem::WithoutModifier(item) => (item, VisModifier::Default),
+                    };
+
+                    let (kind, name) = get_item_kind_and_name(item);
+
+                    let Ok(name) = name else { unreachable!() };
+
+                    let name_pool_idx = id_pool.get(&name.data.val);
+
+                    let ast_counter = match kind {
+                        ItemKind::UnitSruct => &mut ast_items_counter.unit_structs,
+                        ItemKind::TupleSruct => &mut ast_items_counter.tuple_structs,
+                        ItemKind::FieldsSruct => &mut ast_items_counter.fields_structs,
+                        ItemKind::Fn => &mut ast_items_counter.fns,
+                    };
+
+                    let idx = *ast_counter;
+
+                    *ast_counter += 1;
+
+                    match mod_items_map.get(&name_pool_idx) {
+                        None => {
+                            mod_items_map.insert(
+                                name_pool_idx,
+                                (ModItemsEncoderDecoder::encode(kind, vis, idx), name.span),
+                            );
+                        }
+                        Some((_, found_span)) => {
+                            let cursor = found_span.start;
+                            let mut code_window = CodeWindow::new(cursor);
+
+                            code_window
+                                .mark_secondary(*found_span, vec!["هنا أول عنصر".to_string()]);
+                            code_window.mark_secondary(
+                                name.span,
+                                vec!["هنا ثاني عنصر بنفس الاسم".to_string()],
+                            );
+
+                            let msg =
+                                format!("يُوجد عنصران بنفس الاسم `{}` في نفس الملف", name.data.val);
+
+                            file_diagnostics.push(Diagnostic::error(msg, Some(code_window)));
+                        }
+                    }
+                })
+                .collect::<Vec<()>>();
+
+            if file_diagnostics.has_disgnostics() {
+                eprintln!("{}", file_diagnostics);
+                Err(())
+            } else {
+                Ok(())
+            }
+        })
+        .collect::<Vec<_>>()
+        .iter()
+        .for_each(|r| {
+            if r.is_err() {
+                exit(1)
+            }
         });
 
     // let (file_path, file_content) = cli::read_file();

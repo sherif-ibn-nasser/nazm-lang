@@ -1,21 +1,21 @@
 use error::*;
 use nazmc_diagnostics::{span::SpanCursor, CodeWindow, Diagnostic};
 use nazmc_lexer::*;
-use std::{collections::HashMap, panic, path::Path};
+use std::panic;
 use syntax::File;
 
 pub mod syntax;
 
-pub(crate) mod parse_methods;
+pub mod parse_methods;
 pub(crate) mod tokens_iter;
 
-pub(crate) use nazmc_diagnostics::{span::Span, PhaseDiagnostics};
+pub(crate) use nazmc_diagnostics::{span::Span, FileDiagnostics};
 pub(crate) use nazmc_parse_derive::*;
 pub(crate) use parse_methods::*;
 pub(crate) use syntax::*;
 pub(crate) use tokens_iter::TokensIter;
 
-pub fn parse(file_path: &Path, file_content: &str) -> File {
+pub fn parse<'a>(file_path: &'a str, file_content: &'a str) -> (File, Vec<String>) {
     let (tokens, file_lines, lexer_errors) = LexerIter::new(file_content).collect_all();
 
     let mut reporter = ParseErrorsReporter::new(file_path, &file_lines, &tokens);
@@ -36,19 +36,19 @@ pub fn parse(file_path: &Path, file_content: &str) -> File {
         panic!()
     }
 
-    file
+    (file, file_lines)
 }
 
 struct ParseErrorsReporter<'a> {
     tokens: &'a [Token<'a>],
-    diagnostics: PhaseDiagnostics<'a>,
+    diagnostics: FileDiagnostics<'a>,
 }
 
 impl<'a> ParseErrorsReporter<'a> {
-    fn new(file_path: &'a Path, file_lines: &'a [&'a str], tokens: &'a [Token<'a>]) -> Self {
+    fn new(file_path: &'a str, file_lines: &'a [String], tokens: &'a [Token<'a>]) -> Self {
         Self {
             tokens,
-            diagnostics: PhaseDiagnostics::new(file_path, file_lines),
+            diagnostics: FileDiagnostics::new(file_path, file_lines),
         }
     }
 

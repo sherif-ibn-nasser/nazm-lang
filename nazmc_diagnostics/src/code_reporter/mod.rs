@@ -72,7 +72,7 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
         &self,
         f: &mut std::fmt::Formatter<'_>,
         path: &'a str,
-        file_lines: &'a [&'a str],
+        file_lines: &'a [String],
     ) -> std::fmt::Result {
         let mut free_connection_margins = vec![];
         let mut connections_painter = Painter::new(
@@ -93,10 +93,10 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
 
             let code_line = &self.code_lines[line_index];
 
-            let file_line = file_lines[*line_index];
+            let file_line = &file_lines[*line_index];
 
             big_sheet.push(vec![vec![Marker {
-                sign: MarkerSign::CodeLine(file_line),
+                sign: MarkerSign::CodeLine(&file_line),
                 style: Style::new(),
             }]]);
 
@@ -110,7 +110,7 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
             let painter_opt = code_line.draw(
                 &mut free_connection_margins,
                 &mut connections_painter,
-                file_line,
+                &file_line,
             );
 
             match painter_opt {
@@ -642,19 +642,19 @@ impl<'a> fmt::Debug for CodeReporter<'a> {
             f,
             "اختبار.نظم",
             &[
-                "حجز متغير أ = 555؛",
-                "حجز متغير ب = 555؛",
-                "حجز متغير ج = 555؛",
-                "حجز متغير د = 555؛",
-                "حجز متغير ه = 555؛",
-                "حجز متغير و = 555؛",
-                "حجز متغير ز = 555؛",
-                "حجز متغير ح = 555؛",
-                "حجز متغير ك = 555؛",
-                "حجز متغير ل = 555؛",
-                "حجز متغير م = 555؛",
-                "حجز متغير ن = 555؛",
-                "حجز متغير ز = 555؛",
+                "حجز متغير أ = 555؛".to_string(),
+                "حجز متغير ب = 555؛".to_string(),
+                "حجز متغير ج = 555؛".to_string(),
+                "حجز متغير د = 555؛".to_string(),
+                "حجز متغير ه = 555؛".to_string(),
+                "حجز متغير و = 555؛".to_string(),
+                "حجز متغير ز = 555؛".to_string(),
+                "حجز متغير ح = 555؛".to_string(),
+                "حجز متغير ك = 555؛".to_string(),
+                "حجز متغير ل = 555؛".to_string(),
+                "حجز متغير م = 555؛".to_string(),
+                "حجز متغير ن = 555؛".to_string(),
+                "حجز متغير ز = 555؛".to_string(),
             ],
         )
     }

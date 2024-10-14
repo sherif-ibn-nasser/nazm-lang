@@ -16,7 +16,7 @@ pub struct LexerIter<'a> {
     /// The byte index the cursor stopped at
     stopped_at_bidx: usize,
     /// The file lines to fill from lexing
-    file_lines: Vec<&'a str>,
+    file_lines: Vec<String>,
     /// The start byte index of current line
     current_line_start_bidx: usize,
     /// Errors
@@ -58,11 +58,11 @@ impl<'a> LexerIter<'a> {
         _self
     }
 
-    pub fn collect_all(mut self) -> (Vec<Token<'a>>, Vec<&'a str>, Vec<LexerError>) {
+    pub fn collect_all(mut self) -> (Vec<Token<'a>>, Vec<String>, Vec<LexerError>) {
         let tokens = self.by_ref().collect_vec();
 
         if self.file_lines.is_empty() {
-            self.file_lines.push("");
+            self.file_lines.push("".to_string());
         }
 
         (tokens, self.file_lines, self.errs)
@@ -290,7 +290,7 @@ impl<'a> LexerIter<'a> {
         let stopped_at_eol = self.cursor.stopped_at.1 == '\n';
 
         if stopped_at_eol {
-            self.file_lines.push(current_line);
+            self.file_lines.push(current_line.to_string());
             self.current_line_start_bidx = self.stopped_at_bidx;
         }
 
@@ -298,11 +298,11 @@ impl<'a> LexerIter<'a> {
 
         if next.is_none() {
             if stopped_at_eol {
-                self.file_lines.push("");
+                self.file_lines.push("".to_string());
             } else if self.current_line_start_bidx < self.content.len() {
                 let current_line =
                     &self.content[self.current_line_start_bidx..self.stopped_at_bidx];
-                self.file_lines.push(current_line);
+                self.file_lines.push(current_line.to_string());
                 self.current_line_start_bidx = self.stopped_at_bidx;
             }
         }

@@ -110,6 +110,7 @@ version = "0.1.0"
 dependencies = [
  "bpaf",
  "nazmc_data_pool",
+ "nazmc_diagnostics",
  "nazmc_parser",
  "owo-colors",
  "serde",

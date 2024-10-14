@@ -138,7 +138,7 @@ create_symbol_parser!(Hash);
 
 #[derive(Debug)]
 pub struct IdToken {
-    val: Arc<String>,
+    pub val: Arc<String>,
 }
 
 #[derive(Debug)]
@@ -602,7 +602,7 @@ mod tests {
     fn test() {
         let content = "دالة البداية(/* تعليق */){}";
 
-        let lexer = LexerIter::new(content);
+        let lexer = LexerIter::new(content, &mut vec![]);
         let (tokens, ..) = lexer.collect_all();
         let mut iter = TokensIter::new(&tokens);
         iter.next(); // Initialize the value of recent
@@ -626,7 +626,7 @@ mod tests {
     fn test_fail() {
         let content = "دالة البداية(عدد: ص8){}";
 
-        let lexer = LexerIter::new(content);
+        let lexer = LexerIter::new(content, &mut vec![]);
 
         let (tokens, ..) = lexer.collect_all();
         let mut iter = TokensIter::new(&tokens);
