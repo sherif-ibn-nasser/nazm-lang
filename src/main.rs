@@ -7,11 +7,15 @@ use owo_colors::{OwoColorize, XtermColors};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::{
+    arch::x86_64::__m128i,
+    cell::RefCell,
     fmt::format,
     fs,
     io::{self, stderr, Write},
     panic::{self, panic_any},
+    path::PathBuf,
     process::{abort, exit, Command, ExitCode, Termination},
+    sync::{Arc, Mutex},
 };
 
 fn collect_paths(paths: Vec<Value>, prefix: &str, collected_paths: &mut Vec<String>) {
@@ -107,12 +111,14 @@ fn main() {
         .unwrap();
 
     let files_paths = get_file_paths();
-    let mut id_pool = DataPool::new();
+    let mut id_pool = Arc::new(Mutex::new(DataPool::new()));
     let mut str_pool = DataPool::new();
 
     files_paths
         .into_iter()
         .map(|file_path| {
+            let id_pool = Arc::clone(&id_pool);
+
             std::thread::spawn(move || {
                 let Ok(file_content) = fs::read_to_string(format!("{file_path}.نظم")) else {
                     panic::set_hook(Box::new(|_| {}));
@@ -124,6 +130,15 @@ fn main() {
                     ));
                     panic!()
                 };
+
+                let mut guard = id_pool.lock().unwrap();
+
+                let mod_path = file_path
+                    .split_terminator('/')
+                    .map(|s| guard.get(s))
+                    .collect::<Vec<_>>();
+
+                drop(guard);
             })
         })
         .collect::<Vec<_>>()
