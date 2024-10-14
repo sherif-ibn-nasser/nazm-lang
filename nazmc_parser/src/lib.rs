@@ -1,14 +1,11 @@
 use error::*;
-use nazmc_data_pool::{DataPool, Init, PoolIdx};
 use nazmc_diagnostics::{span::SpanCursor, CodeWindow, Diagnostic};
 use nazmc_lexer::*;
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, panic, path::Path};
 use syntax::File;
 
-pub mod ast;
 pub mod syntax;
 
-pub(crate) mod lower_to_ast;
 pub(crate) mod parse_methods;
 pub(crate) mod tokens_iter;
 
@@ -18,26 +15,8 @@ pub(crate) use parse_methods::*;
 pub(crate) use syntax::*;
 pub(crate) use tokens_iter::TokensIter;
 
-/// FIXME
-pub fn parse(
-    // map file mod path to its path and content
-    files: HashMap<Vec<PoolIdx>, (&Path, &str)>,
-    id_pool: &mut DataPool<Init>,
-    str_pool: &mut DataPool<Init>,
-) {
-    for (file_mod_path, (file_path, file_content)) in &files {
-        parse_file(file_path, file_content, id_pool, str_pool);
-    }
-}
-
-pub fn parse_file(
-    file_path: &Path,
-    file_content: &str,
-    id_pool: &mut DataPool<Init>,
-    str_pool: &mut DataPool<Init>,
-) {
-    let (tokens, file_lines, lexer_errors) =
-        LexerIter::new(file_content, id_pool, str_pool).collect_all();
+pub fn parse(file_path: &Path, file_content: &str) -> File {
+    let (tokens, file_lines, lexer_errors) = LexerIter::new(file_content).collect_all();
 
     let mut reporter = ParseErrorsReporter::new(file_path, &file_lines, &tokens);
 
@@ -47,16 +26,17 @@ pub fn parse_file(
 
     tokens_iter.next_non_space_or_comment(); // To init recent()
 
-    let ZeroOrMany {
-        items,
-        terminator: _,
-    } = ParseResult::<File>::parse(&mut tokens_iter)
-        .unwrap()
-        .content;
+    let file = ParseResult::<File>::parse(&mut tokens_iter).unwrap();
 
-    reporter.check_file_items(&items);
+    reporter.check_file_items(&file.content.items);
 
-    println!("{}", reporter.diagnostics);
+    if reporter.diagnostics.has_disgnostics() {
+        eprintln!("{}", reporter.diagnostics);
+        panic::set_hook(Box::new(|_| {}));
+        panic!()
+    }
+
+    file
 }
 
 struct ParseErrorsReporter<'a> {

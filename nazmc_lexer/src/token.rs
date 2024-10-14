@@ -1,5 +1,6 @@
+use std::sync::Arc;
+
 use documented::DocumentedVariants;
-use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::*;
 use strum::EnumIter;
 
@@ -19,14 +20,14 @@ pub enum TokenKind {
     LineComment,
     DelimitedComment,
     Literal(LiteralKind),
-    Id(PoolIdx),
+    Id(Arc<String>),
     Symbol(SymbolKind),
     Keyword(KeywordKind),
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LiteralKind {
-    Str(PoolIdx),
+    Str(Arc<String>),
     Char(char),
     Bool(bool),
     Num(NumKind),

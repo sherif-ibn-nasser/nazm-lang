@@ -3,17 +3,19 @@ mod cli;
 use bpaf::doc;
 use cli::{format_err, print_err};
 use nazmc_data_pool::DataPool;
+use nazmc_parser::parse;
 use owo_colors::{OwoColorize, XtermColors};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::{
     arch::x86_64::__m128i,
     cell::RefCell,
+    collections::HashMap,
     fmt::format,
     fs,
     io::{self, stderr, Write},
     panic::{self, panic_any},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{abort, exit, Command, ExitCode, Termination},
     sync::{Arc, Mutex},
 };
@@ -111,16 +113,20 @@ fn main() {
         .unwrap();
 
     let files_paths = get_file_paths();
-    let mut id_pool = Arc::new(Mutex::new(DataPool::new()));
+    let mut id_pool = DataPool::new();
     let mut str_pool = DataPool::new();
 
-    files_paths
+    let _ = files_paths
         .into_iter()
         .map(|file_path| {
-            let id_pool = Arc::clone(&id_pool);
+            let mod_path = file_path
+                .split_terminator('/')
+                .map(|s| id_pool.get(s))
+                .collect::<Vec<_>>();
 
             std::thread::spawn(move || {
-                let Ok(file_content) = fs::read_to_string(format!("{file_path}.نظم")) else {
+                let path = format!("{file_path}.نظم");
+                let Ok(file_content) = fs::read_to_string(&path) else {
                     panic::set_hook(Box::new(|_| {}));
                     print_err(format!(
                         "{} {}{}",
@@ -131,14 +137,9 @@ fn main() {
                     panic!()
                 };
 
-                let mut guard = id_pool.lock().unwrap();
+                let file = parse(Path::new(&path), &file_content);
 
-                let mod_path = file_path
-                    .split_terminator('/')
-                    .map(|s| guard.get(s))
-                    .collect::<Vec<_>>();
-
-                drop(guard);
+                (mod_path, file)
             })
         })
         .collect::<Vec<_>>()
@@ -146,10 +147,8 @@ fn main() {
         .map(|jh| jh.join())
         .collect::<Vec<_>>()
         .into_iter()
-        .for_each(|r| {
-            if r.is_err() {
-                exit(1)
-            }
+        .map(|r| {
+            let Ok((mod_path, file)) = r else { exit(1) };
         });
 
     // let (file_path, file_content) = cli::read_file();

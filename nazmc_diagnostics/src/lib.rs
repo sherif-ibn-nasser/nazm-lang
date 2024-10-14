@@ -55,6 +55,10 @@ impl<'a> PhaseDiagnostics<'a> {
             None => {}
         }
     }
+
+    pub fn has_disgnostics(&self) -> bool {
+        !self.diagnostics.is_empty()
+    }
 }
 
 impl<'a> Display for PhaseDiagnostics<'a> {
