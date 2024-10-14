@@ -1,15 +1,17 @@
 mod cli;
 
 use bpaf::doc;
-use cli::print_err;
+use cli::{format_err, print_err};
 use nazmc_data_pool::DataPool;
 use owo_colors::{OwoColorize, XtermColors};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::{
+    fmt::format,
     fs,
-    io::{self, Write},
-    process::{exit, Command},
+    io::{self, stderr, Write},
+    panic::{self, panic_any},
+    process::{abort, exit, Command, ExitCode, Termination},
 };
 
 fn collect_paths(paths: Vec<Value>, prefix: &str, collected_paths: &mut Vec<String>) {
@@ -98,18 +100,45 @@ fn get_file_paths() -> Vec<String> {
 }
 
 fn main() {
-    let files_paths = get_file_paths();
-
-    // let (file_path, file_content) = cli::read_file();
-
     // RTL printing
     let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
     io::stdout()
         .write_all(&output.stdout[1..output.stdout.len() - 1])
         .unwrap();
 
-    // let mut id_pool = DataPool::new();
-    // let mut str_pool = DataPool::new();
+    let files_paths = get_file_paths();
+    let mut id_pool = DataPool::new();
+    let mut str_pool = DataPool::new();
+
+    files_paths
+        .into_iter()
+        .map(|file_path| {
+            std::thread::spawn(move || {
+                let Ok(file_content) = fs::read_to_string(format!("{file_path}.نظم")) else {
+                    panic::set_hook(Box::new(move |_| {
+                        print_err(format!(
+                            "{} {}{}",
+                            "لا يمكن قراءة الملف".bold(),
+                            file_path.bright_red().bold(),
+                            ".نظم أو أنه غير موجود".bold()
+                        ))
+                    }));
+                    panic!()
+                };
+            })
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .map(|jh| jh.join())
+        .collect::<Vec<_>>()
+        .into_iter()
+        .for_each(|r| {
+            if r.is_err() {
+                exit(1)
+            }
+        });
+
+    // let (file_path, file_content) = cli::read_file();
 
     // nazmc_parser::parse_file(&file_path, &file_content, &mut id_pool, &mut str_pool);
 
