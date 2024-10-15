@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Index};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PoolIdx(usize);
@@ -54,5 +54,13 @@ impl DataPool<Init> {
         DataPool {
             state: Built(table),
         }
+    }
+}
+
+impl Index<PoolIdx> for DataPool<Built> {
+    type Output = str;
+
+    fn index(&self, index: PoolIdx) -> &Self::Output {
+        &self.state.0[index.0]
     }
 }

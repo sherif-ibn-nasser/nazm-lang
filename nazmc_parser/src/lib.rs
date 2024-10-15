@@ -1,5 +1,5 @@
 use error::*;
-use nazmc_diagnostics::{span::SpanCursor, CodeWindow, Diagnostic};
+use nazmc_diagnostics::{eprint_diagnostics, span::SpanCursor, CodeWindow, Diagnostic};
 use nazmc_lexer::*;
 use std::panic;
 use syntax::File;
@@ -36,9 +36,7 @@ pub fn parse<'a>(file_path: &'a str, file_content: &'a str) -> (File, Vec<String
     reporter.check_file_items(&file.content.items);
 
     if !reporter.diagnostics.is_empty() {
-        for d in &reporter.diagnostics {
-            eprintln!("{}", d);
-        }
+        eprint_diagnostics(reporter.diagnostics);
         panic::set_hook(Box::new(|_| {}));
         panic!()
     }
@@ -69,7 +67,7 @@ impl<'a> ParseErrorsReporter<'a> {
             code_window.mark_secondary(span, multiline_label);
         }
 
-        let diagnostic = Diagnostic::error(msg, Some(code_window));
+        let diagnostic = Diagnostic::error(msg, vec![code_window]);
 
         self.diagnostics.push(diagnostic);
     }
@@ -208,7 +206,7 @@ impl<'a> ParseErrorsReporter<'a> {
                     self.diagnostics.last_mut().unwrap().chain(Diagnostic::help(
                         "اللاحقات الصالحة للعدد هى (ص، ص1، ص2، ص4، ص8، ط، ط1، ط2، ط4، ط8، ع4، ع8)"
                             .to_string(),
-                        None,
+                        vec![],
                     ));
                 }
                 LexerErrorKind::InvalidFloatSuffix => {
@@ -221,7 +219,7 @@ impl<'a> ParseErrorsReporter<'a> {
 
                     self.diagnostics.last_mut().unwrap().chain(Diagnostic::help(
                         "اللاحقات الصالحة للعدد العشري هى (ع4، ع8)".to_string(),
-                        None,
+                        vec![],
                     ));
                 }
                 LexerErrorKind::InvalidIntSuffix => {
@@ -235,7 +233,7 @@ impl<'a> ParseErrorsReporter<'a> {
                     self.diagnostics.last_mut().unwrap().chain(Diagnostic::help(
                         "اللاحقات الصالحة للعدد الصحيح هى (ص، ص1، ص2، ص4، ص8، ط، ط1، ط2، ط4، ط8)"
                             .to_string(),
-                        None,
+                        vec![],
                     ));
                 }
                 LexerErrorKind::InvalidDigitForBase(base) => {
@@ -277,7 +275,7 @@ impl<'a> ParseErrorsReporter<'a> {
 
                     self.diagnostics.last_mut().unwrap().chain(Diagnostic::help(
                         format!("أكبر قيمة من نفس نوع العدد هى `{}`", max_num_str),
-                        None,
+                        vec![],
                     ));
                 }
                 LexerErrorKind::DigitsEndWithCommma => {

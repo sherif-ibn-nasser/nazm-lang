@@ -166,7 +166,7 @@ impl<'a> Display for CodeWindow<'a> {
             self.cursor.col + 1
         );
 
-        let _ = writeln!(
+        let _ = write!(
             f,
             "{} {}",
             " ".repeat(max_line_num_indent).style(line_nums_style),
@@ -180,6 +180,7 @@ impl<'a> Display for CodeWindow<'a> {
         let mut prev_line_num = 0; // Start with zero (This will store the line num and not the its index)
 
         for line_of_markers in big_sheet.iter().flatten() {
+            let _ = writeln!(f);
             if line_of_markers.len() == 1
                 && matches!(line_of_markers[0].sign, MarkerSign::CodeLine(_))
             {
@@ -229,7 +230,6 @@ impl<'a> Display for CodeWindow<'a> {
             for marker in line_of_markers {
                 let _ = write!(f, "{marker}");
             }
-            let _ = writeln!(f);
         }
 
         Ok(())

@@ -1,9 +1,7 @@
 mod cli;
 
-use bpaf::doc;
-use cli::{format_err, print_err};
+use cli::print_err;
 use nazmc_data_pool::DataPool;
-use nazmc_data_pool::Init;
 use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::Span;
 use nazmc_diagnostics::CodeWindow;
@@ -12,23 +10,15 @@ use nazmc_parser::parse;
 use nazmc_parser::parse_methods::ParseResult;
 use nazmc_parser::syntax;
 use nazmc_parser::syntax::Id;
-use nazmc_parser::syntax::IdToken;
-use nazmc_parser::syntax::Terminal;
-use owo_colors::{OwoColorize, XtermColors};
-use serde::{Deserialize, Serialize};
+use owo_colors::OwoColorize;
+use serde::Deserialize;
 use serde_yaml::Value;
-use std::borrow::Borrow;
+use std::io;
+use std::io::Write;
 use std::{
-    arch::x86_64::__m128i,
-    cell::RefCell,
     collections::HashMap,
-    fmt::format,
-    fs,
-    io::{self, stderr, Write},
-    panic::{self, panic_any},
-    path::{Path, PathBuf},
-    process::{abort, exit, Command, ExitCode, Termination},
-    sync::{Arc, Mutex},
+    fs, panic,
+    process::{exit, Command},
 };
 
 fn collect_paths(paths: Vec<Value>, prefix: &str, collected_paths: &mut Vec<String>) {
@@ -124,6 +114,7 @@ struct ASTItemsCounter {
     fns: usize,
 }
 
+#[derive(Clone)]
 struct ItemMapToMod {
     mod_idx: usize,
     file_idx: usize,
@@ -184,6 +175,7 @@ fn main() {
 
     files_paths
         .into_iter()
+        // Lex and parse
         .map(|file_path| {
             let mut mod_path = file_path
                 .split_terminator('/')
@@ -193,7 +185,7 @@ fn main() {
             mod_path.pop(); // remove the actual file
 
             let mod_idx = mods.len();
-            let _ = *mods.entry(mod_path).or_insert(mod_idx);
+            let mod_idx = *mods.entry(mod_path).or_insert(mod_idx);
 
             std::thread::spawn(move || {
                 let file_path = format!("{file_path}.نظم");
@@ -215,9 +207,11 @@ fn main() {
         })
         .collect::<Vec<_>>()
         .into_iter()
+        // Wait for thread to finish
         .map(|jh| jh.join())
         .collect::<Vec<_>>()
         .into_iter()
+        // Map files, mods and items in each mod and encoding them
         .for_each(|r| {
             let Ok((mod_idx, file_path, file_lines, file)) = r else {
                 exit(1)
@@ -273,49 +267,75 @@ fn main() {
                         encoded_idx: ModItemsEncoderDecoder::encode(kind, vis, idx),
                         span: name.span,
                     });
-
-                // match mods_items[mod_idx].get(&name_pool_idx) {
-                //     None => {
-                //         mods_items[mod_idx].insert(
-                //             name_pool_idx,
-                //             (ModItemsEncoderDecoder::encode(kind, vis, idx), name.span),
-                //         );
-                //     }
-                //     Some((_, found_span)) => {
-                //         let cursor = found_span.start;
-                //         let mut code_window = CodeWindow::new(&file_path, &file_lines, cursor);
-
-                //         code_window
-                //             .mark_secondary(*found_span, vec!["هنا أول عنصر".to_string()]);
-                //         code_window.mark_secondary(
-                //             name.span,
-                //             vec!["هنا ثاني عنصر بنفس الاسم".to_string()],
-                //         );
-
-                //         let msg =
-                //             format!("يُوجد عنصران بنفس الاسم `{}` في نفس الملف", name.data.val);
-
-                //         file_diagnostics.push(Diagnostic::error(msg, Some(code_window)));
-                //     }
-                // }
             });
 
             files.push((file_path, file_lines, file));
-
-            // mods_items.insert(mod_path, file_items_map);
-
-            // if !file_diagnostics.is_empty() {
-            //     for d in &file_diagnostics {
-            //         eprintln!("{}", d);
-            //     }
-            //     Err(())
-            // } else {
-            //     Ok(())
-            // }
         });
 
-    for (item_name_idx, item_to_mods) in items_to_mods {
-        // TODO
+    let id_pool = id_pool.build();
+
+    let last_idx = items_to_mods.len() - 1;
+
+    // Check duplicate items across mod files
+    // FIXME: Could we multithread that?!
+    for (i, (item_name_idx, item_to_mods)) in items_to_mods.iter_mut().enumerate() {
+        item_to_mods.sort_by(|a, b| a.mod_idx.cmp(&b.mod_idx));
+
+        let name = &id_pool[*item_name_idx];
+
+        let msg = format!("يوجد أكثر من عنصر بنفس الاسم `{}` في نفس الحزمة", name);
+
+        let mut diagnostic = Diagnostic::error(msg, vec![]);
+
+        let mut occurunces = 1;
+
+        item_to_mods
+            .chunk_by(|a, b| a.mod_idx == b.mod_idx)
+            .for_each(|slice| {
+                let mut slice = slice.to_vec();
+
+                slice.sort_by(|a, b| a.file_idx.cmp(&b.file_idx));
+
+                slice
+                    .chunk_by(|a, b| a.file_idx == b.file_idx)
+                    .for_each(|slice2| {
+                        let (file_path, file_lines, _) = &files[slice2[0].file_idx];
+                        let cursor = slice2[0].span.start;
+                        let mut code_window = CodeWindow::new(file_path, file_lines, cursor);
+
+                        for s in slice2.iter() {
+                            let occurence_str = match occurunces {
+                                1 => "هنا تم العثور على أول عنصر بهذا الاسم".to_string(),
+                                2 => "هنا تم العثور على نفس الاسم للمرة الثانية".to_string(),
+                                3 => "هنا تم العثور على نفس الاسم للمرة الثالثة".to_string(),
+                                4 => "هنا تم العثور على نفس الاسم للمرة الرابعة".to_string(),
+                                5 => "هنا تم العثور على نفس الاسم للمرة الخامسة".to_string(),
+                                6 => "هنا تم العثور على نفس الاسم للمرة السادسة".to_string(),
+                                7 => "هنا تم العثور على نفس الاسم للمرة السابعة".to_string(),
+                                8 => "هنا تم العثور على نفس الاسم للمرة الثامنة".to_string(),
+                                9 => "هنا تم العثور على نفس الاسم للمرة التاسعة".to_string(),
+                                10 => "هنا تم العثور على نفس الاسم للمرة العاشرة".to_string(),
+                                o => format!("هنا تم العثور على نفس الاسم للمرة {}", o),
+                            };
+                            if occurunces == 1 {
+                                code_window.mark_error(s.span, vec![occurence_str]);
+                            } else {
+                                code_window.mark_secondary(s.span, vec![occurence_str]);
+                            }
+                            occurunces += 1;
+                        }
+
+                        diagnostic.push_code_window(code_window);
+                    });
+            });
+
+        eprintln!("{}", diagnostic);
+
+        if i != last_idx {
+            eprintln!();
+        } else {
+            exit(1)
+        }
     }
 
     // let (file_path, file_content) = cli::read_file();
