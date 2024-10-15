@@ -9,7 +9,7 @@ pub mod syntax;
 pub mod parse_methods;
 pub(crate) mod tokens_iter;
 
-pub(crate) use nazmc_diagnostics::{span::Span, FileDiagnostics};
+pub(crate) use nazmc_diagnostics::span::Span;
 pub(crate) use nazmc_parse_derive::*;
 pub(crate) use parse_methods::*;
 pub(crate) use syntax::*;
@@ -18,7 +18,12 @@ pub(crate) use tokens_iter::TokensIter;
 pub fn parse<'a>(file_path: &'a str, file_content: &'a str) -> (File, Vec<String>) {
     let (tokens, file_lines, lexer_errors) = LexerIter::new(file_content).collect_all();
 
-    let mut reporter = ParseErrorsReporter::new(file_path, &file_lines, &tokens);
+    let mut reporter = ParseErrorsReporter {
+        file_path,
+        file_lines: &file_lines,
+        tokens: &tokens,
+        diagnostics: vec![],
+    };
 
     reporter.report_lexer_errors(&lexer_errors);
 
@@ -30,8 +35,10 @@ pub fn parse<'a>(file_path: &'a str, file_content: &'a str) -> (File, Vec<String
 
     reporter.check_file_items(&file.content.items);
 
-    if reporter.diagnostics.has_disgnostics() {
-        eprintln!("{}", reporter.diagnostics);
+    if !reporter.diagnostics.is_empty() {
+        for d in &reporter.diagnostics {
+            eprintln!("{}", d);
+        }
         panic::set_hook(Box::new(|_| {}));
         panic!()
     }
@@ -41,17 +48,12 @@ pub fn parse<'a>(file_path: &'a str, file_content: &'a str) -> (File, Vec<String
 
 struct ParseErrorsReporter<'a> {
     tokens: &'a [Token<'a>],
-    diagnostics: FileDiagnostics<'a>,
+    file_path: &'a str,
+    file_lines: &'a [String],
+    diagnostics: Vec<Diagnostic<'a>>,
 }
 
 impl<'a> ParseErrorsReporter<'a> {
-    fn new(file_path: &'a str, file_lines: &'a [String], tokens: &'a [Token<'a>]) -> Self {
-        Self {
-            tokens,
-            diagnostics: FileDiagnostics::new(file_path, file_lines),
-        }
-    }
-
     fn report(
         &mut self,
         msg: String,
@@ -59,7 +61,7 @@ impl<'a> ParseErrorsReporter<'a> {
         primary_label: String,
         secondary_labels: Vec<(Span, Vec<String>)>,
     ) {
-        let mut code_window = CodeWindow::new(span.start);
+        let mut code_window = CodeWindow::new(self.file_path, &self.file_lines, span.start);
 
         code_window.mark_error(span, vec![primary_label]);
 
@@ -203,7 +205,7 @@ impl<'a> ParseErrorsReporter<'a> {
                         vec![],
                     );
 
-                    self.diagnostics.chain_on_last(Diagnostic::help(
+                    self.diagnostics.last_mut().unwrap().chain(Diagnostic::help(
                         "اللاحقات الصالحة للعدد هى (ص، ص1، ص2، ص4، ص8، ط، ط1، ط2، ط4، ط8، ع4، ع8)"
                             .to_string(),
                         None,
@@ -217,7 +219,7 @@ impl<'a> ParseErrorsReporter<'a> {
                         vec![],
                     );
 
-                    self.diagnostics.chain_on_last(Diagnostic::help(
+                    self.diagnostics.last_mut().unwrap().chain(Diagnostic::help(
                         "اللاحقات الصالحة للعدد العشري هى (ع4، ع8)".to_string(),
                         None,
                     ));
@@ -230,7 +232,7 @@ impl<'a> ParseErrorsReporter<'a> {
                         vec![],
                     );
 
-                    self.diagnostics.chain_on_last(Diagnostic::help(
+                    self.diagnostics.last_mut().unwrap().chain(Diagnostic::help(
                         "اللاحقات الصالحة للعدد الصحيح هى (ص، ص1، ص2، ص4، ص8، ط، ط1، ط2، ط4، ط8)"
                             .to_string(),
                         None,
@@ -273,7 +275,7 @@ impl<'a> ParseErrorsReporter<'a> {
                         NumKind::U8(_) | NumKind::UnspecifiedInt(_) => u64::MAX.to_string(),
                     };
 
-                    self.diagnostics.chain_on_last(Diagnostic::help(
+                    self.diagnostics.last_mut().unwrap().chain(Diagnostic::help(
                         format!("أكبر قيمة من نفس نوع العدد هى `{}`", max_num_str),
                         None,
                     ));

@@ -8,7 +8,6 @@ use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::Span;
 use nazmc_diagnostics::CodeWindow;
 use nazmc_diagnostics::Diagnostic;
-use nazmc_diagnostics::FileDiagnostics;
 use nazmc_parser::parse;
 use nazmc_parser::parse_methods::ParseResult;
 use nazmc_parser::syntax;
@@ -117,6 +116,14 @@ fn get_file_paths() -> Vec<String> {
     collected_paths
 }
 
+#[derive(Default)]
+struct ASTItemsCounter {
+    unit_structs: usize,
+    tuple_structs: usize,
+    fields_structs: usize,
+    fns: usize,
+}
+
 fn main() {
     // RTL printing
     let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
@@ -127,24 +134,17 @@ fn main() {
     let files_paths = get_file_paths();
     let mut id_pool = DataPool::new();
     let mut str_pool = DataPool::new();
-
-    #[derive(Default)]
-    struct ASTItemsCounter {
-        unit_structs: usize,
-        tuple_structs: usize,
-        fields_structs: usize,
-        fns: usize,
-    }
-
     let mut ast_items_counter = ASTItemsCounter::default();
 
     files_paths
         .into_iter()
         .map(|file_path| {
-            let mod_path = file_path
+            let mut mod_path = file_path
                 .split_terminator('/')
                 .map(|s| id_pool.get(s))
                 .collect::<Vec<_>>();
+
+            // mod_path.pop(); // remove the actual file
 
             std::thread::spawn(move || {
                 let file_path = format!("{file_path}.نظم");
@@ -174,7 +174,7 @@ fn main() {
                 exit(1)
             };
 
-            let mut file_diagnostics = FileDiagnostics::new(&file_path, &file_lines);
+            let mut file_diagnostics = vec![];
 
             let mut mod_items_map = HashMap::new();
 
@@ -266,7 +266,7 @@ fn main() {
                         }
                         Some((_, found_span)) => {
                             let cursor = found_span.start;
-                            let mut code_window = CodeWindow::new(cursor);
+                            let mut code_window = CodeWindow::new(&file_path, &file_lines, cursor);
 
                             code_window
                                 .mark_secondary(*found_span, vec!["هنا أول عنصر".to_string()]);
@@ -284,8 +284,10 @@ fn main() {
                 })
                 .collect::<Vec<()>>();
 
-            if file_diagnostics.has_disgnostics() {
-                eprintln!("{}", file_diagnostics);
+            if !file_diagnostics.is_empty() {
+                for d in &file_diagnostics {
+                    eprintln!("{}", d);
+                }
                 Err(())
             } else {
                 Ok(())

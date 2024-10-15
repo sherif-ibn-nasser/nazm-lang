@@ -1,74 +1,8 @@
+use owo_colors::OwoColorize;
 use std::fmt::Display;
-
-use owo_colors::{OwoColorize, Style};
-use span::{Span, SpanCursor};
-
+mod code_window;
 pub mod span;
-
-mod code_reporter;
-
-use code_reporter::CodeReporter;
-
-trait DiagnosticPrint<'a> {
-    fn write(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-        path: &'a str,
-        file_lines: &'a [String],
-    ) -> std::fmt::Result;
-    fn writeln(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-        path: &'a str,
-        file_lines: &'a [String],
-    ) -> std::fmt::Result {
-        let _ = writeln!(f, "");
-        self.write(f, path, file_lines)
-    }
-}
-
-/// Represents the diagnostics for any compiler phase
-pub struct FileDiagnostics<'a> {
-    file_path: &'a str,
-    file_lines: &'a [String],
-    diagnostics: Vec<Diagnostic<'a>>,
-}
-
-impl<'a> FileDiagnostics<'a> {
-    pub fn new(file_path: &'a str, file_lines: &'a [String]) -> Self {
-        Self {
-            file_path,
-            file_lines,
-            diagnostics: vec![],
-        }
-    }
-
-    pub fn push(&mut self, diagnostic: Diagnostic<'a>) {
-        self.diagnostics.push(diagnostic);
-    }
-
-    pub fn chain_on_last(&mut self, diagnostic: Diagnostic<'a>) {
-        match self.diagnostics.last_mut() {
-            Some(last) => {
-                last.chain(diagnostic);
-            }
-            None => {}
-        }
-    }
-
-    pub fn has_disgnostics(&self) -> bool {
-        !self.diagnostics.is_empty()
-    }
-}
-
-impl<'a> Display for FileDiagnostics<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for d in &self.diagnostics {
-            let _ = d.writeln(f, self.file_path, self.file_lines);
-        }
-        Ok(())
-    }
-}
+pub use code_window::CodeWindow;
 
 pub struct Diagnostic<'a> {
     level: DiagnosticLevel,
@@ -110,13 +44,8 @@ enum DiagnosticLevel {
     Note,
 }
 
-impl<'a> DiagnosticPrint<'a> for Diagnostic<'a> {
-    fn write(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-        path: &'a str,
-        file_lines: &'a [String],
-    ) -> std::fmt::Result {
+impl<'a> Display for Diagnostic<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let _ = match self.level {
             DiagnosticLevel::Error => write!(f, "{}", "خطأ".bold().red()),
             DiagnosticLevel::ErrorWithCode(error_code) => write!(
@@ -135,76 +64,13 @@ impl<'a> DiagnosticPrint<'a> for Diagnostic<'a> {
         let _ = writeln!(f, "{} {}", ":".bold(), self.msg.bold());
 
         if let Some(code_window) = &self.code_window {
-            let _ = code_window.write(f, path, file_lines);
+            let _ = write!(f, "{}", code_window);
         }
 
         for chained_diagnostic in &self.chained_diagnostics {
-            let _ = chained_diagnostic.writeln(f, path, file_lines);
+            let _ = writeln!(f, "{}", chained_diagnostic);
         }
 
         Ok(())
-    }
-}
-
-pub struct CodeWindow<'a> {
-    cursor: SpanCursor,
-    code_reporter: CodeReporter<'a>,
-}
-
-impl<'a> CodeWindow<'a> {
-    pub fn new(cursor: SpanCursor) -> CodeWindow<'a> {
-        Self {
-            cursor,
-            code_reporter: CodeReporter::new(),
-        }
-    }
-
-    pub fn mark_error(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
-        self.code_reporter
-            .mark(span, '^', Style::new().bold().red(), labels);
-        self
-    }
-
-    pub fn mark_warning(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
-        self.code_reporter
-            .mark(span, '^', Style::new().bold().yellow(), labels);
-        self
-    }
-
-    pub fn mark_help(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
-        self.code_reporter
-            .mark(span, '=', Style::new().bold().green(), labels);
-        self
-    }
-
-    pub fn mark_note(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
-        self.code_reporter
-            .mark(span, '~', Style::new().bold().cyan(), labels);
-        self
-    }
-
-    pub fn mark_secondary(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
-        self.code_reporter
-            .mark(span, '-', Style::new().bold().blue(), labels);
-        self
-    }
-
-    pub fn mark_tertiary(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
-        self.code_reporter
-            .mark(span, '*', Style::new().bold().bright_magenta(), labels);
-        self
-    }
-}
-
-impl<'a> DiagnosticPrint<'a> for CodeWindow<'a> {
-    fn write(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-        path: &'a str,
-        file_lines: &'a [String],
-    ) -> std::fmt::Result {
-        let path = format!("{}:{}:{}", path, self.cursor.line + 1, self.cursor.col + 1);
-
-        self.code_reporter.write(f, &path, file_lines)
     }
 }
