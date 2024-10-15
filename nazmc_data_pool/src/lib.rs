@@ -1,5 +1,7 @@
 use std::{collections::HashMap, ops::Index};
 
+use itertools::Itertools;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PoolIdx(usize);
 
@@ -45,11 +47,20 @@ impl DataPool<Init> {
     pub fn build(self) -> DataPool<Built> {
         let mut table = Vec::with_capacity(self.state.0.len());
 
-        unsafe { table.set_len(self.state.0.len()) };
-
         for (str, idx) in self.state.0 {
+            if idx.0 >= table.len() {
+                for _ in table.len()..=idx.0 {
+                    table.push("".to_string());
+                }
+            }
             table[idx.0] = str;
         }
+
+        // unsafe { table.set_len(self.state.0.len()) };
+
+        // for (str, idx) in self.state.0 {
+        //     table[idx.0] = str;
+        // }
 
         DataPool {
             state: Built(table),

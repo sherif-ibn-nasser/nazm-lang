@@ -3,6 +3,7 @@ mod cli;
 use cli::print_err;
 use nazmc_data_pool::DataPool;
 use nazmc_data_pool::PoolIdx;
+use nazmc_diagnostics::eprint_diagnostics;
 use nazmc_diagnostics::span::Span;
 use nazmc_diagnostics::CodeWindow;
 use nazmc_diagnostics::Diagnostic;
@@ -274,24 +275,24 @@ fn main() {
 
     let id_pool = id_pool.build();
 
-    let last_idx = items_to_mods.len() - 1;
+    let mut diagnostics = vec![];
 
     // Check duplicate items across mod files
     // FIXME: Could we multithread that?!
-    for (i, (item_name_idx, item_to_mods)) in items_to_mods.iter_mut().enumerate() {
+    for (item_name_idx, item_to_mods) in items_to_mods.iter_mut() {
         item_to_mods.sort_by(|a, b| a.mod_idx.cmp(&b.mod_idx));
 
         let name = &id_pool[*item_name_idx];
 
-        let msg = format!("يوجد أكثر من عنصر بنفس الاسم `{}` في نفس الحزمة", name);
-
-        let mut diagnostic = Diagnostic::error(msg, vec![]);
-
-        let mut occurunces = 1;
-
         item_to_mods
             .chunk_by(|a, b| a.mod_idx == b.mod_idx)
             .for_each(|slice| {
+                let msg = format!("يوجد أكثر من عنصر بنفس الاسم `{}` في نفس الحزمة", name);
+
+                let mut diagnostic = Diagnostic::error(msg, vec![]);
+
+                let mut occurunces = 1;
+
                 let mut slice = slice.to_vec();
 
                 slice.sort_by(|a, b| a.file_idx.cmp(&b.file_idx));
@@ -327,15 +328,13 @@ fn main() {
 
                         diagnostic.push_code_window(code_window);
                     });
+                diagnostics.push(diagnostic);
             });
+    }
 
-        eprintln!("{}", diagnostic);
-
-        if i != last_idx {
-            eprintln!();
-        } else {
-            exit(1)
-        }
+    if !diagnostics.is_empty() {
+        eprint_diagnostics(diagnostics);
+        exit(1)
     }
 
     // let (file_path, file_content) = cli::read_file();

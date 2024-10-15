@@ -5,7 +5,7 @@ pub mod span;
 pub use code_window::CodeWindow;
 
 pub fn eprint_diagnostics(diagnostics: Vec<Diagnostic>) {
-    let last_idx = diagnostics.len();
+    let last_idx = diagnostics.len() - 1;
     for (i, d) in diagnostics.iter().enumerate() {
         eprintln!("{}", d);
         if i != last_idx {

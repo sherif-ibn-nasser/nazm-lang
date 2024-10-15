@@ -120,6 +120,9 @@ dependencies = [
 [[package]]
 name = "nazmc_data_pool"
 version = "0.1.0"
+dependencies = [
+ "itertools",
+]
 
 [[package]]
 name = "nazmc_diagnostics"
