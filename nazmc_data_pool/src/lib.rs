@@ -47,6 +47,7 @@ impl DataPool<Init> {
     pub fn build(self) -> DataPool<Built> {
         let mut table = Vec::with_capacity(self.state.0.len());
 
+        // FIXME: Optimize
         for (str, idx) in self.state.0 {
             if idx.0 >= table.len() {
                 for _ in table.len()..=idx.0 {

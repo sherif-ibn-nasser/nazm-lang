@@ -109,12 +109,21 @@ name = "nazmc"
 version = "0.1.0"
 dependencies = [
  "bpaf",
+ "nazmc_ast",
  "nazmc_data_pool",
  "nazmc_diagnostics",
  "nazmc_parser",
  "owo-colors",
  "serde",
  "serde_yaml",
+]
+
+[[package]]
+name = "nazmc_ast"
+version = "0.1.0"
+dependencies = [
+ "nazmc_data_pool",
+ "nazmc_diagnostics",
 ]
 
 [[package]]

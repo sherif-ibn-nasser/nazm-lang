@@ -10,7 +10,9 @@ use nazmc_diagnostics::Diagnostic;
 use nazmc_parser::parse;
 use nazmc_parser::parse_methods::ParseResult;
 use nazmc_parser::syntax;
+use nazmc_parser::syntax::FileItem;
 use nazmc_parser::syntax::Id;
+use nazmc_parser::syntax::Item;
 use owo_colors::OwoColorize;
 use serde::Deserialize;
 use serde_yaml::Value;
@@ -115,47 +117,44 @@ struct ASTItemsCounter {
     fns: usize,
 }
 
-#[derive(Clone)]
-struct ItemMapToMod {
-    mod_idx: usize,
-    file_idx: usize,
-    encoded_idx: u64,
-    span: Span,
-}
-
 enum VisModifier {
     Default = 0,
     Pub = 1,
     Priv = 2,
 }
 
-enum ItemKind {
-    UnitSruct = 0,
-    TupleSruct = 1,
-    FieldsSruct = 2,
-    Fn = 3,
+#[derive(Clone)]
+struct ItemMapToMod {
+    mod_idx: usize,
+    file_idx: usize,
+    idx_in_file: usize,
 }
 
-struct ModItemsEncoderDecoder;
+// struct ModItemsEncoderDecoder;
 
-impl ModItemsEncoderDecoder {
-    pub fn encode(kind: ItemKind, vis: VisModifier, idx: usize) -> u64 {
-        (kind as u64) << 62 | (vis as u64) << 60 | (idx as u64)
-    }
-}
+// impl ModItemsEncoderDecoder {
+//     pub fn encode(kind: ItemKind, vis: VisModifier, idx: usize) -> u64 {
+//         (kind as u64) << 62 | (vis as u64) << 60 | (idx as u64)
+//     }
+// }
 
-fn get_item_kind_and_name(item: &syntax::Item) -> (ItemKind, &ParseResult<Id>) {
-    match item {
-        syntax::Item::Struct(s) => (
-            match &s.kind {
-                Ok(syntax::StructKind::Unit(_)) => ItemKind::UnitSruct,
-                Ok(syntax::StructKind::Tuple(_)) => ItemKind::TupleSruct,
-                Ok(syntax::StructKind::Fields(_)) => ItemKind::FieldsSruct,
-                _ => unreachable!(),
-            },
-            &s.name,
-        ),
-        syntax::Item::Fn(f) => (ItemKind::Fn, &f.name),
+#[inline]
+fn get_file_item(file_item: &FileItem) -> (&Item, VisModifier) {
+    match file_item {
+        syntax::FileItem::WithVisModifier(item_with_vis) => {
+            let Ok(item) = &item_with_vis.item else {
+                unreachable!()
+            };
+
+            (
+                item,
+                match item_with_vis.visibility.data {
+                    syntax::VisModifierToken::Public => VisModifier::Pub,
+                    syntax::VisModifierToken::Private => VisModifier::Priv,
+                },
+            )
+        }
+        syntax::FileItem::WithoutModifier(item) => (item, VisModifier::Default),
     }
 }
 
@@ -220,55 +219,44 @@ fn main() {
 
             let file_idx = files.len();
 
-            file.content.items.iter().for_each(|item| {
-                let Ok(item) = item else {
-                    unreachable!();
-                };
+            file.content
+                .items
+                .iter()
+                .enumerate()
+                .for_each(|(idx_in_file, item)| {
+                    let Ok(item) = item else {
+                        unreachable!();
+                    };
 
-                let (item, vis) = match item {
-                    syntax::FileItem::WithVisModifier(item_with_vis) => {
-                        let Ok(item) = &item_with_vis.item else {
-                            unreachable!()
-                        };
+                    let item = match item {
+                        syntax::FileItem::WithVisModifier(item_with_vis) => {
+                            let Ok(item) = &item_with_vis.item else {
+                                unreachable!()
+                            };
 
-                        (
-                            item,
-                            match item_with_vis.visibility.data {
-                                syntax::VisModifierToken::Public => VisModifier::Pub,
-                                syntax::VisModifierToken::Private => VisModifier::Priv,
-                            },
-                        )
-                    }
-                    syntax::FileItem::WithoutModifier(item) => (item, VisModifier::Default),
-                };
+                            item
+                        }
+                        syntax::FileItem::WithoutModifier(item) => item,
+                    };
 
-                let (kind, name) = get_item_kind_and_name(item);
+                    let Ok(name) = (match item {
+                        syntax::Item::Struct(s) => &s.name,
+                        syntax::Item::Fn(f) => &f.name,
+                    }) else {
+                        unreachable!()
+                    };
 
-                let Ok(name) = name else { unreachable!() };
+                    let name_pool_idx = id_pool.get(&name.data.val);
 
-                let name_pool_idx = id_pool.get(&name.data.val);
-
-                let ast_counter = match kind {
-                    ItemKind::UnitSruct => &mut ast_items_counter.unit_structs,
-                    ItemKind::TupleSruct => &mut ast_items_counter.tuple_structs,
-                    ItemKind::FieldsSruct => &mut ast_items_counter.fields_structs,
-                    ItemKind::Fn => &mut ast_items_counter.fns,
-                };
-
-                let idx = *ast_counter;
-
-                *ast_counter += 1;
-
-                items_to_mods
-                    .entry(name_pool_idx)
-                    .or_default()
-                    .push(ItemMapToMod {
-                        mod_idx,
-                        file_idx,
-                        encoded_idx: ModItemsEncoderDecoder::encode(kind, vis, idx),
-                        span: name.span,
-                    });
-            });
+                    items_to_mods
+                        .entry(name_pool_idx)
+                        .or_default()
+                        .push(ItemMapToMod {
+                            mod_idx,
+                            file_idx,
+                            idx_in_file,
+                        });
+                });
 
             files.push((file_path, file_lines, file));
         });
@@ -300,11 +288,42 @@ fn main() {
                 slice
                     .chunk_by(|a, b| a.file_idx == b.file_idx)
                     .for_each(|slice2| {
-                        let (file_path, file_lines, _) = &files[slice2[0].file_idx];
-                        let cursor = slice2[0].span.start;
-                        let mut code_window = CodeWindow::new(file_path, file_lines, cursor);
+                        let (file_path, file_lines, file) = &files[slice2[0].file_idx];
 
-                        for s in slice2.iter() {
+                        let get_item_name_span_by_idx = |idx: usize| {
+                            let Ok(item_syntax_tree) = &file.content.items[slice2[idx].idx_in_file]
+                            else {
+                                unreachable!()
+                            };
+
+                            let item = match item_syntax_tree {
+                                syntax::FileItem::WithVisModifier(item_with_vis) => {
+                                    let Ok(item) = &item_with_vis.item else {
+                                        unreachable!()
+                                    };
+
+                                    item
+                                }
+                                syntax::FileItem::WithoutModifier(item) => item,
+                            };
+
+                            let Ok(name) = (match item {
+                                syntax::Item::Struct(s) => &s.name,
+                                syntax::Item::Fn(f) => &f.name,
+                            }) else {
+                                unreachable!()
+                            };
+                            name.span
+                        };
+
+                        let mut code_window = CodeWindow::new(
+                            file_path,
+                            file_lines,
+                            get_item_name_span_by_idx(0).start,
+                        );
+
+                        for (i, _) in slice2.iter().enumerate() {
+                            let span = get_item_name_span_by_idx(i);
                             let occurence_str = match occurunces {
                                 1 => "هنا تم العثور على أول عنصر بهذا الاسم".to_string(),
                                 2 => "هنا تم العثور على نفس الاسم للمرة الثانية".to_string(),
@@ -319,9 +338,9 @@ fn main() {
                                 o => format!("هنا تم العثور على نفس الاسم للمرة {}", o),
                             };
                             if occurunces == 1 {
-                                code_window.mark_error(s.span, vec![occurence_str]);
+                                code_window.mark_error(span, vec![occurence_str]);
                             } else {
-                                code_window.mark_secondary(s.span, vec![occurence_str]);
+                                code_window.mark_secondary(span, vec![occurence_str]);
                             }
                             occurunces += 1;
                         }
@@ -335,6 +354,57 @@ fn main() {
     if !diagnostics.is_empty() {
         eprint_diagnostics(diagnostics);
         exit(1)
+    }
+
+    // FIXME: Optimize
+    let mut mods_vec = Vec::with_capacity(mods.len());
+    for (mod_path, idx) in mods {
+        if idx >= mods_vec.len() {
+            for _ in mods_vec.len()..=idx {
+                mods_vec.push(vec![]);
+            }
+        }
+        mods_vec[idx] = mod_path;
+    }
+
+    let mut fns = vec![];
+
+    for (item_name_idx, item_to_mods) in items_to_mods {
+        for item_to_mod in item_to_mods {
+            let (file_path, file_lines, file) = &files[item_to_mod.file_idx];
+
+            let Ok(item) = &file.content.items[item_to_mod.idx_in_file] else {
+                unreachable!()
+            };
+
+            let (item, vis) = get_file_item(item);
+
+            match item {
+                syntax::Item::Struct(s) => {
+                    let Ok(name) = &s.name else { unreachable!() };
+                    let name = nazmc_ast::ASTId {
+                        span: name.span,
+                        id: item_name_idx,
+                    };
+                    todo!()
+                }
+                syntax::Item::Fn(f) => {
+                    let Ok(name) = &f.name else { unreachable!() };
+                    let name = nazmc_ast::ASTId {
+                        span: name.span,
+                        id: item_name_idx,
+                    };
+                    todo!();
+                    fns.push(nazmc_ast::Fn {
+                        mod_index: item_to_mod.mod_idx,
+                        name,
+                        params: todo!(),
+                        return_ty: todo!(),
+                        scope: todo!(),
+                    });
+                }
+            }
+        }
     }
 
     // let (file_path, file_content) = cli::read_file();

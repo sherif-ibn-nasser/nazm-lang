@@ -4,3 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+nazmc_diagnostics = { path = "../nazmc_diagnostics" }
+nazmc_data_pool = { path = "../nazmc_data_pool" }
