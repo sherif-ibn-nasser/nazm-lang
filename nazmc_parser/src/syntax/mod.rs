@@ -34,5 +34,13 @@ generateTrailingCommaWithCloseDelimiter!(RArrowSymbol);
 
 #[derive(NazmcParse, Debug)]
 pub struct File {
+    pub imports: Vec<ImportStm>,
     pub content: ZeroOrMany<FileItem, Eof>,
+}
+
+#[derive(NazmcParse, Debug)]
+pub struct ImportStm {
+    pub import_keyword: ImportKeyword,
+    pub path: ParseResult<SimplePath>,
+    pub semicolon: ParseResult<SemicolonSymbol>,
 }

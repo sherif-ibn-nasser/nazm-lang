@@ -237,6 +237,7 @@ fn main() {
                             item
                         }
                         syntax::FileItem::WithoutModifier(item) => item,
+                        _ => return, // i.e. continue
                     };
 
                     let Ok(name) = (match item {

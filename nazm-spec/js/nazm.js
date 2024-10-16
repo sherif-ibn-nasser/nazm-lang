@@ -28,6 +28,7 @@
       "صحيح",
       "فاسد",
       "على",
+      "استيراد",
     ],
     non_keywords = XRegExp(
       "(?!" + `(?:${keywords.join("|")})` + uni_b_e + ")",

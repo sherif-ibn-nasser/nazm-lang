@@ -33,7 +33,7 @@ pub fn parse<'a>(file_path: &'a str, file_content: &'a str) -> (File, Vec<String
 
     let file = ParseResult::<File>::parse(&mut tokens_iter).unwrap();
 
-    reporter.check_file_items(&file.content.items);
+    reporter.check_file(&file);
 
     if !reporter.diagnostics.is_empty() {
         eprint_diagnostics(reporter.diagnostics);
@@ -373,6 +373,24 @@ impl<'a> ParseErrorsReporter<'a> {
             "يجب إغلاق هذا القوس".to_string(),
             vec![],
         );
+    }
+
+    fn check_file(&mut self, file: &File) {
+        for import in &file.imports {
+            match &import.path {
+                Ok(path) => {
+                    self.check_simple_path(path);
+                    self.check_semicolon_result(&import.semicolon);
+                }
+                Err(_) => self.report(
+                    "يُتوقع مسار بعد `استيراد`".to_string(),
+                    import.import_keyword.span,
+                    "".to_string(),
+                    vec![],
+                ),
+            }
+        }
+        self.check_file_items(&file.content.items);
     }
 
     fn check_file_items(&mut self, items: &[ParseResult<FileItem>]) {

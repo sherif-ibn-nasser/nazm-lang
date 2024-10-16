@@ -151,4 +151,6 @@ pub enum KeywordKind {
     Continue,
     /// أرجع
     Return,
+    /// استيراد
+    Import,
 }
