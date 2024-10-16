@@ -377,18 +377,69 @@ impl<'a> ParseErrorsReporter<'a> {
 
     fn check_file(&mut self, file: &File) {
         for import in &file.imports {
-            match &import.path {
-                Ok(path) => {
-                    self.check_simple_path(path);
-                    self.check_semicolon_result(&import.semicolon);
-                }
-                Err(_) => self.report(
-                    "يُتوقع مسار بعد `استيراد`".to_string(),
-                    import.import_keyword.span,
-                    "".to_string(),
-                    vec![],
-                ),
+            if let Err(err) = &import.top {
+                self.report_expected("اسم حزمة", err, vec![]);
+                return;
             }
+
+            let mut last_star_symbol_span = None;
+
+            match &import.sec {
+                Ok(a) => match &a.seg {
+                    Ok(b) => {
+                        if let PathSegInImportStm::Star(s) = b {
+                            last_star_symbol_span = Some(s.span)
+                        }
+                    }
+                    Err(err) => self.report_expected("اسم أو *", err, vec![]),
+                },
+                Err(_) => {
+                    self.report(
+                        "يُتوقع `::` ثم اسم عنصر أو `*` بعد الحزمة".to_string(),
+                        if let Ok(t) = &import.top {
+                            t.span
+                        } else {
+                            unreachable!()
+                        },
+                        "قُم بعدها بإضافة `::` ثم اسم عنصر أو `*`".to_string(),
+                        vec![],
+                    );
+                    return;
+                }
+            }
+
+            for seg in &import.segs {
+                match &seg.seg {
+                    Ok(a) => {
+                        if let PathSegInImportStm::Star(s) = a {
+                            if let Some(span) = last_star_symbol_span {
+                                self.report(
+                                    "الرمز `*` يجب أن يكون في آخر المسار".to_string(),
+                                    span,
+                                    "".to_string(),
+                                    vec![],
+                                );
+                                return;
+                            }
+                            last_star_symbol_span = Some(s.span)
+                        }
+                    }
+                    Err(_) => {
+                        self.report(
+                            "يُتوقع `::` ثم اسم عنصر أو `*` بعد الحزمة".to_string(),
+                            if let Ok(t) = &import.top {
+                                t.span
+                            } else {
+                                unreachable!()
+                            },
+                            "قُم بعدها بإضافة `::` ثم اسم عنصر أو `*`".to_string(),
+                            vec![],
+                        );
+                    }
+                }
+            }
+
+            self.check_semicolon_result(&import.semicolon);
         }
         self.check_file_items(&file.content.items);
     }

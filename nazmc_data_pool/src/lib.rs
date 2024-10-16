@@ -11,8 +11,10 @@ mod private {
 
 pub trait DisplayTableState: private::DisplayTableStateGuard {}
 
+#[derive(Clone)]
 pub struct Init(HashMap<String, PoolIdx>);
 
+#[derive(Clone)]
 pub struct Built(Vec<String>);
 
 impl private::DisplayTableStateGuard for Init {}
@@ -21,7 +23,11 @@ impl private::DisplayTableStateGuard for Built {}
 impl DisplayTableState for Init {}
 impl DisplayTableState for Built {}
 
-pub struct DataPool<S: DisplayTableState> {
+#[derive(Clone)]
+pub struct DataPool<S>
+where
+    S: DisplayTableState + Clone,
+{
     state: S,
 }
 

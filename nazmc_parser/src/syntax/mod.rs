@@ -41,6 +41,20 @@ pub struct File {
 #[derive(NazmcParse, Debug)]
 pub struct ImportStm {
     pub import_keyword: ImportKeyword,
-    pub path: ParseResult<SimplePath>,
+    pub top: ParseResult<Id>,
+    pub sec: ParseResult<DoubleColonsWithPathSegInImportStm>,
+    pub segs: Vec<DoubleColonsWithPathSegInImportStm>,
     pub semicolon: ParseResult<SemicolonSymbol>,
+}
+
+#[derive(NazmcParse, Debug)]
+pub struct DoubleColonsWithPathSegInImportStm {
+    pub double_colons: DoubleColonsSymbol,
+    pub seg: ParseResult<PathSegInImportStm>,
+}
+
+#[derive(NazmcParse, Debug)]
+pub enum PathSegInImportStm {
+    Id(Id),
+    Star(StarSymbol),
 }

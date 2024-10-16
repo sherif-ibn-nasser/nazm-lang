@@ -1,5 +1,4 @@
 mod cli;
-
 use cli::print_err;
 use nazmc_data_pool::DataPool;
 use nazmc_data_pool::PoolIdx;
@@ -18,6 +17,7 @@ use serde::Deserialize;
 use serde_yaml::Value;
 use std::io;
 use std::io::Write;
+use std::vec;
 use std::{
     collections::HashMap,
     fs, panic,
@@ -158,6 +158,23 @@ fn get_file_item(file_item: &FileItem) -> (&Item, VisModifier) {
     }
 }
 
+struct UnresolvedImport {
+    first_invalid_seg: PoolIdx,
+    first_invalid_seg_span: Span,
+    file_idx: usize,
+}
+
+struct ResolvedImport {
+    file_idx: usize,
+    item_id: PoolIdx,
+    item_to_mod_idx: usize,
+}
+
+struct ResolvedStarImport {
+    file_idx: usize,
+    mod_idx: usize,
+}
+
 fn main() {
     // RTL printing
     let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
@@ -262,7 +279,7 @@ fn main() {
             files.push((file_path, file_lines, file));
         });
 
-    let id_pool = id_pool.build();
+    let id_pool_cloned_built = id_pool.clone().build();
 
     let mut diagnostics = vec![];
 
@@ -271,11 +288,14 @@ fn main() {
     for (item_name_idx, item_to_mods) in items_to_mods.iter_mut() {
         item_to_mods.sort_by(|a, b| a.mod_idx.cmp(&b.mod_idx));
 
-        let name = &id_pool[*item_name_idx];
+        let name = &id_pool_cloned_built[*item_name_idx];
 
         item_to_mods
             .chunk_by(|a, b| a.mod_idx == b.mod_idx)
             .for_each(|slice| {
+                if slice.len() == 1 {
+                    return;
+                }
                 let msg = format!("يوجد أكثر من عنصر بنفس الاسم `{}` في نفس الحزمة", name);
 
                 let mut diagnostic = Diagnostic::error(msg, vec![]);
@@ -352,20 +372,145 @@ fn main() {
             });
     }
 
+    let mut unresolved_imports = vec![];
+    let mut resolved_imports = vec![];
+    let mut resolved_star_imports = vec![];
+
+    // Resolve imports
+    for (file_idx, (file_path, file_lines, file)) in files.iter().enumerate() {
+        for import_stm in &file.imports {
+            let mut mod_path = vec![];
+            let mut path_spans = vec![];
+            let mut import_all = false;
+
+            if let Ok(id) = &import_stm.top {
+                mod_path.push(id_pool.get(&id.data.val));
+                path_spans.push(id.span);
+            } else {
+                unreachable!()
+            };
+
+            if let Ok(s) = &import_stm.sec {
+                match s.seg.as_ref().unwrap() {
+                    syntax::PathSegInImportStm::Id(id) => {
+                        mod_path.push(id_pool.get(&id.data.val));
+                        path_spans.push(id.span);
+                    }
+                    syntax::PathSegInImportStm::Star(_) => import_all = true,
+                }
+            } else {
+                unreachable!()
+            };
+
+            for s in &import_stm.segs {
+                match s.seg.as_ref().unwrap() {
+                    syntax::PathSegInImportStm::Id(id) => {
+                        mod_path.push(id_pool.get(&id.data.val));
+                        path_spans.push(id.span);
+                    }
+                    syntax::PathSegInImportStm::Star(_) => import_all = true,
+                }
+            }
+
+            if import_all {
+                match mods.get(&mod_path) {
+                    Some(mod_idx) => {
+                        resolved_star_imports.push(ResolvedStarImport {
+                            file_idx,
+                            mod_idx: *mod_idx,
+                        });
+                    }
+                    None => {
+                        while let Some(first_invalid_seg) = mod_path.pop() {
+                            let first_invalid_seg_span = path_spans.pop().unwrap();
+
+                            if mods.contains_key(&mod_path) {
+                                unresolved_imports.push(UnresolvedImport {
+                                    first_invalid_seg,
+                                    first_invalid_seg_span,
+                                    file_idx,
+                                });
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else {
+                let item_id = mod_path.pop().unwrap();
+                let item_span = path_spans.pop().unwrap();
+                match mods.get(&mod_path) {
+                    Some(mod_idx) => {
+                        let item_to_mods = match items_to_mods.get(&item_id) {
+                            Some(item_to_mods) => item_to_mods,
+                            None => {
+                                unresolved_imports.push(UnresolvedImport {
+                                    first_invalid_seg: item_id,
+                                    first_invalid_seg_span: item_span,
+                                    file_idx,
+                                });
+                                continue;
+                            }
+                        };
+
+                        match item_to_mods.binary_search_by(|probe| probe.mod_idx.cmp(mod_idx)) {
+                            Ok(item_to_mod_idx) => {
+                                resolved_imports.push(ResolvedImport {
+                                    file_idx,
+                                    item_id,
+                                    item_to_mod_idx,
+                                });
+                            }
+                            Err(_) => {
+                                unresolved_imports.push(UnresolvedImport {
+                                    first_invalid_seg: item_id,
+                                    first_invalid_seg_span: item_span,
+                                    file_idx,
+                                });
+                            }
+                        }
+                    }
+                    None => {
+                        while let Some(first_invalid_seg) = mod_path.pop() {
+                            let first_invalid_seg_span = path_spans.pop().unwrap();
+
+                            if mods.contains_key(&mod_path) {
+                                unresolved_imports.push(UnresolvedImport {
+                                    first_invalid_seg,
+                                    first_invalid_seg_span,
+                                    file_idx,
+                                });
+                                break;
+                            }
+                        }
+                    }
+                };
+            }
+        }
+    }
+
+    if !unresolved_imports.is_empty() {
+        let id_pool = id_pool.build();
+        for unresolved_import in unresolved_imports {
+            let name = &id_pool[unresolved_import.first_invalid_seg];
+            let msg = format!("لم يتم العثور على الاسم `{}` في المسار", name);
+            let (file_path, file_lines, _) = &files[unresolved_import.file_idx];
+            let mut code_window = CodeWindow::new(
+                file_path,
+                file_lines,
+                unresolved_import.first_invalid_seg_span.start,
+            );
+            code_window.mark_error(
+                unresolved_import.first_invalid_seg_span,
+                vec!["هذا الاسم غير موجود داخل المسار المحدد".to_string()],
+            );
+            let diagnostic = Diagnostic::error(msg, vec![code_window]);
+            diagnostics.push(diagnostic);
+        }
+    }
+
     if !diagnostics.is_empty() {
         eprint_diagnostics(diagnostics);
         exit(1)
-    }
-
-    // FIXME: Optimize
-    let mut mods_vec = Vec::with_capacity(mods.len());
-    for (mod_path, idx) in mods {
-        if idx >= mods_vec.len() {
-            for _ in mods_vec.len()..=idx {
-                mods_vec.push(vec![]);
-            }
-        }
-        mods_vec[idx] = mod_path;
     }
 
     let mut fns = vec![];
@@ -407,6 +552,17 @@ fn main() {
             }
         }
     }
+
+    // FIXME: Optimize
+    // let mut mods_vec = Vec::with_capacity(mods.len());
+    // for (mod_path, idx) in mods {
+    //     if idx >= mods_vec.len() {
+    //         for _ in mods_vec.len()..=idx {
+    //             mods_vec.push(vec![]);
+    //         }
+    //     }
+    //     mods_vec[idx] = mod_path;
+    // }
 
     // let (file_path, file_content) = cli::read_file();
 
