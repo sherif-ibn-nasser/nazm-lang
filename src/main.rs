@@ -186,7 +186,7 @@ fn main() {
     let mut id_pool = DataPool::new();
     let mut str_pool = DataPool::new();
     let mut ast_items_counter = ASTItemsCounter::default();
-    let mut files = vec![]; // path, lines and the parse syntax tree
+    let mut files = vec![]; // path, lines, the parse syntax tree and the mod index
     let mut mods = HashMap::new();
     let mut items_to_mods: HashMap<PoolIdx, Vec<_>> = HashMap::new();
 
@@ -276,7 +276,7 @@ fn main() {
                         });
                 });
 
-            files.push((file_path, file_lines, file));
+            files.push((file_path, file_lines, file, mod_idx));
         });
 
     let id_pool_cloned_built = id_pool.clone().build();
@@ -309,7 +309,8 @@ fn main() {
                 slice
                     .chunk_by(|a, b| a.file_idx == b.file_idx)
                     .for_each(|slice2| {
-                        let (file_path, file_lines, file) = &files[slice2[0].file_idx];
+                        let (file_path, file_lines, file, file_mod_idx) =
+                            &files[slice2[0].file_idx];
 
                         let get_item_name_span_by_idx = |idx: usize| {
                             let Ok(item_syntax_tree) = &file.content.items[slice2[idx].idx_in_file]
@@ -377,12 +378,13 @@ fn main() {
     let mut resolved_star_imports = vec![];
 
     // Resolve imports
-    for (file_idx, (file_path, file_lines, file)) in files.iter().enumerate() {
+    for (file_idx, (file_path, file_lines, file, file_mod_idx)) in files.iter().enumerate() {
         for import_stm in &file.imports {
             let mut mod_path = vec![];
             let mut path_spans = vec![];
             let mut import_all = false;
 
+            // Init
             if let Ok(id) = &import_stm.top {
                 mod_path.push(id_pool.get(&id.data.val));
                 path_spans.push(id.span);
@@ -412,9 +414,11 @@ fn main() {
                 }
             }
 
+            // Resolve
             if import_all {
                 match mods.get(&mod_path) {
                     Some(mod_idx) => {
+                        // The mod is found with mod_idx
                         resolved_star_imports.push(ResolvedStarImport {
                             file_idx,
                             mod_idx: *mod_idx,
@@ -440,6 +444,7 @@ fn main() {
                 let item_span = path_spans.pop().unwrap();
                 match mods.get(&mod_path) {
                     Some(mod_idx) => {
+                        // The mod is found with mod_idx
                         let item_to_mods = match items_to_mods.get(&item_id) {
                             Some(item_to_mods) => item_to_mods,
                             None => {
@@ -454,11 +459,27 @@ fn main() {
 
                         match item_to_mods.binary_search_by(|probe| probe.mod_idx.cmp(mod_idx)) {
                             Ok(item_to_mod_idx) => {
-                                resolved_imports.push(ResolvedImport {
-                                    file_idx,
-                                    item_id,
-                                    item_to_mod_idx,
-                                });
+                                let item_to_mod = &item_to_mods[item_to_mod_idx];
+
+                                if item_to_mod.mod_idx == *file_mod_idx {
+                                    resolved_imports.push(ResolvedImport {
+                                        file_idx,
+                                        item_id,
+                                        item_to_mod_idx,
+                                    });
+                                } else {
+                                    // The import stm and the item are not in the same mods
+                                    let (_item, vis) = get_file_item(
+                                        files[item_to_mod.file_idx].2.content.items
+                                            [item_to_mod.idx_in_file]
+                                            .as_ref()
+                                            .unwrap(),
+                                    );
+                                    // Check resolved item visibility
+                                    if let VisModifier::Default = vis {
+                                        // TODO
+                                    }
+                                }
                             }
                             Err(_) => {
                                 unresolved_imports.push(UnresolvedImport {
@@ -493,7 +514,7 @@ fn main() {
         for unresolved_import in unresolved_imports {
             let name = &id_pool[unresolved_import.first_invalid_seg];
             let msg = format!("لم يتم العثور على الاسم `{}` في المسار", name);
-            let (file_path, file_lines, _) = &files[unresolved_import.file_idx];
+            let (file_path, file_lines, ..) = &files[unresolved_import.file_idx];
             let mut code_window = CodeWindow::new(
                 file_path,
                 file_lines,
@@ -517,7 +538,7 @@ fn main() {
 
     for (item_name_idx, item_to_mods) in items_to_mods {
         for item_to_mod in item_to_mods {
-            let (file_path, file_lines, file) = &files[item_to_mod.file_idx];
+            let (file_path, file_lines, file, file_mod_idx) = &files[item_to_mod.file_idx];
 
             let Ok(item) = &file.content.items[item_to_mod.idx_in_file] else {
                 unreachable!()
