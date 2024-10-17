@@ -4,9 +4,10 @@ use nazmc_lexer::*;
 use std::panic;
 use syntax::File;
 
-pub mod syntax;
-
+pub mod ast;
+mod ast_generator;
 pub mod parse_methods;
+pub mod syntax;
 pub(crate) mod tokens_iter;
 
 pub(crate) use nazmc_diagnostics::span::Span;
@@ -40,6 +41,8 @@ pub fn parse<'a>(file_path: &'a str, file_content: &'a str) -> (File, Vec<String
         panic::set_hook(Box::new(|_| {}));
         panic!()
     }
+
+    // let file = ast_generator::lower_file(file);
 
     (file, file_lines)
 }
