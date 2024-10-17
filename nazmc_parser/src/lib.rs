@@ -878,10 +878,22 @@ impl<'a> ParseErrorsReporter<'a> {
                             self.check_semicolon_result(semicolon);
                         }
                     }
-                    Stm::Expr(ExprStm::WithBlock(ExprWithBlockStm { expr, semicolon: _ })) => {
-                        self.check_expr_with_block(expr);
+                    Stm::While(while_stm) => {
+                        match &while_stm.conditional_block.condition {
+                            Ok(expr) => self.check_expr(expr),
+                            Err(err) => {
+                                self.report_expected("تعبير برمجي (شرط `طالما`)", err, vec![])
+                            }
+                        }
+
+                        match &while_stm.conditional_block.block {
+                            Ok(block) => self.check_block(block),
+                            Err(err) => self.report_expected("محتوى `طالما`", err, vec![]),
+                        }
                     }
-                    Stm::Expr(ExprStm::Any(AnyExprStm { expr, semicolon })) => {
+                    Stm::If(if_expr) => self.check_if_expr(if_expr),
+                    Stm::When(when_expr) => self.check_when_expr(when_expr),
+                    Stm::Expr(ExprStm { expr, semicolon }) => {
                         self.check_expr(expr);
                         self.check_semicolon_result(semicolon);
                     }
@@ -1004,8 +1016,9 @@ impl<'a> ParseErrorsReporter<'a> {
             AtomicExpr::Literal(_) | AtomicExpr::On(_) | AtomicExpr::Continue(_) => {}
             AtomicExpr::Paren(paren_expr) => self.check_paren_expr(paren_expr),
             AtomicExpr::Path(simple_path) => self.check_simple_path(simple_path),
-            AtomicExpr::WithBlock(expr_with_block) => self.check_expr_with_block(expr_with_block),
             AtomicExpr::Lambda(lambda_expr) => self.check_lambda_expr(lambda_expr),
+            AtomicExpr::If(if_expr) => self.check_if_expr(if_expr),
+            AtomicExpr::When(when_expr) => self.check_when_expr(when_expr),
             AtomicExpr::Break(BreakExpr {
                 break_keyword: _,
                 expr,
@@ -1106,64 +1119,47 @@ impl<'a> ParseErrorsReporter<'a> {
         }
     }
 
-    fn check_expr_with_block(&mut self, expr: &ExprWithBlock) {
-        match expr {
-            ExprWithBlock::If(if_expr) => {
-                match &if_expr.conditional_block.condition {
-                    Ok(expr) => self.check_expr(expr),
-                    Err(err) => self.report_expected("تعبير برمجي (شرط `لو`)", err, vec![]),
-                }
-
-                match &if_expr.conditional_block.block {
-                    Ok(block) => self.check_block(block),
-                    Err(err) => self.report_expected("محتوى `لو`", err, vec![]),
-                }
-
-                for ElseIfClause {
-                    conditional_block, ..
-                } in &if_expr.else_ifs
-                {
-                    match &conditional_block.condition {
-                        Ok(expr) => self.check_expr(expr),
-                        Err(err) => {
-                            self.report_expected("تعبير برمجي (شرط `وإلا لو`)", err, vec![])
-                        }
-                    }
-
-                    match &conditional_block.block {
-                        Ok(block) => self.check_block(block),
-                        Err(err) => self.report_expected("محتوى `وإلا لو`", err, vec![]),
-                    }
-                }
-
-                if let Some(ElseClause {
-                    else_keyword: _,
-                    block,
-                }) = &if_expr.else_cluase
-                {
-                    match block {
-                        Ok(block) => self.check_block(block),
-                        Err(err) => self.report_expected("محتوى `وإلا`", err, vec![]),
-                    }
-                }
-            }
-            ExprWithBlock::While(WhileExpr {
-                while_keyword: _,
-                conditional_block,
-            }) => {
-                match &conditional_block.condition {
-                    Ok(expr) => self.check_expr(expr),
-                    Err(err) => self.report_expected("تعبير برمجي (شرط `طالما`)", err, vec![]),
-                }
-
-                match &conditional_block.block {
-                    Ok(block) => self.check_block(block),
-                    Err(err) => self.report_expected("محتوى `طالما`", err, vec![]),
-                }
-            }
-            ExprWithBlock::When(_) => todo!(),    // TODO
-            ExprWithBlock::DoWhile(_) => todo!(), // TODO
+    fn check_if_expr(&mut self, if_expr: &IfExpr) {
+        match &if_expr.conditional_block.condition {
+            Ok(expr) => self.check_expr(expr),
+            Err(err) => self.report_expected("تعبير برمجي (شرط `لو`)", err, vec![]),
         }
+
+        match &if_expr.conditional_block.block {
+            Ok(block) => self.check_block(block),
+            Err(err) => self.report_expected("محتوى `لو`", err, vec![]),
+        }
+
+        for ElseIfClause {
+            conditional_block, ..
+        } in &if_expr.else_ifs
+        {
+            match &conditional_block.condition {
+                Ok(expr) => self.check_expr(expr),
+                Err(err) => self.report_expected("تعبير برمجي (شرط `وإلا لو`)", err, vec![]),
+            }
+
+            match &conditional_block.block {
+                Ok(block) => self.check_block(block),
+                Err(err) => self.report_expected("محتوى `وإلا لو`", err, vec![]),
+            }
+        }
+
+        if let Some(ElseClause {
+            else_keyword: _,
+            block,
+        }) = &if_expr.else_cluase
+        {
+            match block {
+                Ok(block) => self.check_block(block),
+                Err(err) => self.report_expected("محتوى `وإلا`", err, vec![]),
+            }
+        }
+    }
+
+    fn check_when_expr(&mut self, when_expr: &WhenExpr) {
+        // TODO
+        todo!()
     }
 
     fn check_lambda_expr(&mut self, lambda: &LambdaExpr) {

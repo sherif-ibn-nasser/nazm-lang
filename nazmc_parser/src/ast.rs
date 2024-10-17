@@ -90,7 +90,9 @@ pub struct Scope {
 pub enum Stm {
     Let(Box<LetStm>),
     LetMut(Box<LetStm>),
-    Expr(Expr),
+    While(Box<(Expr, Scope)>),
+    If(Box<IfExpr>),
+    Expr(Box<Expr>),
 }
 
 pub struct LetStm {

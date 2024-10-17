@@ -80,7 +80,8 @@ pub(crate) enum AtomicExpr {
     Break(BreakExpr),
     Continue(ContinueExpr),
     Return(ReturnExpr),
-    WithBlock(ExprWithBlock),
+    If(IfExpr),
+    When(WhenExpr),
 }
 
 #[derive(NazmcParse, Debug)]
@@ -94,14 +95,6 @@ pub(crate) struct StructExpr {
 pub(crate) enum StructInit {
     Tuple(ParenExpr),
     Fields(StructFieldsInitExpr),
-}
-
-#[derive(NazmcParse, Debug)]
-pub(crate) enum ExprWithBlock {
-    If(IfExpr),
-    When(WhenExpr),
-    While(WhileExpr),
-    DoWhile(DoWhileExpr),
 }
 
 #[derive(NazmcParse, Debug)]

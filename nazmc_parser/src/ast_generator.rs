@@ -391,7 +391,13 @@ fn lower_lambda_as_body(lambda: LambdaExpr) -> ast::Scope {
                     ast::Stm::Let(let_stm_)
                 }
             }
-            Stm::Expr(expr_stm) => todo!(),
+            Stm::While(while_stm) => ast::Stm::While(Box::new((
+                lower_expr(while_stm.conditional_block.condition.unwrap()),
+                lower_lambda_as_body(while_stm.conditional_block.block.unwrap()),
+            ))),
+            Stm::If(if_expr) => ast::Stm::If(Box::new(lower_if_expr(if_expr))),
+            Stm::When(when_expr) => todo!(),
+            Stm::Expr(stm) => ast::Stm::Expr(Box::new(lower_expr(stm.expr))),
         };
         stms.push(stm);
     }
@@ -452,5 +458,33 @@ fn lower_binding_kind(kind: BindingKind) -> ast::BindingKind {
 }
 
 fn lower_expr(expr: Expr) -> ast::Expr {
+    todo!()
+}
+
+fn lower_if_expr(if_expr: IfExpr) -> ast::IfExpr {
+    let if_condition = lower_expr(if_expr.conditional_block.condition.unwrap());
+    let if_body = lower_lambda_as_body(if_expr.conditional_block.block.unwrap());
+    let if_ = (if_condition, if_body);
+
+    let mut else_ifs = ThinVec::new();
+
+    for else_if in if_expr.else_ifs {
+        let condition = lower_expr(else_if.conditional_block.condition.unwrap());
+        let body = lower_lambda_as_body(else_if.conditional_block.block.unwrap());
+        else_ifs.push((condition, body));
+    }
+
+    let else_ = if_expr
+        .else_cluase
+        .map(|e| Box::new(lower_lambda_as_body(e.block.unwrap())));
+
+    ast::IfExpr {
+        if_,
+        else_ifs,
+        else_,
+    }
+}
+
+fn lower_when_expr(if_expr: WhenExpr) -> ast::Expr {
     todo!()
 }
