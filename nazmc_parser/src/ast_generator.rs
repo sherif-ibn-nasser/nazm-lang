@@ -471,9 +471,136 @@ fn lower_binding_kind(kind: BindingKind) -> ast::BindingKind {
 }
 
 fn lower_expr(expr: Expr) -> ast::Expr {
-    let mut left = lower_primary_expr(*expr.left);
-    // TODO: Shunting-yard algorithm
-    left
+    let left = lower_primary_expr(*expr.left);
+    let mut ops_stack = ThinVec::new();
+    let mut expr_stack = vec![left]; // Stack to keep track of expressions
+
+    // Shunting-yard algorithm
+    for b in expr.bin {
+        let right = lower_primary_expr(b.right.unwrap());
+        let op = lower_bin_op(b.op.data);
+        let op_span_cursor = b.op.span.start;
+
+        // Pop operators from the stack while they have higher or equal precedence
+        while let Some((last_op, _)) = ops_stack.last() {
+            if get_precendence(&op) > get_precendence(last_op) {
+                break;
+            }
+
+            let (last_op, last_op_span_cursor) = ops_stack.pop().unwrap();
+            let right_expr = expr_stack.pop().unwrap();
+            let left_expr = expr_stack.pop().unwrap();
+
+            // Combine left and right expressions using the last operator
+            let combined_expr = ast::Expr {
+                span: left_expr.span.merged_with(&right_expr.span),
+                kind: ast::ExprKind::BinaryOp(Box::new(ast::BinaryOpExpr {
+                    op: last_op,
+                    op_span_cursor: last_op_span_cursor,
+                    left: left_expr,
+                    right: right_expr,
+                })),
+            };
+
+            expr_stack.push(combined_expr);
+        }
+
+        // Push the current operator and the right-hand expression onto the stacks
+        ops_stack.push((op, op_span_cursor));
+        expr_stack.push(right);
+    }
+
+    // Apply remaining operators in the stack
+    while let Some((last_op, last_op_span_cursor)) = ops_stack.pop() {
+        let right_expr = expr_stack.pop().unwrap();
+        let left_expr = expr_stack.pop().unwrap();
+
+        // Combine left and right expressions using the remaining operators
+        let combined_expr = ast::Expr {
+            span: left_expr.span.merged_with(&right_expr.span),
+            kind: ast::ExprKind::BinaryOp(Box::new(ast::BinaryOpExpr {
+                op: last_op,
+                op_span_cursor: last_op_span_cursor,
+                left: left_expr,
+                right: right_expr,
+            })),
+        };
+
+        expr_stack.push(combined_expr);
+    }
+
+    // Return the final expression
+    expr_stack.pop().unwrap()
+}
+
+#[inline]
+fn get_precendence(op: &ast::BinOp) -> u8 {
+    match op {
+        ast::BinOp::Assign
+        | ast::BinOp::PlusAssign
+        | ast::BinOp::MinusAssign
+        | ast::BinOp::TimesAssign
+        | ast::BinOp::DivAssign
+        | ast::BinOp::ModAssign
+        | ast::BinOp::BAndAssign
+        | ast::BinOp::BOrAssign
+        | ast::BinOp::XorAssign
+        | ast::BinOp::ShlAssign
+        | ast::BinOp::ShrAssign => 0, // Assignments have the lowest precedence
+        ast::BinOp::LOr => 1,
+        ast::BinOp::LAnd => 2,
+        ast::BinOp::EqualEqual | ast::BinOp::NotEqual => 3,
+        ast::BinOp::GE | ast::BinOp::GT | ast::BinOp::LE | ast::BinOp::LT => 4,
+        ast::BinOp::OpenOpenRange
+        | ast::BinOp::CloseOpenRange
+        | ast::BinOp::OpenCloseRange
+        | ast::BinOp::CloseCloseRange => 5,
+        ast::BinOp::BOr => 6,
+        ast::BinOp::Xor => 7,
+        ast::BinOp::BAnd => 8,
+        ast::BinOp::Shl | ast::BinOp::Shr => 9,
+        ast::BinOp::Plus | ast::BinOp::Minus => 10,
+        ast::BinOp::Times | ast::BinOp::Div | ast::BinOp::Mod => 11,
+    }
+}
+
+#[inline]
+fn lower_bin_op(op: BinOpToken) -> ast::BinOp {
+    match op {
+        BinOpToken::LOr => ast::BinOp::LOr,
+        BinOpToken::LAnd => ast::BinOp::LAnd,
+        BinOpToken::EqualEqual => ast::BinOp::EqualEqual,
+        BinOpToken::NotEqual => ast::BinOp::NotEqual,
+        BinOpToken::GE => ast::BinOp::GE,
+        BinOpToken::GT => ast::BinOp::GT,
+        BinOpToken::LE => ast::BinOp::LE,
+        BinOpToken::LT => ast::BinOp::LT,
+        BinOpToken::OpenOpenRange => ast::BinOp::OpenOpenRange,
+        BinOpToken::CloseOpenRange => ast::BinOp::CloseOpenRange,
+        BinOpToken::OpenCloseRange => ast::BinOp::OpenCloseRange,
+        BinOpToken::CloseCloseRange => ast::BinOp::CloseCloseRange,
+        BinOpToken::BOr => ast::BinOp::BOr,
+        BinOpToken::Xor => ast::BinOp::Xor,
+        BinOpToken::BAnd => ast::BinOp::BAnd,
+        BinOpToken::Shr => ast::BinOp::Shr,
+        BinOpToken::Shl => ast::BinOp::Shl,
+        BinOpToken::Plus => ast::BinOp::Plus,
+        BinOpToken::Minus => ast::BinOp::Minus,
+        BinOpToken::Times => ast::BinOp::Times,
+        BinOpToken::Div => ast::BinOp::Div,
+        BinOpToken::Mod => ast::BinOp::Mod,
+        BinOpToken::Assign => ast::BinOp::Assign,
+        BinOpToken::PlusAssign => ast::BinOp::PlusAssign,
+        BinOpToken::MinusAssign => ast::BinOp::MinusAssign,
+        BinOpToken::TimesAssign => ast::BinOp::TimesAssign,
+        BinOpToken::DivAssign => ast::BinOp::DivAssign,
+        BinOpToken::ModAssign => ast::BinOp::ModAssign,
+        BinOpToken::BAndAssign => ast::BinOp::BAndAssign,
+        BinOpToken::BOrAssign => ast::BinOp::BOrAssign,
+        BinOpToken::XorAssign => ast::BinOp::XorAssign,
+        BinOpToken::ShlAssign => ast::BinOp::ShlAssign,
+        BinOpToken::ShrAssign => ast::BinOp::ShrAssign,
+    }
 }
 
 fn lower_primary_expr(primary_expr: PrimaryExpr) -> ast::Expr {
