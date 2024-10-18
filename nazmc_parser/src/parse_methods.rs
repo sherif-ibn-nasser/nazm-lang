@@ -195,6 +195,7 @@ where
 #[cfg(test)]
 mod tests {
 
+    use nazmc_data_pool::DataPool;
     use nazmc_parse_derive::{NazmcParse, SpannedAndCheck};
 
     use super::super::*;
@@ -208,7 +209,10 @@ mod tests {
 
     #[test]
     fn test_enum() {
-        let (tokens, ..) = LexerIter::new("+-  /** */ - +").collect_all();
+        let mut id_pool = DataPool::new();
+        let mut str_pool = DataPool::new();
+        let (tokens, ..) =
+            LexerIter::new("+-  /** */ - +", &mut id_pool, &mut str_pool).collect_all();
         let mut tokens_iter = TokensIter::new(&tokens);
         tokens_iter.next(); // Init recent
 
@@ -343,8 +347,14 @@ mod tests {
 
     #[test]
     fn test_wrong_params() {
-        let (tokens, ..) =
-            LexerIter::new("دالة البداية(123 دالة، ت: ح 444، س: ص، ع: ك،) {}").collect_all();
+        let mut id_pool = DataPool::new();
+        let mut str_pool = DataPool::new();
+        let (tokens, ..) = LexerIter::new(
+            "دالة البداية(123 دالة، ت: ح 444، س: ص، ع: ك،) {}",
+            &mut id_pool,
+            &mut str_pool,
+        )
+        .collect_all();
         let mut tokens_iter = TokensIter::new(&tokens);
         tokens_iter.next(); // Init recent
 
@@ -371,7 +381,10 @@ mod tests {
 
     #[test]
     fn test_zero_params() {
-        let (tokens, ..) = LexerIter::new("دالة البداية() {}").collect_all();
+        let mut id_pool = DataPool::new();
+        let mut str_pool = DataPool::new();
+        let (tokens, ..) =
+            LexerIter::new("دالة البداية() {}", &mut id_pool, &mut str_pool).collect_all();
         let mut tokens_iter = TokensIter::new(&tokens);
         tokens_iter.next(); // Init recent
 
@@ -388,7 +401,10 @@ mod tests {
 
     #[test]
     fn test_one_param_no_trailing_comma() {
-        let (tokens, ..) = LexerIter::new("دالة البداية(س: ص8) {}").collect_all();
+        let mut id_pool = DataPool::new();
+        let mut str_pool = DataPool::new();
+        let (tokens, ..) =
+            LexerIter::new("دالة البداية(س: ص8) {}", &mut id_pool, &mut str_pool).collect_all();
         let mut tokens_iter = TokensIter::new(&tokens);
         tokens_iter.next(); // Init recent
 
@@ -410,7 +426,10 @@ mod tests {
 
     #[test]
     fn test_one_param_with_trailing_comma() {
-        let (tokens, ..) = LexerIter::new("دالة البداية(س: ص8،) {}").collect_all();
+        let mut id_pool = DataPool::new();
+        let mut str_pool = DataPool::new();
+        let (tokens, ..) =
+            LexerIter::new("دالة البداية(س: ص8،) {}", &mut id_pool, &mut str_pool).collect_all();
         let mut tokens_iter = TokensIter::new(&tokens);
         tokens_iter.next(); // Init recent
 
@@ -432,7 +451,11 @@ mod tests {
 
     #[test]
     fn test_two_params_no_trailing_comma() {
-        let (tokens, ..) = LexerIter::new("دالة البداية(س: ص8، ك: م) {}").collect_all();
+        let mut id_pool = DataPool::new();
+        let mut str_pool = DataPool::new();
+        let (tokens, ..) =
+            LexerIter::new("دالة البداية(س: ص8، ك: م) {}", &mut id_pool, &mut str_pool)
+                .collect_all();
         let mut tokens_iter = TokensIter::new(&tokens);
         tokens_iter.next(); // Init recent
 
@@ -455,7 +478,11 @@ mod tests {
 
     #[test]
     fn test_two_params_with_trailing_comma() {
-        let (tokens, ..) = LexerIter::new("دالة البداية(س: ص8، ك: م،) {}").collect_all();
+        let mut id_pool = DataPool::new();
+        let mut str_pool = DataPool::new();
+        let (tokens, ..) =
+            LexerIter::new("دالة البداية(س: ص8، ك: م،) {}", &mut id_pool, &mut str_pool)
+                .collect_all();
         let mut tokens_iter = TokensIter::new(&tokens);
         tokens_iter.next(); // Init recent
 

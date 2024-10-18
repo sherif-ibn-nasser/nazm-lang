@@ -16,12 +16,17 @@ pub(crate) use parse_methods::*;
 pub(crate) use syntax::*;
 pub(crate) use tokens_iter::TokensIter;
 
-pub fn parse<'a>(file_path: &'a str, file_content: &'a str) -> (File, Vec<String>) {
-    let (tokens, file_lines, lexer_errors) = LexerIter::new(file_content).collect_all();
-
+pub fn parse(
+    tokens: Vec<Token>,
+    file_path: &str,
+    file_content: &str,
+    file_lines: &[String],
+    lexer_errors: Vec<LexerError>,
+) -> File {
     let mut reporter = ParseErrorsReporter {
         file_path,
         file_lines: &file_lines,
+        file_content,
         tokens: &tokens,
         diagnostics: vec![],
     };
@@ -42,15 +47,14 @@ pub fn parse<'a>(file_path: &'a str, file_content: &'a str) -> (File, Vec<String
         panic!()
     }
 
-    // let file = ast_generator::lower_file(file);
-
-    (file, file_lines)
+    file
 }
 
 struct ParseErrorsReporter<'a> {
-    tokens: &'a [Token<'a>],
+    tokens: &'a [Token],
     file_path: &'a str,
     file_lines: &'a [String],
+    file_content: &'a str,
     diagnostics: Vec<Diagnostic<'a>>,
 }
 
@@ -308,7 +312,11 @@ impl<'a> ParseErrorsReporter<'a> {
         let (found_token_span, found_token_val, primary_label) =
             if err.found_token_index < self.tokens.len() {
                 let token = &self.tokens[err.found_token_index];
-                (token.span, token.val, "رمز غير متوقع".to_string())
+                (
+                    token.span,
+                    &self.file_content[token.start_byte..token.end_byte],
+                    "رمز غير متوقع".to_string(),
+                )
             } else {
                 let last_span = self.tokens[self.tokens.len() - 1].span;
                 (
@@ -925,7 +933,11 @@ impl<'a> ParseErrorsReporter<'a> {
             let (found_token_span, found_token_val, secondary_label) =
                 if err.found_token_index < self.tokens.len() {
                     let token = &self.tokens[err.found_token_index];
-                    (token.span, token.val, "رمز غير متوقع".to_string())
+                    (
+                        token.span,
+                        &self.file_content[token.start_byte..token.end_byte],
+                        "رمز غير متوقع".to_string(),
+                    )
                 } else {
                     let last_span = self.tokens[self.tokens.len() - 1].span;
                     (

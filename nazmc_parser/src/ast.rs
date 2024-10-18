@@ -1,5 +1,4 @@
-use std::sync::Arc;
-
+use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::{Span, SpanCursor};
 use nazmc_lexer::LiteralKind;
 use thin_vec::ThinVec;
@@ -14,7 +13,7 @@ pub struct File {
 }
 
 pub struct ModPath {
-    pub ids: ThinVec<Arc<String>>,
+    pub ids: ThinVec<PoolIdx>,
     pub spans: ThinVec<Span>,
 }
 
@@ -25,7 +24,7 @@ pub struct ModPathWithItem {
 
 pub struct ASTId {
     pub span: Span,
-    pub id: Arc<String>,
+    pub id: PoolIdx,
 }
 
 pub struct Binding {

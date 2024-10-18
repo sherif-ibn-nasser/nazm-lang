@@ -1,14 +1,15 @@
-use std::sync::Arc;
-
 use documented::DocumentedVariants;
+use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::*;
 use strum::EnumIter;
 
 #[derive(Clone, PartialEq, Debug, Default)]
-pub struct Token<'a> {
-    pub val: &'a str,
+pub struct Token {
+    // pub val: &'a str,
     pub span: Span,
     pub kind: TokenKind,
+    pub start_byte: usize,
+    pub end_byte: usize,
 }
 
 #[derive(Clone, PartialEq, Debug, Default)]
@@ -20,14 +21,14 @@ pub enum TokenKind {
     LineComment,
     DelimitedComment,
     Literal(LiteralKind),
-    Id(Arc<String>),
+    Id(PoolIdx),
     Symbol(SymbolKind),
     Keyword(KeywordKind),
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LiteralKind {
-    Str(Arc<String>),
+    Str(PoolIdx),
     Char(char),
     Bool(bool),
     Num(NumKind),

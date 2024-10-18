@@ -2,7 +2,7 @@ use super::*;
 use paste::paste;
 
 pub mod punctuated;
-pub use punctuated::*;
+use punctuated::*;
 
 pub mod terminal;
 pub use terminal::*;

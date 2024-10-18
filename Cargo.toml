@@ -9,6 +9,7 @@ edition = "2021"
 bpaf = { version = "*", features = ["derive"] }
 owo-colors = "*"
 nazmc_data_pool = { path = "nazmc_data_pool" }
+nazmc_lexer = { path = "nazmc_lexer" }
 nazmc_parser = { path = "nazmc_parser" }
 nazmc_diagnostics = { path = "nazmc_diagnostics" }
 nazmc_ast = { path = "nazmc_ast" }

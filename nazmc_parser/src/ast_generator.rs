@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use thin_vec::ThinVec;
 
 use crate::*;
@@ -406,7 +404,7 @@ fn lower_lambda_stms_and_return_expr(
                 lower_lambda_as_body(while_stm.conditional_block.block.unwrap()),
             ))),
             Stm::If(if_expr) => ast::Stm::If(Box::new(lower_if_expr(if_expr))),
-            Stm::When(when_expr) => todo!(),
+            Stm::When(_when_expr) => todo!(),
             Stm::Expr(stm) => ast::Stm::Expr(Box::new(lower_expr(stm.expr))),
         };
         ast_stms.push(stm);
@@ -763,7 +761,7 @@ fn lower_atomic_expr(atomic_expr: AtomicExpr) -> ast::Expr {
         AtomicExpr::Paren(paren_expr) => lower_paren_expr(paren_expr),
         AtomicExpr::Struct(struct_expr) => lower_struct_expr(struct_expr),
         AtomicExpr::Lambda(lambda_expr) => lower_lambda_expr(lambda_expr),
-        AtomicExpr::When(when_expr) => todo!(),
+        AtomicExpr::When(_when_expr) => todo!(),
         AtomicExpr::If(if_expr) => {
             let span_end = if let Some(ref else_) = if_expr.else_cluase {
                 &else_
@@ -850,7 +848,7 @@ fn lower_atomic_expr(atomic_expr: AtomicExpr) -> ast::Expr {
             };
 
             ast::Expr {
-                span: break_expr.break_keyword.span,
+                span,
                 kind: ast::ExprKind::Break(expr),
             }
         }
@@ -1011,7 +1009,7 @@ fn lower_struct_expr(struct_expr: StructExpr) -> ast::Expr {
                             },
                             item: ast::ASTId {
                                 span: name.span,
-                                id: Arc::clone(&name.id),
+                                id: name.id,
                             },
                         })),
                     }
@@ -1111,6 +1109,6 @@ fn lower_if_expr(if_expr: IfExpr) -> ast::IfExpr {
     }
 }
 
-fn lower_when_expr(when_expr: WhenExpr) -> ast::Expr {
+fn lower_when_expr(_when_expr: WhenExpr) -> ast::Expr {
     todo!()
 }
