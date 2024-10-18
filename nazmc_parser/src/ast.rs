@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use nazmc_diagnostics::span::{Span, SpanCursor};
+use nazmc_lexer::LiteralKind;
 use thin_vec::ThinVec;
 
 pub struct File {
@@ -106,47 +107,32 @@ pub struct Expr {
 }
 
 pub enum ExprKind {
-    StrLit(Arc<String>),
-    CharLit(char),
-    Bool(bool),
-    F4(f32),
-    F8(f64),
-    UnspecifiedFloat(f64),
-    I(isize),
-    I1(i8),
-    I2(i16),
-    I4(i32),
-    I8(i64),
-    U(usize),
-    U1(u8),
-    U2(u16),
-    U4(u32),
-    U8(u64),
-    UnspecifiedInt(u64),
+    Literal(LiteralKind),
+    Parens(Box<Expr>),
     Path(Box<ModPathWithItem>),
-    CallOnPath(Box<CallOnPathExpr>),
-    CallOnNonPathExpr(Box<CallOnNonPathExpr>),
+    Call(Box<CallExpr>),
     UnitStruct(Box<ModPathWithItem>),
     TupleStruct(Box<TupleStructExpr>),
     FieldsStruct(Box<FieldsStructExpr>),
     Field(Box<FieldExpr>),
     Index(Box<IndexExpr>),
+    Tuple(ThinVec<Expr>),
     ArrayElemnts(ThinVec<Expr>),
     ArrayElemntsSized(Box<ArrayElementsSizedExpr>),
     If(Box<IfExpr>),
     Lambda(Box<LambdaExpr>),
     UnaryOp(Box<UnaryOpExpr>),
     BinaryOp(Box<BinaryOpExpr>),
+    Return(Option<Box<Expr>>),
+    Break(Option<Box<Expr>>),
+    Continue,
+    On,
 }
 
-pub struct CallOnPathExpr {
-    pub path: ModPathWithItem,
-    pub args: ThinVec<Expr>,
-}
-
-pub struct CallOnNonPathExpr {
+pub struct CallExpr {
     pub on: Expr,
     pub args: ThinVec<Expr>,
+    pub parens_span: Span,
 }
 
 pub struct TupleStructExpr {
@@ -167,6 +153,7 @@ pub struct FieldExpr {
 pub struct IndexExpr {
     pub on: Expr,
     pub index: Expr,
+    pub brackets_span: Span,
 }
 
 pub struct ArrayElementsSizedExpr {
@@ -181,13 +168,13 @@ pub struct IfExpr {
 }
 
 pub struct LambdaExpr {
-    pub params: ThinVec<LambdaParam>,
+    pub params: LambdaParams,
     pub body: Scope,
 }
 
-pub struct LambdaParam {
-    pub binding: Binding,
-    pub ty: Option<Box<Type>>,
+pub enum LambdaParams {
+    Implicit,
+    Explicit(ThinVec<Binding>),
 }
 
 pub struct UnaryOpExpr {

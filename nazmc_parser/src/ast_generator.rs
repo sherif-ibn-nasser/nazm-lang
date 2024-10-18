@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use thin_vec::ThinVec;
 
 use crate::*;
@@ -370,10 +372,18 @@ fn lower_simple_path(mut simple_path: SimplePath) -> ast::ModPathWithItem {
     }
 }
 
+#[inline]
 fn lower_lambda_as_body(lambda: LambdaExpr) -> ast::Scope {
-    let mut stms = ThinVec::new();
+    lower_lambda_stms_and_return_expr(lambda.stms, lambda.last_expr)
+}
 
-    for stm in lambda.stms {
+fn lower_lambda_stms_and_return_expr(
+    stms: Vec<ParseResult<Stm>>,
+    return_expr: Option<Expr>,
+) -> ast::Scope {
+    let mut ast_stms = ThinVec::new();
+
+    for stm in stms {
         let stm = match stm.unwrap() {
             Stm::Semicolon(_) => continue,
             Stm::Let(let_stm) => {
@@ -399,12 +409,15 @@ fn lower_lambda_as_body(lambda: LambdaExpr) -> ast::Scope {
             Stm::When(when_expr) => todo!(),
             Stm::Expr(stm) => ast::Stm::Expr(Box::new(lower_expr(stm.expr))),
         };
-        stms.push(stm);
+        ast_stms.push(stm);
     }
 
-    let return_expr = lambda.last_expr.map(|expr| lower_expr(expr));
+    let return_expr = return_expr.map(|expr| lower_expr(expr));
 
-    ast::Scope { stms, return_expr }
+    ast::Scope {
+        stms: ast_stms,
+        return_expr,
+    }
 }
 
 fn lower_binding(binding: Binding) -> ast::Binding {
@@ -458,7 +471,493 @@ fn lower_binding_kind(kind: BindingKind) -> ast::BindingKind {
 }
 
 fn lower_expr(expr: Expr) -> ast::Expr {
-    todo!()
+    let mut left = lower_primary_expr(*expr.left);
+    // TODO: Shunting-yard algorithm
+    left
+}
+
+fn lower_primary_expr(primary_expr: PrimaryExpr) -> ast::Expr {
+    let expr = match primary_expr.kind {
+        PrimaryExprKind::Unary(unary_expr) => lower_unary_expr(unary_expr),
+        PrimaryExprKind::Atomic(atomic_expr) => lower_atomic_expr(atomic_expr),
+    };
+
+    let expr = lower_post_ops_exprs(expr, primary_expr.post_ops);
+
+    let expr = lower_inner_access_expr(expr, primary_expr.inner_access);
+
+    expr
+}
+
+#[inline]
+fn lower_inner_access_expr(
+    mut on: ast::Expr,
+    inner_access_exprs: Vec<InnerAccessExpr>,
+) -> ast::Expr {
+    for inner_access_expr in inner_access_exprs {
+        let name = inner_access_expr.inner.unwrap();
+
+        let name = ast::ASTId {
+            span: name.span,
+            id: name.data.val,
+        };
+
+        let field_expr = ast::Expr {
+            span: on.span.merged_with(&name.span),
+            kind: ast::ExprKind::Field(Box::new(ast::FieldExpr { on, name })),
+        };
+
+        on = lower_post_ops_exprs(field_expr, inner_access_expr.post_ops);
+    }
+    on
+}
+
+fn lower_post_ops_exprs(mut on: ast::Expr, ops: Vec<PostOpExpr>) -> ast::Expr {
+    for op in ops {
+        match op {
+            PostOpExpr::Invoke(paren_expr) => {
+                let parens_span = paren_expr
+                    .open_delim
+                    .span
+                    .merged_with(&paren_expr.close_delim.unwrap().span);
+
+                let span = on.span.merged_with(&parens_span);
+
+                let mut args = ThinVec::new();
+
+                if let Some(PunctuatedExpr {
+                    first_item,
+                    rest_items,
+                    trailing_comma: _,
+                }) = paren_expr.items
+                {
+                    let first = lower_expr(first_item.unwrap());
+                    args.push(first);
+                    for r in rest_items {
+                        args.push(lower_expr(r.unwrap().item));
+                    }
+                }
+
+                let call = ast::CallExpr {
+                    on,
+                    args,
+                    parens_span,
+                };
+
+                on = ast::Expr {
+                    span,
+                    kind: ast::ExprKind::Call(Box::new(call)),
+                };
+            }
+            PostOpExpr::Lambda(lambda_expr) => {
+                let parens_span = lambda_expr
+                    .open_curly
+                    .span
+                    .merged_with(&lambda_expr.close_curly.as_ref().unwrap().span);
+
+                let span = on.span.merged_with(&parens_span);
+
+                let mut args = ThinVec::new();
+
+                args.push(lower_lambda_expr(lambda_expr));
+
+                let call = ast::CallExpr {
+                    on,
+                    args,
+                    parens_span,
+                };
+
+                on = ast::Expr {
+                    span,
+                    kind: ast::ExprKind::Call(Box::new(call)),
+                };
+            }
+            PostOpExpr::Index(idx_expr) => {
+                let brackets_span = idx_expr
+                    .open_bracket
+                    .span
+                    .merged_with(&idx_expr.close_bracket.unwrap().span);
+
+                let span = on.span.merged_with(&brackets_span);
+
+                let index = lower_expr(idx_expr.expr.unwrap());
+
+                let index = ast::IndexExpr {
+                    on,
+                    index,
+                    brackets_span,
+                };
+
+                on = ast::Expr {
+                    span,
+                    kind: ast::ExprKind::Index(Box::new(index)),
+                };
+            }
+        }
+    }
+    on
+}
+
+fn lower_unary_expr(unary_expr: UnaryExpr) -> ast::Expr {
+    let mut expr = lower_atomic_expr(unary_expr.expr.unwrap());
+
+    for op in unary_expr.rest_ops.into_iter().rev() {
+        let op_span = op.span;
+        let op = lower_unary_op(op.data);
+
+        expr = ast::Expr {
+            span: op_span.merged_with(&expr.span),
+            kind: ast::ExprKind::UnaryOp(Box::new(ast::UnaryOpExpr { op, op_span, expr })),
+        }
+    }
+
+    let op_span = unary_expr.first_op.span;
+    let op = lower_unary_op(unary_expr.first_op.data);
+    ast::Expr {
+        span: op_span.merged_with(&expr.span),
+        kind: ast::ExprKind::UnaryOp(Box::new(ast::UnaryOpExpr { op, op_span, expr })),
+    }
+}
+
+fn lower_unary_op(op: UnaryOpToken) -> ast::UnaryOp {
+    match op {
+        UnaryOpToken::Minus => ast::UnaryOp::Minus,
+        UnaryOpToken::LNot => ast::UnaryOp::LNot,
+        UnaryOpToken::BNot => ast::UnaryOp::BNot,
+        UnaryOpToken::Deref => ast::UnaryOp::Deref,
+        UnaryOpToken::Borrow => ast::UnaryOp::Borrow,
+        UnaryOpToken::BorrowMut => ast::UnaryOp::BorrowMut,
+    }
+}
+
+fn lower_atomic_expr(atomic_expr: AtomicExpr) -> ast::Expr {
+    match atomic_expr {
+        AtomicExpr::Array(array_expr) => lower_array_expr(array_expr),
+        AtomicExpr::Paren(paren_expr) => lower_paren_expr(paren_expr),
+        AtomicExpr::Struct(struct_expr) => lower_struct_expr(struct_expr),
+        AtomicExpr::Lambda(lambda_expr) => lower_lambda_expr(lambda_expr),
+        AtomicExpr::When(when_expr) => todo!(),
+        AtomicExpr::If(if_expr) => {
+            let span_end = if let Some(ref else_) = if_expr.else_cluase {
+                &else_
+                    .block
+                    .as_ref()
+                    .unwrap()
+                    .close_curly
+                    .as_ref()
+                    .unwrap()
+                    .span
+            } else if !if_expr.else_ifs.is_empty() {
+                &if_expr
+                    .else_ifs
+                    .last()
+                    .unwrap()
+                    .conditional_block
+                    .block
+                    .as_ref()
+                    .unwrap()
+                    .close_curly
+                    .as_ref()
+                    .unwrap()
+                    .span
+            } else {
+                &if_expr
+                    .conditional_block
+                    .block
+                    .as_ref()
+                    .unwrap()
+                    .close_curly
+                    .as_ref()
+                    .unwrap()
+                    .span
+            };
+
+            ast::Expr {
+                span: if_expr.if_keyword.span.merged_with(span_end),
+                kind: ast::ExprKind::If(Box::new(lower_if_expr(if_expr))),
+            }
+        }
+        AtomicExpr::Path(simple_path) => {
+            let path = lower_simple_path(simple_path);
+
+            let span = if path.mod_path.spans.is_empty() {
+                path.item.span
+            } else {
+                path.mod_path
+                    .spans
+                    .first()
+                    .unwrap()
+                    .merged_with(&path.item.span)
+            };
+
+            ast::Expr {
+                span,
+                kind: ast::ExprKind::Path(Box::new(path)),
+            }
+        }
+        AtomicExpr::Literal(lit) => ast::Expr {
+            span: lit.span,
+            kind: ast::ExprKind::Literal(lit.data),
+        },
+        AtomicExpr::Return(return_expr) => {
+            let expr = return_expr.expr.map(|e| Box::new(lower_expr(e)));
+
+            let span = if let Some(e) = expr.as_ref() {
+                return_expr.return_keyword.span.merged_with(&e.span)
+            } else {
+                return_expr.return_keyword.span
+            };
+
+            ast::Expr {
+                span,
+                kind: ast::ExprKind::Return(expr),
+            }
+        }
+        AtomicExpr::Break(break_expr) => {
+            let expr = break_expr.expr.map(|e| Box::new(lower_expr(e)));
+
+            let span = if let Some(e) = expr.as_ref() {
+                break_expr.break_keyword.span.merged_with(&e.span)
+            } else {
+                break_expr.break_keyword.span
+            };
+
+            ast::Expr {
+                span: break_expr.break_keyword.span,
+                kind: ast::ExprKind::Break(expr),
+            }
+        }
+        AtomicExpr::Continue(continue_expr) => ast::Expr {
+            span: continue_expr.continue_keyword.span,
+            kind: ast::ExprKind::Continue,
+        },
+        AtomicExpr::On(on) => ast::Expr {
+            span: on.span,
+            kind: ast::ExprKind::On,
+        },
+    }
+}
+
+#[inline]
+fn lower_array_expr(array_expr: ArrayExpr) -> ast::Expr {
+    let span = array_expr
+        .open_bracket
+        .span
+        .merged_with(&array_expr.close_bracket.unwrap().span);
+
+    if let Some(ArrayExprKind::Elements(ElementsArrayExpr {
+        first,
+        rest,
+        trailing_comma: _,
+    })) = array_expr.expr_kind
+    {
+        let mut elements = ThinVec::new();
+        let first = lower_expr(first.unwrap());
+        elements.push(first);
+        for r in rest {
+            elements.push(lower_expr(r.unwrap().item));
+        }
+
+        ast::Expr {
+            span,
+            kind: ast::ExprKind::ArrayElemnts(elements),
+        }
+    } else if let Some(ArrayExprKind::ExplicitSize(ExplicitSizeArrayExpr {
+        repeated_expr,
+        semicolon: _,
+        size_expr,
+    })) = array_expr.expr_kind
+    {
+        let repeat = lower_expr(repeated_expr.unwrap());
+        let size = lower_expr(size_expr.unwrap());
+        let array_elements_sized_expr = Box::new(ast::ArrayElementsSizedExpr { repeat, size });
+        ast::Expr {
+            span,
+            kind: ast::ExprKind::ArrayElemntsSized(array_elements_sized_expr),
+        }
+    } else {
+        let elements = ThinVec::new();
+        ast::Expr {
+            span,
+            kind: ast::ExprKind::ArrayElemnts(elements),
+        }
+    }
+}
+
+#[inline]
+fn lower_paren_expr(paren_expr: ParenExpr) -> ast::Expr {
+    let span = paren_expr
+        .open_delim
+        .span
+        .merged_with(&paren_expr.close_delim.unwrap().span);
+
+    if let Some(PunctuatedExpr {
+        first_item,
+        rest_items,
+        trailing_comma,
+    }) = paren_expr.items
+    {
+        let first = lower_expr(first_item.unwrap());
+        if rest_items.is_empty() && trailing_comma.is_none() {
+            ast::Expr {
+                span,
+                kind: ast::ExprKind::Parens(Box::new(first)),
+            }
+        } else {
+            let mut exprs = ThinVec::new();
+            exprs.push(first);
+            for r in rest_items {
+                exprs.push(lower_expr(r.unwrap().item));
+            }
+            ast::Expr {
+                span,
+                kind: ast::ExprKind::Tuple(exprs),
+            }
+        }
+    } else {
+        ast::Expr {
+            span,
+            kind: ast::ExprKind::Tuple(ThinVec::new()),
+        }
+    }
+}
+
+#[inline]
+fn lower_struct_expr(struct_expr: StructExpr) -> ast::Expr {
+    let path = lower_simple_path(struct_expr.path.unwrap());
+    if let Some(StructInit::Tuple(tuple_struct)) = struct_expr.init {
+        let span = struct_expr
+            .dot
+            .span
+            .merged_with(&tuple_struct.close_delim.unwrap().span);
+
+        let mut args = ThinVec::new();
+
+        if let Some(PunctuatedExpr {
+            first_item,
+            rest_items,
+            trailing_comma: _,
+        }) = tuple_struct.items
+        {
+            let first = lower_expr(first_item.unwrap());
+            args.push(first);
+            for r in rest_items {
+                args.push(lower_expr(r.unwrap().item));
+            }
+        }
+
+        let tuple_struct = Box::new(ast::TupleStructExpr { path, args });
+
+        ast::Expr {
+            span,
+            kind: ast::ExprKind::TupleStruct(tuple_struct),
+        }
+    } else if let Some(StructInit::Fields(fields_struct)) = struct_expr.init {
+        let span = struct_expr
+            .dot
+            .span
+            .merged_with(&fields_struct.close_delim.unwrap().span);
+
+        let mut fields = ThinVec::new();
+
+        if let Some(PunctuatedStructFieldInitExpr {
+            first_item,
+            rest_items,
+            trailing_comma: _,
+        }) = fields_struct.items
+        {
+            fn lower_struct_field_expr(e: StructFieldInitExpr) -> (ast::ASTId, ast::Expr) {
+                let name = ast::ASTId {
+                    span: e.name.span,
+                    id: e.name.data.val,
+                };
+
+                let expr = if let Some(e) = e.expr {
+                    lower_expr(e.expr.unwrap())
+                } else {
+                    ast::Expr {
+                        span: name.span,
+                        kind: ast::ExprKind::Path(Box::new(ast::ModPathWithItem {
+                            mod_path: ast::ModPath {
+                                ids: ThinVec::new(),
+                                spans: ThinVec::new(),
+                            },
+                            item: ast::ASTId {
+                                span: name.span,
+                                id: Arc::clone(&name.id),
+                            },
+                        })),
+                    }
+                };
+
+                (name, expr)
+            }
+
+            let first = lower_struct_field_expr(first_item.unwrap());
+            fields.push(first);
+            for r in rest_items {
+                fields.push(lower_struct_field_expr(r.unwrap().item));
+            }
+        }
+
+        let fields_struct = Box::new(ast::FieldsStructExpr { path, fields });
+
+        ast::Expr {
+            span,
+            kind: ast::ExprKind::FieldsStruct(fields_struct),
+        }
+    } else {
+        let span = struct_expr.dot.span.merged_with(&path.item.span);
+
+        ast::Expr {
+            span,
+            kind: ast::ExprKind::UnitStruct(Box::new(path)),
+        }
+    }
+}
+
+#[inline]
+fn lower_lambda_expr(lambda_expr: LambdaExpr) -> ast::Expr {
+    let span = lambda_expr
+        .open_curly
+        .span
+        .merged_with(&lambda_expr.close_curly.unwrap().span);
+
+    let body = lower_lambda_stms_and_return_expr(lambda_expr.stms, lambda_expr.last_expr);
+
+    let lambda = if let Some(arrow) = lambda_expr.lambda_arrow {
+        let mut params = ThinVec::new();
+
+        if let LambdaArrow::WithParams(LambdaParams {
+            first,
+            rest,
+            trailing_comma: _,
+            r_arrow: _,
+        }) = arrow
+        {
+            let first = lower_binding(first);
+            params.push(first);
+
+            for r in rest {
+                params.push(lower_binding(r.item));
+            }
+        }
+
+        ast::LambdaExpr {
+            params: ast::LambdaParams::Explicit(params),
+            body,
+        }
+    } else {
+        ast::LambdaExpr {
+            params: ast::LambdaParams::Implicit,
+            body,
+        }
+    };
+
+    ast::Expr {
+        span,
+        kind: ast::ExprKind::Lambda(Box::new(lambda)),
+    }
 }
 
 fn lower_if_expr(if_expr: IfExpr) -> ast::IfExpr {
@@ -485,6 +984,6 @@ fn lower_if_expr(if_expr: IfExpr) -> ast::IfExpr {
     }
 }
 
-fn lower_when_expr(if_expr: WhenExpr) -> ast::Expr {
+fn lower_when_expr(when_expr: WhenExpr) -> ast::Expr {
     todo!()
 }
