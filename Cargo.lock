@@ -125,6 +125,7 @@ version = "0.1.0"
 dependencies = [
  "nazmc_data_pool",
  "nazmc_diagnostics",
+ "thin-vec",
 ]
 
 [[package]]
