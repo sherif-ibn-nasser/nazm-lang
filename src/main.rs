@@ -16,7 +16,6 @@ use std::{
     fs, panic,
     process::{exit, Command},
 };
-use thin_vec::ThinVec;
 
 fn collect_paths(paths: Vec<Value>, prefix: &str, collected_paths: &mut Vec<String>) {
     for path in paths {
@@ -135,6 +134,7 @@ struct ResolvedStarImport {
     mod_idx: usize,
 }
 
+#[derive(Clone)]
 struct ParsedFile {
     path: String,
     lines: Vec<String>,
@@ -151,76 +151,57 @@ fn main() {
     let files_paths = get_file_paths();
     let mut id_pool = DataPool::new();
     let mut str_pool = DataPool::new();
+    let mut mods = HashMap::new();
+    let mut mods_to_parsed_files = vec![];
+    let mut diagnostics: Vec<String> = vec![];
+    let mut fail_after_parsing = false;
+    // let mut ast_items_counter = ASTItemsCounter::default();
+    // let mut items_to_mods: HashMap<PoolIdx, Vec<_>> = HashMap::new();
 
     // Register the main fn id to index 0 and the implicit lambda param name to index 1
     id_pool.get("البداية");
     id_pool.get("س");
 
-    // let mut ast_items_counter = ASTItemsCounter::default();
-    let mut mods = HashMap::new();
-    let mut fail_after_parsing = false;
-    // let mut items_to_mods: HashMap<PoolIdx, Vec<_>> = HashMap::new();
+    files_paths.into_iter().for_each(|file_path| {
+        let mut mod_path = file_path
+            .split_terminator('/')
+            .map(|s| id_pool.get(s))
+            .collect::<Vec<_>>();
 
-    let jhs = files_paths
-        .into_iter()
-        .map(|file_path| {
-            let mut mod_path = file_path
-                .split_terminator('/')
-                .map(|s| id_pool.get(s))
-                .collect::<Vec<_>>();
+        mod_path.pop(); // remove the actual file
 
-            mod_path.pop(); // remove the actual file
+        let mod_idx = mods.len();
+        let mod_idx = *mods.entry(mod_path).or_insert(mod_idx);
 
-            let mod_idx = mods.len();
-            let mod_idx = *mods.entry(mod_path).or_insert(mod_idx);
+        let path = format!("{file_path}.نظم");
+        let Ok(file_content) = fs::read_to_string(&path) else {
+            panic::set_hook(Box::new(|_| {}));
+            print_err(format!(
+                "{} {}{}",
+                "لا يمكن قراءة الملف".bold(),
+                path.bright_red().bold(),
+                " أو أنه غير موجود".bold()
+            ));
+            panic!()
+        };
 
-            let path = format!("{file_path}.نظم");
-            let Ok(file_content) = fs::read_to_string(&path) else {
-                panic::set_hook(Box::new(|_| {}));
-                print_err(format!(
-                    "{} {}{}",
-                    "لا يمكن قراءة الملف".bold(),
-                    path.bright_red().bold(),
-                    " أو أنه غير موجود".bold()
-                ));
-                panic!()
-            };
+        let (tokens, lines, lexer_errors) =
+            LexerIter::new(&file_content, &mut id_pool, &mut str_pool).collect_all();
 
-            let (tokens, lines, lexer_errors) =
-                LexerIter::new(&file_content, &mut id_pool, &mut str_pool).collect_all();
+        let ast = parse(tokens, &path, &file_content, &lines, lexer_errors);
 
-            std::thread::spawn(move || {
-                let ast = parse(tokens, &path, &file_content, &lines, lexer_errors);
+        match ast {
+            Ok(ast) => {
+                if mod_idx >= mods_to_parsed_files.len() {
+                    mods_to_parsed_files.resize(mod_idx + 1, vec![]);
+                }
 
-                (mod_idx, path, lines, ast)
-            })
-        })
-        .collect::<Vec<_>>();
-
-    let mut parsed_files = ThinVec::with_capacity(jhs.len());
-    let mut parsed_mods: ThinVec<ThinVec<_>> = ThinVec::with_capacity(mods.len());
-    for _ in 0..mods.len() {
-        parsed_mods.push(ThinVec::new());
-    }
-
-    let id_bool = id_pool.build();
-    let str_bool = str_pool.build();
-    let mut diagnostics = vec![];
-
-    // Wait for threads to finish
-    jhs.into_iter().for_each(|jh| {
-        let r = jh.join();
-        match r {
-            Ok((mod_idx, path, lines, Ok(ast))) => {
-                let file_idx = parsed_files.len();
-                parsed_files.push(ParsedFile { path, lines, ast });
-                parsed_mods[mod_idx].push(file_idx);
+                mods_to_parsed_files[mod_idx].push(ParsedFile { path, lines, ast });
             }
-            Ok((.., Err(dd))) => {
-                diagnostics.push(dd);
-                fail_after_parsing = true
+            Err(d) => {
+                diagnostics.push(d);
+                fail_after_parsing = true;
             }
-            Err(_) => fail_after_parsing = true,
         }
     });
 
@@ -234,6 +215,49 @@ fn main() {
         }
         exit(1)
     }
+
+    let id_bool = id_pool.build();
+    let str_bool = str_pool.build();
+
+    // let jhs = files_paths
+    //     .into_iter()
+    //     .map(|file_path| {
+    //         let mut mod_path = file_path
+    //             .split_terminator('/')
+    //             .map(|s| id_pool.get(s))
+    //             .collect::<Vec<_>>();
+
+    //         mod_path.pop(); // remove the actual file
+
+    //         let mod_idx = mods.len();
+    //         let mod_idx = *mods.entry(mod_path).or_insert(mod_idx);
+
+    //         std::thread::spawn(move || {})
+    //     })
+    //     .collect::<Vec<_>>();
+
+    // let mut parsed_files = ThinVec::with_capacity(jhs.len());
+    // let mut parsed_mods: ThinVec<ThinVec<_>> = ThinVec::with_capacity(mods.len());
+    // for _ in 0..mods.len() {
+    //     parsed_mods.push(ThinVec::new());
+    // }
+
+    // // Wait for threads to finish
+    // jhs.into_iter().for_each(|jh| {
+    //     let r = jh.join();
+    //     match r {
+    //         Ok((mod_idx, path, lines, Ok(ast))) => {
+    //             let file_idx = parsed_files.len();
+    //             parsed_files.push(ParsedFile { path, lines, ast });
+    //             parsed_mods[mod_idx].push(file_idx);
+    //         }
+    //         Ok((.., Err(dd))) => {
+    //             diagnostics.push(dd);
+    //             fail_after_parsing = true
+    //         }
+    //         Err(_) => fail_after_parsing = true,
+    //     }
+    // });
 
     // for file_path in files_paths {
     //     let mut mod_path = file_path

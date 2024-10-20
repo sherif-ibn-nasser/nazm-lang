@@ -3,6 +3,7 @@ use nazmc_diagnostics::span::{Span, SpanCursor};
 use nazmc_lexer::LiteralKind;
 use thin_vec::ThinVec;
 
+#[derive(Clone)]
 pub struct File {
     pub imports: ThinVec<ModPathWithItem>,
     pub star_imports: ThinVec<ModPath>,
@@ -12,31 +13,37 @@ pub struct File {
     pub fns: ThinVec<Fn>,
 }
 
+#[derive(Clone)]
 pub struct ModPath {
     pub ids: ThinVec<PoolIdx>,
     pub spans: ThinVec<Span>,
 }
 
+#[derive(Clone)]
 pub struct ModPathWithItem {
     pub mod_path: ModPath,
     pub item: ASTId,
 }
 
+#[derive(Clone)]
 pub struct ASTId {
     pub span: Span,
     pub id: PoolIdx,
 }
 
+#[derive(Clone)]
 pub struct Binding {
     pub kind: BindingKind,
     pub typ: Option<Type>,
 }
 
+#[derive(Clone)]
 pub enum BindingKind {
     Id(ASTId),
     Tuple(ThinVec<BindingKind>, Span),
 }
 
+#[derive(Clone)]
 pub enum Type {
     Path(ModPathWithItem),
     Unit(Option<Span>),
@@ -51,29 +58,34 @@ pub enum Type {
     Lambda(ThinVec<Type>, Box<Type>),
 }
 
+#[derive(Clone)]
 pub enum VisModifier {
     Default,
     Public,
     Private,
 }
 
+#[derive(Clone)]
 pub struct UnitStruct {
     pub vis: VisModifier,
     pub name: ASTId,
 }
 
+#[derive(Clone)]
 pub struct TupleStruct {
     pub vis: VisModifier,
     pub name: ASTId,
     pub types: ThinVec<(VisModifier, Type)>,
 }
 
+#[derive(Clone)]
 pub struct FieldsStruct {
     pub vis: VisModifier,
     pub name: ASTId,
     pub fields: ThinVec<(VisModifier, ASTId, Type)>,
 }
 
+#[derive(Clone)]
 pub struct Fn {
     pub vis: VisModifier,
     pub name: ASTId,
@@ -82,11 +94,13 @@ pub struct Fn {
     pub body: Scope,
 }
 
+#[derive(Clone)]
 pub struct Scope {
     pub stms: ThinVec<Stm>,
     pub return_expr: Option<Expr>,
 }
 
+#[derive(Clone)]
 pub enum Stm {
     Let(Box<LetStm>),
     LetMut(Box<LetStm>),
@@ -95,16 +109,19 @@ pub enum Stm {
     Expr(Box<Expr>),
 }
 
+#[derive(Clone)]
 pub struct LetStm {
     pub binding: Binding,
     pub assign: Option<Box<Expr>>,
 }
 
+#[derive(Clone)]
 pub struct Expr {
     pub span: Span,
     pub kind: ExprKind,
 }
 
+#[derive(Clone)]
 pub enum ExprKind {
     Literal(LiteralKind),
     Parens(Box<Expr>),
@@ -128,55 +145,65 @@ pub enum ExprKind {
     On,
 }
 
+#[derive(Clone)]
 pub struct CallExpr {
     pub on: Expr,
     pub args: ThinVec<Expr>,
     pub parens_span: Span,
 }
 
+#[derive(Clone)]
 pub struct TupleStructExpr {
     pub path: ModPathWithItem,
     pub args: ThinVec<Expr>,
 }
 
+#[derive(Clone)]
 pub struct FieldsStructExpr {
     pub path: ModPathWithItem,
     pub fields: ThinVec<(ASTId, Expr)>,
 }
 
+#[derive(Clone)]
 pub struct FieldExpr {
     pub on: Expr,
     pub name: ASTId,
 }
 
+#[derive(Clone)]
 pub struct IndexExpr {
     pub on: Expr,
     pub index: Expr,
     pub brackets_span: Span,
 }
 
+#[derive(Clone)]
 pub struct ArrayElementsSizedExpr {
     pub repeat: Expr,
     pub size: Expr,
 }
 
+#[derive(Clone)]
 pub struct IfExpr {
     pub if_: (Expr, Scope),
     pub else_ifs: ThinVec<(Expr, Scope)>,
     pub else_: Option<Box<Scope>>,
 }
 
+#[derive(Clone)]
 pub struct LambdaExpr {
     pub params: ThinVec<Binding>,
     pub body: Scope,
 }
 
+#[derive(Clone)]
 pub struct UnaryOpExpr {
     pub op: UnaryOp,
     pub op_span: Span,
     pub expr: Expr,
 }
 
+#[derive(Clone)]
 pub enum UnaryOp {
     Minus,
     LNot,
@@ -186,6 +213,7 @@ pub enum UnaryOp {
     BorrowMut,
 }
 
+#[derive(Clone)]
 pub struct BinaryOpExpr {
     pub op: BinOp,
     pub op_span_cursor: SpanCursor,
@@ -193,6 +221,7 @@ pub struct BinaryOpExpr {
     pub right: Expr,
 }
 
+#[derive(Clone)]
 pub enum BinOp {
     LOr,
     LAnd,
