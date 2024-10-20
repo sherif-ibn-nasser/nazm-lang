@@ -13,6 +13,8 @@ pub struct ExprKindAndIndex(u64);
 impl ExprKindAndIndex {
     pub const KIND_BITS: u64 = 5;
     pub const KIND_SHIFT: u64 = 64 - Self::KIND_BITS;
+    pub const KIND_MASK: u64 = 0b11111 << Self::KIND_SHIFT;
+    pub const INDEX_MASK: u64 = !Self::KIND_MASK;
 
     // Possible kinds
     pub const UNIT: u64 = 0 << Self::KIND_SHIFT;
@@ -41,7 +43,7 @@ impl ExprKindAndIndex {
 
     // Decode the kind of the expression
     pub fn kind(self) -> u64 {
-        self.0 >> Self::KIND_SHIFT
+        self.0 & Self::KIND_MASK
     }
 
     // Decode the index of the expression

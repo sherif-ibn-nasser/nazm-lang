@@ -29,7 +29,7 @@ pub struct ASTId {
 
 pub struct Binding {
     pub kind: BindingKind,
-    pub typ: Type,
+    pub typ: Option<Type>,
 }
 
 pub enum BindingKind {
@@ -167,13 +167,8 @@ pub struct IfExpr {
 }
 
 pub struct LambdaExpr {
-    pub params: LambdaParams,
+    pub params: ThinVec<Binding>,
     pub body: Scope,
-}
-
-pub enum LambdaParams {
-    Implicit,
-    Explicit(ThinVec<Binding>),
 }
 
 pub struct UnaryOpExpr {

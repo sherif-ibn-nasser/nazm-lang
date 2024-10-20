@@ -5,6 +5,11 @@ use itertools::Itertools;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PoolIdx(usize);
 
+impl PoolIdx {
+    pub const MAIN: Self = Self(0);
+    pub const LAMBDA_IMPLICIT_PARAM: Self = Self(1);
+}
+
 mod private {
     pub trait DisplayTableStateGuard {}
 }

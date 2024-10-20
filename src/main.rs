@@ -194,6 +194,11 @@ fn main() {
     let files_paths = get_file_paths();
     let mut id_pool = DataPool::new();
     let mut str_pool = DataPool::new();
+
+    // Register the main fn id to index 0 and the implicit lambda param name to index 1
+    id_pool.get("البداية");
+    id_pool.get("س");
+
     let mut ast_items_counter = ASTItemsCounter::default();
     // let mut lexed_files = vec![]; // path, lines, the parse syntax tree and the mod index
     let mut mods = HashMap::new();

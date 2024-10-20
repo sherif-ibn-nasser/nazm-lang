@@ -1,3 +1,4 @@
+use nazmc_data_pool::PoolIdx;
 use thin_vec::ThinVec;
 
 use crate::*;
@@ -421,11 +422,7 @@ fn lower_lambda_stms_and_return_expr(
 fn lower_binding(binding: Binding) -> ast::Binding {
     let kind = lower_binding_kind(binding.kind);
 
-    let typ = if let Some(ColonWithType { colon: _, typ }) = binding.typ {
-        lower_type(typ.unwrap())
-    } else {
-        ast::Type::Unit(None)
-    };
+    let typ = binding.typ.map(|t| lower_type(t.typ.unwrap()));
 
     ast::Binding { kind, typ }
 }
@@ -1068,15 +1065,17 @@ fn lower_lambda_expr(lambda_expr: LambdaExpr) -> ast::Expr {
             }
         }
 
-        ast::LambdaExpr {
-            params: ast::LambdaParams::Explicit(params),
-            body,
-        }
+        ast::LambdaExpr { params, body }
     } else {
-        ast::LambdaExpr {
-            params: ast::LambdaParams::Implicit,
-            body,
-        }
+        let mut params = ThinVec::new();
+        params.push(ast::Binding {
+            kind: ast::BindingKind::Id(ast::ASTId {
+                span: lambda_expr.open_curly.span,
+                id: PoolIdx::LAMBDA_IMPLICIT_PARAM,
+            }),
+            typ: None,
+        });
+        ast::LambdaExpr { params, body }
     };
 
     ast::Expr {
