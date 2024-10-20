@@ -182,7 +182,7 @@ fn main() {
     let id_pool = id_pool.build();
     let str_pool = str_pool.build();
 
-    nazmc_resolve::check_conflicts(packages_to_parsed_files, parsed_files, &id_pool);
+    nazmc_resolve::check_conflicts(&packages_to_parsed_files, &parsed_files, &id_pool);
 
     // let jhs = files_paths
     //     .into_iter()
