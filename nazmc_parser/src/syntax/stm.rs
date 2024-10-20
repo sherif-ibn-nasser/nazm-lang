@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(NazmcParse, Debug)]
-pub enum Stm {
+pub(crate) enum Stm {
     Semicolon(SemicolonSymbol),
     Let(LetStm),
     While(WhileStm),
@@ -11,22 +11,22 @@ pub enum Stm {
 }
 
 #[derive(NazmcParse, Debug)]
-pub struct LetStm {
-    pub let_keyword: LetKeyword,
-    pub mut_keyword: Option<MutKeyword>,
-    pub binding: ParseResult<Binding>,
-    pub let_assign: Option<LetAssign>,
-    pub semicolon: ParseResult<SemicolonSymbol>,
+pub(crate) struct LetStm {
+    pub(crate) let_keyword: LetKeyword,
+    pub(crate) mut_keyword: Option<MutKeyword>,
+    pub(crate) binding: ParseResult<Binding>,
+    pub(crate) let_assign: Option<LetAssign>,
+    pub(crate) semicolon: ParseResult<SemicolonSymbol>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub struct Binding {
-    pub kind: BindingKind,
-    pub typ: Option<ColonWithType>,
+pub(crate) struct Binding {
+    pub(crate) kind: BindingKind,
+    pub(crate) typ: Option<ColonWithType>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub enum BindingKind {
+pub(crate) enum BindingKind {
     Id(Id),
     Destructed(Box<DestructedTuple>), // Box for the large size
 }
@@ -43,19 +43,19 @@ generateDelimitedPunctuated!(
 );
 
 #[derive(NazmcParse, Debug)]
-pub struct ColonWithType {
-    pub colon: ColonSymbol,
-    pub typ: ParseResult<Type>,
+pub(crate) struct ColonWithType {
+    pub(crate) colon: ColonSymbol,
+    pub(crate) typ: ParseResult<Type>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub struct LetAssign {
-    pub equal: EqualSymbol,
-    pub expr: ParseResult<Expr>,
+pub(crate) struct LetAssign {
+    pub(crate) equal: EqualSymbol,
+    pub(crate) expr: ParseResult<Expr>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub struct WhileStm {
+pub(crate) struct WhileStm {
     pub(crate) while_keyword: WhileKeyword,
     pub(crate) conditional_block: ConditionalBlock,
 }
@@ -71,7 +71,7 @@ pub struct DoWhileStm {
 }
 
 #[derive(NazmcParse, Debug)]
-pub struct ExprStm {
-    pub expr: Expr,
-    pub semicolon: ParseResult<SemicolonSymbol>,
+pub(crate) struct ExprStm {
+    pub(crate) expr: Expr,
+    pub(crate) semicolon: ParseResult<SemicolonSymbol>,
 }

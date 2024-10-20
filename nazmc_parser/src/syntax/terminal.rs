@@ -10,12 +10,12 @@ mod private {
 pub(crate) trait TerminalGuard: private::Sealed + Debug {}
 
 #[derive(Debug)]
-pub struct Terminal<T>
+pub(crate) struct Terminal<T>
 where
     T: TerminalGuard,
 {
-    pub span: Span,
-    pub data: T,
+    pub(crate) span: Span,
+    pub(crate) data: T,
 }
 
 macro_rules! create_keyword_parser {
@@ -23,13 +23,13 @@ macro_rules! create_keyword_parser {
         paste! {
 
             #[derive(Debug)]
-            pub struct [<$keyword KeywordToken>];
+            pub(crate) struct [<$keyword KeywordToken>];
 
             impl private::Sealed for [<$keyword KeywordToken>] {}
 
             impl TerminalGuard for [<$keyword KeywordToken>] {}
 
-            pub type [<$keyword Keyword>] = Terminal<[<$keyword KeywordToken>]>;
+            pub(crate) type [<$keyword Keyword>] = Terminal<[<$keyword KeywordToken>]>;
 
             impl NazmcParse for ParseResult<Terminal<[<$keyword KeywordToken>]>>{
 
@@ -60,13 +60,13 @@ macro_rules! create_symbol_parser {
         paste! {
 
             #[derive(Debug)]
-            pub struct [<$symbol SymbolToken>];
+            pub(crate) struct [<$symbol SymbolToken>];
 
             impl private::Sealed for [<$symbol SymbolToken>] {}
 
             impl TerminalGuard for [<$symbol SymbolToken>] {}
 
-            pub type [<$symbol Symbol>] = Terminal<[<$symbol SymbolToken>]>;
+            pub(crate) type [<$symbol Symbol>] = Terminal<[<$symbol SymbolToken>]>;
 
             impl NazmcParse for ParseResult<Terminal<[<$symbol SymbolToken>]>>{
 
@@ -139,19 +139,19 @@ create_symbol_parser!(Equal);
 create_symbol_parser!(Hash);
 
 #[derive(Debug)]
-pub struct IdToken {
-    pub val: PoolIdx,
+pub(crate) struct IdToken {
+    pub(crate) val: PoolIdx,
 }
 
 #[derive(Debug)]
-pub struct DoubleColonsSymbolToken;
+pub(crate) struct DoubleColonsSymbolToken;
 
 #[derive(Debug)]
-pub struct RArrowSymbolToken;
+pub(crate) struct RArrowSymbolToken;
 
 #[derive(Debug)]
 /// The parse method is written by hand to avoid backtracking
-pub enum BinOpToken {
+pub(crate) enum BinOpToken {
     LOr,
     LAnd,
     EqualEqual,
@@ -191,7 +191,7 @@ pub enum BinOpToken {
 /// The parse method is written by hand to avoid backtracking
 ///
 /// Note that there is no unary plus operator
-pub enum UnaryOpToken {
+pub(crate) enum UnaryOpToken {
     Minus,
     LNot,
     BNot,
@@ -202,13 +202,13 @@ pub enum UnaryOpToken {
 
 #[derive(Debug)]
 /// The parse method is written by hand to avoid backtracking
-pub enum VisModifierToken {
+pub(crate) enum VisModifierToken {
     Public,
     Private,
 }
 
 #[derive(Debug)]
-pub struct EOFToken;
+pub(crate) struct EOFToken;
 
 impl private::Sealed for IdToken {}
 impl private::Sealed for DoubleColonsSymbolToken {}
@@ -228,14 +228,14 @@ impl TerminalGuard for LiteralKind {}
 impl TerminalGuard for VisModifierToken {}
 impl TerminalGuard for EOFToken {}
 
-pub type Id = Terminal<IdToken>;
-pub type DoubleColonsSymbol = Terminal<DoubleColonsSymbolToken>;
-pub type RArrowSymbol = Terminal<RArrowSymbolToken>;
-pub type BinOp = Terminal<BinOpToken>;
-pub type UnaryOp = Terminal<UnaryOpToken>;
-pub type LiteralExpr = Terminal<LiteralKind>;
-pub type VisModifier = Terminal<VisModifierToken>;
-pub type Eof = Terminal<EOFToken>;
+pub(crate) type Id = Terminal<IdToken>;
+pub(crate) type DoubleColonsSymbol = Terminal<DoubleColonsSymbolToken>;
+pub(crate) type RArrowSymbol = Terminal<RArrowSymbolToken>;
+pub(crate) type BinOp = Terminal<BinOpToken>;
+pub(crate) type UnaryOp = Terminal<UnaryOpToken>;
+pub(crate) type LiteralExpr = Terminal<LiteralKind>;
+pub(crate) type VisModifier = Terminal<VisModifierToken>;
+pub(crate) type Eof = Terminal<EOFToken>;
 
 macro_rules! match_peek_symbols {
     ($iter:ident, $symbol0:ident, $symbol1:ident, $symbol2:ident) => {

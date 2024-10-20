@@ -117,6 +117,7 @@ dependencies = [
  "owo-colors",
  "serde",
  "serde_yaml",
+ "thin-vec",
 ]
 
 [[package]]

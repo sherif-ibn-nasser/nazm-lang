@@ -2,19 +2,10 @@ mod cli;
 use cli::print_err;
 use nazmc_data_pool::DataPool;
 use nazmc_data_pool::PoolIdx;
-use nazmc_diagnostics::eprint_diagnostics;
 use nazmc_diagnostics::span::Span;
-use nazmc_diagnostics::CodeWindow;
-use nazmc_diagnostics::Diagnostic;
 use nazmc_lexer::LexerIter;
-use nazmc_lexer::Token;
+use nazmc_parser::ast;
 use nazmc_parser::parse;
-use nazmc_parser::parse_methods::ParseResult;
-use nazmc_parser::syntax;
-use nazmc_parser::syntax::File;
-use nazmc_parser::syntax::FileItem;
-use nazmc_parser::syntax::Id;
-use nazmc_parser::syntax::Item;
 use owo_colors::OwoColorize;
 use serde::Deserialize;
 use serde_yaml::Value;
@@ -25,6 +16,7 @@ use std::{
     fs, panic,
     process::{exit, Command},
 };
+use thin_vec::ThinVec;
 
 fn collect_paths(paths: Vec<Value>, prefix: &str, collected_paths: &mut Vec<String>) {
     for path in paths {
@@ -119,45 +111,11 @@ struct ASTItemsCounter {
     fns: usize,
 }
 
-enum VisModifier {
-    Default = 0,
-    Pub = 1,
-    Priv = 2,
-}
-
 #[derive(Clone)]
 struct ItemMapToMod {
     mod_idx: usize,
     file_idx: usize,
     idx_in_file: usize,
-}
-
-// struct ModItemsEncoderDecoder;
-
-// impl ModItemsEncoderDecoder {
-//     pub fn encode(kind: ItemKind, vis: VisModifier, idx: usize) -> u64 {
-//         (kind as u64) << 62 | (vis as u64) << 60 | (idx as u64)
-//     }
-// }
-
-#[inline]
-fn get_file_item(file_item: &FileItem) -> (&Item, VisModifier) {
-    match file_item {
-        syntax::FileItem::WithVisModifier(item_with_vis) => {
-            let Ok(item) = &item_with_vis.item else {
-                unreachable!()
-            };
-
-            (
-                item,
-                match item_with_vis.visibility.data {
-                    syntax::VisModifierToken::Public => VisModifier::Pub,
-                    syntax::VisModifierToken::Private => VisModifier::Priv,
-                },
-            )
-        }
-        syntax::FileItem::WithoutModifier(item) => (item, VisModifier::Default),
-    }
 }
 
 struct UnresolvedImport {
@@ -178,18 +136,17 @@ struct ResolvedStarImport {
 }
 
 struct ParsedFile {
-    mod_idx: usize,
     path: String,
     lines: Vec<String>,
-    syntax_tree: File,
+    ast: ast::File,
 }
 
 fn main() {
     // RTL printing
     let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
-    io::stdout()
-        .write_all(&output.stdout[1..output.stdout.len() - 1])
-        .unwrap();
+    let output = &output.stdout[1..output.stdout.len() - 1];
+    io::stdout().write_all(output).unwrap();
+    io::stderr().write_all(output).unwrap();
 
     let files_paths = get_file_paths();
     let mut id_pool = DataPool::new();
@@ -199,13 +156,12 @@ fn main() {
     id_pool.get("البداية");
     id_pool.get("س");
 
-    let mut ast_items_counter = ASTItemsCounter::default();
-    // let mut lexed_files = vec![]; // path, lines, the parse syntax tree and the mod index
+    // let mut ast_items_counter = ASTItemsCounter::default();
     let mut mods = HashMap::new();
     let mut fail_after_parsing = false;
     // let mut items_to_mods: HashMap<PoolIdx, Vec<_>> = HashMap::new();
 
-    let jh_iter = files_paths
+    let jhs = files_paths
         .into_iter()
         .map(|file_path| {
             let mut mod_path = file_path
@@ -234,35 +190,48 @@ fn main() {
                 LexerIter::new(&file_content, &mut id_pool, &mut str_pool).collect_all();
 
             std::thread::spawn(move || {
-                let syntax_tree = parse(tokens, &path, &file_content, &lines, lexer_errors);
+                let ast = parse(tokens, &path, &file_content, &lines, lexer_errors);
 
-                ParsedFile {
-                    mod_idx,
-                    path,
-                    lines,
-                    syntax_tree,
-                }
+                (mod_idx, path, lines, ast)
             })
         })
-        .collect::<Vec<_>>()
-        .into_iter();
+        .collect::<Vec<_>>();
+
+    let mut parsed_files = ThinVec::with_capacity(jhs.len());
+    let mut parsed_mods: ThinVec<ThinVec<_>> = ThinVec::with_capacity(mods.len());
+    for _ in 0..mods.len() {
+        parsed_mods.push(ThinVec::new());
+    }
 
     let id_bool = id_pool.build();
     let str_bool = str_pool.build();
+    let mut diagnostics = vec![];
 
-    // Wait for thread to finish
-    jh_iter
-        .map(|jh| {
-            let r = jh.join();
-            match r {
-                Ok(parsed_file) => todo!(),
-                Err(_) => fail_after_parsing = true,
+    // Wait for threads to finish
+    jhs.into_iter().for_each(|jh| {
+        let r = jh.join();
+        match r {
+            Ok((mod_idx, path, lines, Ok(ast))) => {
+                let file_idx = parsed_files.len();
+                parsed_files.push(ParsedFile { path, lines, ast });
+                parsed_mods[mod_idx].push(file_idx);
             }
-        })
-        .collect::<Vec<_>>()
-        .into_iter();
+            Ok((.., Err(dd))) => {
+                diagnostics.push(dd);
+                fail_after_parsing = true
+            }
+            Err(_) => fail_after_parsing = true,
+        }
+    });
 
     if fail_after_parsing {
+        let last_idx = diagnostics.len() - 1;
+        for (i, d) in diagnostics.iter().enumerate() {
+            eprint!("{d}");
+            if i != last_idx {
+                eprintln!();
+            }
+        }
         exit(1)
     }
 

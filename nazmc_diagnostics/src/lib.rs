@@ -14,6 +14,18 @@ pub fn eprint_diagnostics(diagnostics: Vec<Diagnostic>) {
     }
 }
 
+pub fn fmt_diagnostics(diagnostics: Vec<Diagnostic>) -> String {
+    let last_idx = diagnostics.len() - 1;
+    let mut dd = String::new();
+    for (i, d) in diagnostics.iter().enumerate() {
+        dd += &format!("{d}\n");
+        if i != last_idx {
+            dd.push('\n');
+        }
+    }
+    dd
+}
+
 pub struct Diagnostic<'a> {
     level: DiagnosticLevel,
     msg: String,

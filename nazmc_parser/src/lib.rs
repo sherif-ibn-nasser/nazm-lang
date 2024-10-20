@@ -1,13 +1,16 @@
+use ast_generator::lower_file;
 use error::*;
-use nazmc_diagnostics::{eprint_diagnostics, span::SpanCursor, CodeWindow, Diagnostic};
+use nazmc_diagnostics::{
+    eprint_diagnostics, fmt_diagnostics, span::SpanCursor, CodeWindow, Diagnostic,
+};
 use nazmc_lexer::*;
-use std::panic;
+use std::{io::Write, panic};
 use syntax::File;
 
 pub mod ast;
 mod ast_generator;
-pub mod parse_methods;
-pub mod syntax;
+pub(crate) mod parse_methods;
+pub(crate) mod syntax;
 pub(crate) mod tokens_iter;
 
 pub(crate) use nazmc_diagnostics::span::Span;
@@ -22,7 +25,7 @@ pub fn parse(
     file_content: &str,
     file_lines: &[String],
     lexer_errors: Vec<LexerError>,
-) -> File {
+) -> Result<ast::File, String> {
     let mut reporter = ParseErrorsReporter {
         file_path,
         file_lines: &file_lines,
@@ -41,13 +44,11 @@ pub fn parse(
 
     reporter.check_file(&file);
 
-    if !reporter.diagnostics.is_empty() {
-        eprint_diagnostics(reporter.diagnostics);
-        panic::set_hook(Box::new(|_| {}));
-        panic!()
+    if reporter.diagnostics.is_empty() {
+        Ok(lower_file(file))
+    } else {
+        Err(fmt_diagnostics(reporter.diagnostics))
     }
-
-    file
 }
 
 struct ParseErrorsReporter<'a> {
@@ -1169,7 +1170,7 @@ impl<'a> ParseErrorsReporter<'a> {
         }
     }
 
-    fn check_when_expr(&mut self, when_expr: &WhenExpr) {
+    fn check_when_expr(&mut self, _when_expr: &WhenExpr) {
         // TODO
         todo!()
     }

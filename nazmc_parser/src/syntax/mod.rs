@@ -1,26 +1,26 @@
 use super::*;
 use paste::paste;
 
-pub mod punctuated;
+pub(crate) mod punctuated;
 use punctuated::*;
 
-pub mod terminal;
-pub use terminal::*;
+pub(crate) mod terminal;
+pub(crate) use terminal::*;
 
-pub mod item;
-pub use item::*;
+pub(crate) mod item;
+pub(crate) use item::*;
 
-pub mod path;
-pub use path::*;
+pub(crate) mod path;
+pub(crate) use path::*;
 
-pub mod typ;
-pub use typ::*;
+pub(crate) mod typ;
+pub(crate) use typ::*;
 
-pub mod stm;
-pub use stm::*;
+pub(crate) mod stm;
+pub(crate) use stm::*;
 
-pub mod expr;
-pub use expr::*;
+pub(crate) mod expr;
+pub(crate) use expr::*;
 
 generateTrailingCommaWithCloseDelimiter!(CloseParenthesisSymbol);
 
@@ -33,28 +33,28 @@ generateTrailingCommaWithCloseDelimiter!(CloseSquareBracketSymbol);
 generateTrailingCommaWithCloseDelimiter!(RArrowSymbol);
 
 #[derive(NazmcParse, Debug)]
-pub struct File {
-    pub imports: Vec<ImportStm>,
-    pub content: ZeroOrMany<FileItem, Eof>,
+pub(crate) struct File {
+    pub(crate) imports: Vec<ImportStm>,
+    pub(crate) content: ZeroOrMany<FileItem, Eof>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub struct ImportStm {
-    pub import_keyword: ImportKeyword,
-    pub top: ParseResult<Id>,
-    pub sec: ParseResult<DoubleColonsWithPathSegInImportStm>,
-    pub segs: Vec<DoubleColonsWithPathSegInImportStm>,
-    pub semicolon: ParseResult<SemicolonSymbol>,
+pub(crate) struct ImportStm {
+    pub(crate) import_keyword: ImportKeyword,
+    pub(crate) top: ParseResult<Id>,
+    pub(crate) sec: ParseResult<DoubleColonsWithPathSegInImportStm>,
+    pub(crate) segs: Vec<DoubleColonsWithPathSegInImportStm>,
+    pub(crate) semicolon: ParseResult<SemicolonSymbol>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub struct DoubleColonsWithPathSegInImportStm {
-    pub double_colons: DoubleColonsSymbol,
-    pub seg: ParseResult<PathSegInImportStm>,
+pub(crate) struct DoubleColonsWithPathSegInImportStm {
+    pub(crate) double_colons: DoubleColonsSymbol,
+    pub(crate) seg: ParseResult<PathSegInImportStm>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub enum PathSegInImportStm {
+pub(crate) enum PathSegInImportStm {
     Id(Id),
     Star(StarSymbol),
 }

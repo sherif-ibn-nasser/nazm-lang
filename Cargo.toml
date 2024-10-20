@@ -15,3 +15,4 @@ nazmc_diagnostics = { path = "nazmc_diagnostics" }
 nazmc_nir = { path = "nazmc_nir" }
 serde = { version = "*", features = ["derive"] }
 serde_yaml = "*"
+thin-vec = "*"

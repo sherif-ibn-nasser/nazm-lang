@@ -1,13 +1,13 @@
 use super::*;
 
 #[derive(NazmcParse, Debug)]
-pub struct SimplePath {
-    pub top: Id,
-    pub inners: Vec<SimpleInnerPath>,
+pub(crate) struct SimplePath {
+    pub(crate) top: Id,
+    pub(crate) inners: Vec<SimpleInnerPath>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub struct SimpleInnerPath {
-    pub double_colons: DoubleColonsSymbol,
-    pub inner: ParseResult<Id>,
+pub(crate) struct SimpleInnerPath {
+    pub(crate) double_colons: DoubleColonsSymbol,
+    pub(crate) inner: ParseResult<Id>,
 }
