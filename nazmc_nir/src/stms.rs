@@ -4,13 +4,14 @@ use thin_vec::ThinVec;
 use crate::{
     exprs::{Expr, IfExpr},
     types::Type,
-    ASTId, ConditionalScope,
+    ConditionalScope, NIRId,
 };
 
 pub struct Stm {
     pub kind_and_index: u64,
 }
 
+#[derive(Default)]
 pub struct Stms {
     pub lets: ThinVec<LetStm>,
     pub let_muts: ThinVec<LetStm>,
@@ -30,6 +31,6 @@ pub struct Binding {
 }
 
 pub enum BindingKind {
-    Name(ASTId),
+    Name(NIRId),
     TupleDestruction(ThinVec<Binding>, Span),
 }

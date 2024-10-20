@@ -2,6 +2,7 @@ use crate::{Expr, ModPathWithItem};
 use nazmc_diagnostics::span::Span;
 use thin_vec::ThinVec;
 
+#[derive(Default)]
 pub struct Types {
     pub paths: ThinVec<ModPathWithItem>,
     pub ptrs: ThinVec<Type>,

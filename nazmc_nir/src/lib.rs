@@ -9,7 +9,8 @@ mod exprs;
 mod stms;
 mod types;
 
-pub struct AST {
+#[derive(Default)]
+pub struct NIR {
     pub imports: ThinVec<ModPathWithItem>,
     pub star_imports: ThinVec<ModPath>,
     pub types: Types,
@@ -29,10 +30,10 @@ pub struct ModPath {
 
 pub struct ModPathWithItem {
     pub mod_path: ModPath,
-    pub item: ASTId,
+    pub item: NIRId,
 }
 
-pub struct ASTId {
+pub struct NIRId {
     pub span: Span,
     pub id: PoolIdx,
 }
@@ -45,25 +46,25 @@ pub enum VisModifier {
 
 pub struct UnitStruct {
     pub vis: VisModifier,
-    pub name: ASTId,
+    pub name: NIRId,
 }
 
 pub struct TupleStruct {
     pub vis: VisModifier,
-    pub name: ASTId,
+    pub name: NIRId,
     pub types: ThinVec<(VisModifier, Type)>,
 }
 
 pub struct FieldsStruct {
     pub vis: VisModifier,
-    pub name: ASTId,
-    pub fields: ThinVec<(VisModifier, ASTId, Type)>,
+    pub name: NIRId,
+    pub fields: ThinVec<(VisModifier, NIRId, Type)>,
 }
 
 pub struct Fn {
     pub vis: VisModifier,
-    pub name: ASTId,
-    pub params: ThinVec<(ASTId, Type)>,
+    pub name: NIRId,
+    pub params: ThinVec<(NIRId, Type)>,
     pub return_type: Type,
     pub body: Scope,
 }
