@@ -101,45 +101,6 @@ fn get_file_paths() -> Vec<String> {
     collected_paths
 }
 
-#[derive(Default)]
-struct ASTItemsCounter {
-    unit_structs: usize,
-    tuple_structs: usize,
-    fields_structs: usize,
-    fns: usize,
-}
-
-#[derive(Clone)]
-struct ItemMapToMod {
-    mod_idx: usize,
-    file_idx: usize,
-    idx_in_file: usize,
-}
-
-struct UnresolvedImport {
-    first_invalid_seg: PoolIdx,
-    first_invalid_seg_span: Span,
-    file_idx: usize,
-}
-
-struct ResolvedImport {
-    file_idx: usize,
-    item_id: PoolIdx,
-    item_to_mod_idx: usize,
-}
-
-struct ResolvedStarImport {
-    file_idx: usize,
-    mod_idx: usize,
-}
-
-#[derive(Clone)]
-struct ParsedFile {
-    path: String,
-    lines: Vec<String>,
-    ast: nazmc_ast::File,
-}
-
 fn main() {
     // RTL printing
     let output = Command::new("printf").arg(r#""\e[2 k""#).output().unwrap();
@@ -150,8 +111,9 @@ fn main() {
     let files_paths = get_file_paths();
     let mut id_pool = DataPool::new();
     let mut str_pool = DataPool::new();
-    let mut mods = HashMap::new();
-    let mut mods_to_parsed_files = vec![];
+    let mut packages = HashMap::new();
+    let mut parsed_files = vec![];
+    let mut packages_to_parsed_files = vec![];
     let mut diagnostics: Vec<String> = vec![];
     let mut fail_after_parsing = false;
     // let mut ast_items_counter = ASTItemsCounter::default();
@@ -162,15 +124,15 @@ fn main() {
     id_pool.get("س");
 
     files_paths.into_iter().for_each(|file_path| {
-        let mut mod_path = file_path
+        let mut package_path = file_path
             .split_terminator('/')
             .map(|s| id_pool.get(s))
             .collect::<Vec<_>>();
 
-        mod_path.pop(); // remove the actual file
+        package_path.pop(); // remove the actual file
 
-        let mod_idx = mods.len();
-        let mod_idx = *mods.entry(mod_path).or_insert(mod_idx);
+        let package_idx = packages.len();
+        let package_idx = *packages.entry(package_path).or_insert(package_idx);
 
         let path = format!("{file_path}.نظم");
         let Ok(file_content) = fs::read_to_string(&path) else {
@@ -191,11 +153,13 @@ fn main() {
 
         match ast {
             Ok(ast) => {
-                if mod_idx >= mods_to_parsed_files.len() {
-                    mods_to_parsed_files.resize(mod_idx + 1, vec![]);
+                if package_idx >= packages_to_parsed_files.len() {
+                    packages_to_parsed_files.resize(package_idx + 1, vec![]);
                 }
 
-                mods_to_parsed_files[mod_idx].push(ParsedFile { path, lines, ast });
+                let file_idx = parsed_files.len();
+                parsed_files.push(nazmc_resolve::ParsedFile { path, lines, ast });
+                packages_to_parsed_files[package_idx].push(file_idx);
             }
             Err(d) => {
                 diagnostics.push(d);
@@ -215,8 +179,10 @@ fn main() {
         exit(1)
     }
 
-    let id_bool = id_pool.build();
-    let str_bool = str_pool.build();
+    let id_pool = id_pool.build();
+    let str_pool = str_pool.build();
+
+    nazmc_resolve::check_conflicts(packages_to_parsed_files, parsed_files, &id_pool);
 
     // let jhs = files_paths
     //     .into_iter()

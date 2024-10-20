@@ -115,6 +115,7 @@ dependencies = [
  "nazmc_lexer",
  "nazmc_nir",
  "nazmc_parser",
+ "nazmc_resolve",
  "owo-colors",
  "serde",
  "serde_yaml",
@@ -185,6 +186,15 @@ dependencies = [
  "nazmc_parse_derive",
  "paste",
  "thin-vec",
+]
+
+[[package]]
+name = "nazmc_resolve"
+version = "0.1.0"
+dependencies = [
+ "nazmc_ast",
+ "nazmc_data_pool",
+ "nazmc_diagnostics",
 ]
 
 [[package]]

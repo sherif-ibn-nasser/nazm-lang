@@ -6,15 +6,12 @@ use thin_vec::ThinVec;
 pub(crate) fn lower_file(file: File) -> nazmc_ast::File {
     let (imports, star_imports) = lower_imports(file.imports);
 
-    let (unit_structs, tuple_structs, fields_structs, fns) = lower_file_items(file.content.items);
+    let items = lower_file_items(file.content.items);
 
     nazmc_ast::File {
         imports,
         star_imports,
-        unit_structs,
-        tuple_structs,
-        fields_structs,
-        fns,
+        items,
     }
 }
 
@@ -84,18 +81,8 @@ fn lower_imports(
 }
 
 #[inline]
-fn lower_file_items(
-    file_items: Vec<ParseResult<FileItem>>,
-) -> (
-    ThinVec<nazmc_ast::UnitStruct>,
-    ThinVec<nazmc_ast::TupleStruct>,
-    ThinVec<nazmc_ast::FieldsStruct>,
-    ThinVec<nazmc_ast::Fn>,
-) {
-    let mut unit_structs = ThinVec::new();
-    let mut tuple_structs = ThinVec::new();
-    let mut fields_structs = ThinVec::new();
-    let mut fns = ThinVec::new();
+fn lower_file_items(file_items: Vec<ParseResult<FileItem>>) -> ThinVec<nazmc_ast::Item> {
+    let mut items = ThinVec::new();
 
     for file_item in file_items {
         let (item, vis) = match file_item.unwrap() {
@@ -125,7 +112,11 @@ fn lower_file_items(
 
                 match s.kind.unwrap() {
                     StructKind::Unit(_) => {
-                        unit_structs.push(nazmc_ast::UnitStruct { vis, name });
+                        items.push(nazmc_ast::Item {
+                            name,
+                            vis,
+                            kind: nazmc_ast::ItemKind::UnitStruct,
+                        });
                     }
                     StructKind::Tuple(tuple_struct_fields) => {
                         let mut types = ThinVec::new();
@@ -144,8 +135,13 @@ fn lower_file_items(
                                 types.push(typ);
                             }
                         }
-
-                        tuple_structs.push(nazmc_ast::TupleStruct { vis, name, types });
+                        items.push(nazmc_ast::Item {
+                            name,
+                            vis,
+                            kind: nazmc_ast::ItemKind::TupleStruct(nazmc_ast::TupleStruct {
+                                types,
+                            }),
+                        });
                     }
                     StructKind::Fields(struct_fields) => {
                         let mut fields = ThinVec::new();
@@ -164,7 +160,13 @@ fn lower_file_items(
                                 fields.push(field);
                             }
                         }
-                        fields_structs.push(nazmc_ast::FieldsStruct { vis, name, fields });
+                        items.push(nazmc_ast::Item {
+                            name,
+                            vis,
+                            kind: nazmc_ast::ItemKind::FieldsStruct(nazmc_ast::FieldsStruct {
+                                fields,
+                            }),
+                        });
                     }
                 }
             }
@@ -200,18 +202,19 @@ fn lower_file_items(
 
                 let body = lower_lambda_as_body(f.body.unwrap());
 
-                fns.push(nazmc_ast::Fn {
-                    vis,
+                items.push(nazmc_ast::Item {
                     name,
-                    params,
-                    return_type,
-                    body,
+                    vis,
+                    kind: nazmc_ast::ItemKind::Fn(nazmc_ast::Fn {
+                        params,
+                        return_type,
+                        body,
+                    }),
                 });
             }
         }
     }
-
-    (unit_structs, tuple_structs, fields_structs, fns)
+    items
 }
 
 fn lower_tuple_struct_field(field: TupleStructField) -> (nazmc_ast::VisModifier, nazmc_ast::Type) {

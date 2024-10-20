@@ -6,10 +6,22 @@ use thin_vec::ThinVec;
 pub struct File {
     pub imports: ThinVec<ModPathWithItem>,
     pub star_imports: ThinVec<ModPath>,
-    pub unit_structs: ThinVec<UnitStruct>,
-    pub tuple_structs: ThinVec<TupleStruct>,
-    pub fields_structs: ThinVec<FieldsStruct>,
-    pub fns: ThinVec<Fn>,
+    pub items: ThinVec<Item>,
+}
+
+#[derive(Clone)]
+pub struct Item {
+    pub name: ASTId,
+    pub vis: VisModifier,
+    pub kind: ItemKind,
+}
+
+#[derive(Clone)]
+pub enum ItemKind {
+    UnitStruct,
+    TupleStruct(TupleStruct),
+    FieldsStruct(FieldsStruct),
+    Fn(Fn),
 }
 
 #[derive(Clone)]
@@ -57,7 +69,7 @@ pub enum Type {
     Lambda(ThinVec<Type>, Box<Type>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum VisModifier {
     Default,
     Public,
@@ -65,29 +77,17 @@ pub enum VisModifier {
 }
 
 #[derive(Clone)]
-pub struct UnitStruct {
-    pub vis: VisModifier,
-    pub name: ASTId,
-}
-
-#[derive(Clone)]
 pub struct TupleStruct {
-    pub vis: VisModifier,
-    pub name: ASTId,
     pub types: ThinVec<(VisModifier, Type)>,
 }
 
 #[derive(Clone)]
 pub struct FieldsStruct {
-    pub vis: VisModifier,
-    pub name: ASTId,
     pub fields: ThinVec<(VisModifier, ASTId, Type)>,
 }
 
 #[derive(Clone)]
 pub struct Fn {
-    pub vis: VisModifier,
-    pub name: ASTId,
     pub params: ThinVec<(ASTId, Type)>,
     pub return_type: Type,
     pub body: Scope,
