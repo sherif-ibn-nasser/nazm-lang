@@ -4,7 +4,6 @@ use nazmc_data_pool::DataPool;
 use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::Span;
 use nazmc_lexer::LexerIter;
-use nazmc_parser::ast;
 use nazmc_parser::parse;
 use owo_colors::OwoColorize;
 use serde::Deserialize;
@@ -138,7 +137,7 @@ struct ResolvedStarImport {
 struct ParsedFile {
     path: String,
     lines: Vec<String>,
-    ast: ast::File,
+    ast: nazmc_ast::File,
 }
 
 fn main() {

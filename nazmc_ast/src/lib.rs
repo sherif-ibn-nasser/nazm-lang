@@ -1,6 +1,5 @@
 use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::{Span, SpanCursor};
-use nazmc_lexer::LiteralKind;
 use thin_vec::ThinVec;
 
 #[derive(Clone)]
@@ -123,7 +122,7 @@ pub struct Expr {
 
 #[derive(Clone)]
 pub enum ExprKind {
-    Literal(LiteralKind),
+    Literal(LiteralExpr),
     Parens(Box<Expr>),
     Path(Box<ModPathWithItem>),
     Call(Box<CallExpr>),
@@ -143,6 +142,32 @@ pub enum ExprKind {
     Break(Option<Box<Expr>>),
     Continue,
     On,
+}
+
+#[derive(Clone)]
+pub enum LiteralExpr {
+    Str(PoolIdx),
+    Char(char),
+    Bool(bool),
+    Num(NumKind),
+}
+
+#[derive(Clone)]
+pub enum NumKind {
+    F4(f32),
+    F8(f64),
+    I(isize),
+    I1(i8),
+    I2(i16),
+    I4(i32),
+    I8(i64),
+    U(usize),
+    U1(u8),
+    U2(u16),
+    U4(u32),
+    U8(u64),
+    UnspecifiedInt(u64),
+    UnspecifiedFloat(f64),
 }
 
 #[derive(Clone)]
