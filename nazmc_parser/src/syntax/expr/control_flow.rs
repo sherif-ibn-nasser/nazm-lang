@@ -30,22 +30,6 @@ pub(crate) struct WhenExpr {
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct WhileExpr {
-    pub(crate) while_keyword: WhileKeyword,
-    pub(crate) conditional_block: ConditionalBlock,
-}
-
-#[derive(NazmcParse, Debug)]
-pub(crate) struct DoWhileExpr {
-    // TODO
-    pub(crate) do_keyword: DoKeyword,
-    /// This must be checked that it doesn't have a lambda arrow
-    pub(crate) block: ParseResult<LambdaExpr>,
-    pub(crate) while_keyword: ParseResult<WhileKeyword>,
-    pub(crate) condition: ParseResult<Expr>,
-}
-
-#[derive(NazmcParse, Debug)]
 pub(crate) struct BreakExpr {
     pub(crate) break_keyword: BreakKeyword,
     pub(crate) expr: Option<Expr>,

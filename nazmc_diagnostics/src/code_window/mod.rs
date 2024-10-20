@@ -9,29 +9,59 @@ use itertools::Itertools;
 use owo_colors::{OwoColorize, Style};
 use painter::Painter;
 
-use crate::{span::Span, DiagnosticPrint};
+use crate::span::{Span, SpanCursor};
 
 mod painter;
 
-pub(crate) struct CodeReporter<'a> {
+pub struct CodeWindow<'a> {
+    file_path: &'a str,
+    file_lines: &'a [String],
+    cursor: SpanCursor,
     /// Map lines indecies and main depth line on them
     code_lines: HashMap<usize, CodeLine<'a>>,
 }
 
-impl<'a> CodeReporter<'a> {
-    pub(crate) fn new() -> Self {
+impl<'a> CodeWindow<'a> {
+    pub fn new(file_path: &'a str, file_lines: &'a [String], cursor: SpanCursor) -> Self {
         Self {
+            file_path,
+            file_lines,
+            cursor,
             code_lines: HashMap::new(),
         }
     }
 
-    pub(crate) fn mark(
-        &mut self,
-        span: Span,
-        sign: char,
-        style: Style,
-        labels: Vec<String>,
-    ) -> &mut Self {
+    pub fn mark_error(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
+        self.mark(span, '^', Style::new().bold().red(), labels);
+        self
+    }
+
+    pub fn mark_warning(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
+        self.mark(span, '^', Style::new().bold().yellow(), labels);
+        self
+    }
+
+    pub fn mark_help(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
+        self.mark(span, '=', Style::new().bold().green(), labels);
+        self
+    }
+
+    pub fn mark_note(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
+        self.mark(span, '~', Style::new().bold().cyan(), labels);
+        self
+    }
+
+    pub fn mark_secondary(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
+        self.mark(span, '-', Style::new().bold().blue(), labels);
+        self
+    }
+
+    pub fn mark_tertiary(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
+        self.mark(span, '*', Style::new().bold().bright_magenta(), labels);
+        self
+    }
+
+    fn mark(&mut self, span: Span, sign: char, style: Style, labels: Vec<String>) -> &mut Self {
         let start_line = span.start.line;
         let start_col = span.start.col;
         let end_line = span.end.line;
@@ -67,13 +97,8 @@ impl<'a> CodeReporter<'a> {
     }
 }
 
-impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
-    fn write(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-        path: &'a str,
-        file_lines: &'a [&'a str],
-    ) -> std::fmt::Result {
+impl<'a> Display for CodeWindow<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut free_connection_margins = vec![];
         let mut connections_painter = Painter::new(
             Marker {
@@ -93,10 +118,10 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
 
             let code_line = &self.code_lines[line_index];
 
-            let file_line = file_lines[*line_index];
+            let file_line = &self.file_lines[*line_index];
 
             big_sheet.push(vec![vec![Marker {
-                sign: MarkerSign::CodeLine(file_line),
+                sign: MarkerSign::CodeLine(&file_line),
                 style: Style::new(),
             }]]);
 
@@ -110,7 +135,7 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
             let painter_opt = code_line.draw(
                 &mut free_connection_margins,
                 &mut connections_painter,
-                file_line,
+                &file_line,
             );
 
             match painter_opt {
@@ -133,13 +158,15 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
 
         let _ = writeln!(
             f,
-            "{}{} {}",
+            "{}{} {}:{}:{}",
             " ".repeat(max_line_num_indent).style(line_nums_style),
             "-->".style(line_nums_style),
-            path,
+            self.file_path,
+            self.cursor.line + 1,
+            self.cursor.col + 1
         );
 
-        let _ = writeln!(
+        let _ = write!(
             f,
             "{} {}",
             " ".repeat(max_line_num_indent).style(line_nums_style),
@@ -153,6 +180,7 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
         let mut prev_line_num = 0; // Start with zero (This will store the line num and not the its index)
 
         for line_of_markers in big_sheet.iter().flatten() {
+            let _ = writeln!(f);
             if line_of_markers.len() == 1
                 && matches!(line_of_markers[0].sign, MarkerSign::CodeLine(_))
             {
@@ -167,7 +195,7 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
                             " ".repeat(max_line_num_indent - line_num_str.len()),
                             '|'.style(line_nums_style),
                             " ".repeat(max_margin),
-                            file_lines[prev_line_num],
+                            self.file_lines[prev_line_num],
                         );
                     } else {
                         let _ = writeln!(f, "{}", "...".style(line_nums_style));
@@ -202,7 +230,6 @@ impl<'a> DiagnosticPrint<'a> for CodeReporter<'a> {
             for marker in line_of_markers {
                 let _ = write!(f, "{marker}");
             }
-            let _ = writeln!(f);
         }
 
         Ok(())
@@ -636,34 +663,10 @@ enum MarkerType {
 }
 
 #[cfg(test)]
-impl<'a> fmt::Debug for CodeReporter<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.writeln(
-            f,
-            "اختبار.نظم",
-            &[
-                "حجز متغير أ = 555؛",
-                "حجز متغير ب = 555؛",
-                "حجز متغير ج = 555؛",
-                "حجز متغير د = 555؛",
-                "حجز متغير ه = 555؛",
-                "حجز متغير و = 555؛",
-                "حجز متغير ز = 555؛",
-                "حجز متغير ح = 555؛",
-                "حجز متغير ك = 555؛",
-                "حجز متغير ل = 555؛",
-                "حجز متغير م = 555؛",
-                "حجز متغير ن = 555؛",
-                "حجز متغير ز = 555؛",
-            ],
-        )
-    }
-}
-
-#[cfg(test)]
 mod tests {
 
     use std::{
+        collections::HashMap,
         fmt::Debug,
         io::{self, Write},
         process::Command,
@@ -671,9 +674,12 @@ mod tests {
 
     use owo_colors::{Style, XtermColors};
 
-    use crate::{span::Span, DiagnosticPrint};
+    use crate::{
+        span::{Span, SpanCursor},
+        DiagnosticPrint,
+    };
 
-    use super::CodeReporter;
+    use super::CodeWindow;
 
     fn rtl() {
         // RTL printing
@@ -683,10 +689,32 @@ mod tests {
             .unwrap();
     }
 
+    fn get_code_reporter() -> CodeWindow {
+        CodeWindow::new(
+            "اختبار.نظم",
+            &[
+                "حجز متغير أ = 555؛".to_string(),
+                "حجز متغير ب = 555؛".to_string(),
+                "حجز متغير ج = 555؛".to_string(),
+                "حجز متغير د = 555؛".to_string(),
+                "حجز متغير ه = 555؛".to_string(),
+                "حجز متغير و = 555؛".to_string(),
+                "حجز متغير ز = 555؛".to_string(),
+                "حجز متغير ح = 555؛".to_string(),
+                "حجز متغير ك = 555؛".to_string(),
+                "حجز متغير ل = 555؛".to_string(),
+                "حجز متغير م = 555؛".to_string(),
+                "حجز متغير ن = 555؛".to_string(),
+                "حجز متغير ز = 555؛".to_string(),
+            ],
+            SpanCursor { line: 0, col: 0 },
+        )
+    }
+
     #[test]
     fn test_one_line() {
         rtl();
-        let mut reporter = CodeReporter::new();
+        let mut reporter = get_code_reporter();
 
         reporter.mark(
             Span::new((0, 0), (0, 4)),
@@ -701,7 +729,7 @@ mod tests {
     #[test]
     fn test_multi_line() {
         rtl();
-        let mut reporter = CodeReporter::new();
+        let mut reporter = get_code_reporter();
 
         reporter.mark(
             Span::new((0, 4), (1, 5)),
@@ -716,7 +744,7 @@ mod tests {
     #[test]
     fn test_reporting_complex() {
         rtl();
-        let mut reporter = CodeReporter::new();
+        let mut reporter = get_code_reporter();
 
         reporter
             .mark(

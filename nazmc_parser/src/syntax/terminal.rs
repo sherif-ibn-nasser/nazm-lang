@@ -110,6 +110,7 @@ create_keyword_parser!(Do);
 create_keyword_parser!(Break);
 create_keyword_parser!(Continue);
 create_keyword_parser!(Return);
+create_keyword_parser!(Import);
 
 create_symbol_parser!(Comma);
 create_symbol_parser!(Semicolon);
@@ -139,7 +140,7 @@ create_symbol_parser!(Hash);
 
 #[derive(Debug)]
 pub(crate) struct IdToken {
-    pool_idx: PoolIdx,
+    pub(crate) val: PoolIdx,
 }
 
 #[derive(Debug)]
@@ -263,15 +264,13 @@ impl NazmcParse for ParseResult<Terminal<IdToken>> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(Token {
-                val: _,
                 span,
-                kind: TokenKind::Id(display_idx),
+                kind: TokenKind::Id(val),
+                ..
             }) => {
                 let ok = Ok(Terminal {
                     span: *span,
-                    data: IdToken {
-                        pool_idx: *display_idx,
-                    },
+                    data: IdToken { val: *val },
                 });
                 iter.next_non_space_or_comment();
                 ok
@@ -472,9 +471,9 @@ impl NazmcParse for ParseResult<UnaryOp> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(Token {
-                val: _,
                 span,
                 kind: TokenKind::Symbol(symbol_kind),
+                ..
             }) => {
                 let mut span = *span;
 
@@ -604,8 +603,8 @@ mod tests {
         let content = "دالة البداية(/* تعليق */){}";
         let mut id_pool = DataPool::new();
         let mut str_pool = DataPool::new();
-
         let lexer = LexerIter::new(content, &mut id_pool, &mut str_pool);
+
         let (tokens, ..) = lexer.collect_all();
         let mut iter = TokensIter::new(&tokens);
         iter.next(); // Initialize the value of recent
@@ -628,7 +627,6 @@ mod tests {
     #[test]
     fn test_fail() {
         let content = "دالة البداية(عدد: ص8){}";
-
         let mut id_pool = DataPool::new();
         let mut str_pool = DataPool::new();
         let lexer = LexerIter::new(content, &mut id_pool, &mut str_pool);

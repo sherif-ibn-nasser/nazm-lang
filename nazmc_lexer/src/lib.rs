@@ -17,7 +17,7 @@ pub struct LexerIter<'a> {
     /// The byte index the cursor stopped at
     stopped_at_bidx: usize,
     /// The file lines to fill from lexing
-    file_lines: Vec<&'a str>,
+    file_lines: Vec<String>,
     /// The start byte index of current line
     current_line_start_bidx: usize,
     /// Errors
@@ -28,7 +28,7 @@ pub struct LexerIter<'a> {
 }
 
 impl<'a> Iterator for LexerIter<'a> {
-    type Item = Token<'a>;
+    type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.cursor.stopped_at.0;
@@ -39,10 +39,15 @@ impl<'a> Iterator for LexerIter<'a> {
         }
         let end = self.cursor.stopped_at.0;
         let end_byte = self.stopped_at_bidx;
-        let val = &self.content[start_byte..end_byte];
+        // let val = &self.content[start_byte..end_byte];
         let span = Span { start, end };
         self.current_token_idx += 1;
-        Some(Token { val, span, kind })
+        Some(Token {
+            span,
+            kind,
+            start_byte,
+            end_byte,
+        })
     }
 }
 
@@ -67,11 +72,11 @@ impl<'a> LexerIter<'a> {
         _self
     }
 
-    pub fn collect_all(mut self) -> (Vec<Token<'a>>, Vec<&'a str>, Vec<LexerError>) {
+    pub fn collect_all(mut self) -> (Vec<Token>, Vec<String>, Vec<LexerError>) {
         let tokens = self.by_ref().collect_vec();
 
         if self.file_lines.is_empty() {
-            self.file_lines.push("");
+            self.file_lines.push("".to_string());
         }
 
         (tokens, self.file_lines, self.errs)
@@ -302,7 +307,7 @@ impl<'a> LexerIter<'a> {
         let stopped_at_eol = self.cursor.stopped_at.1 == '\n';
 
         if stopped_at_eol {
-            self.file_lines.push(current_line);
+            self.file_lines.push(current_line.to_string());
             self.current_line_start_bidx = self.stopped_at_bidx;
         }
 
@@ -310,11 +315,11 @@ impl<'a> LexerIter<'a> {
 
         if next.is_none() {
             if stopped_at_eol {
-                self.file_lines.push("");
+                self.file_lines.push("".to_string());
             } else if self.current_line_start_bidx < self.content.len() {
                 let current_line =
                     &self.content[self.current_line_start_bidx..self.stopped_at_bidx];
-                self.file_lines.push(current_line);
+                self.file_lines.push(current_line.to_string());
                 self.current_line_start_bidx = self.stopped_at_bidx;
             }
         }
@@ -378,7 +383,7 @@ impl<'a> LexerIter<'a> {
     fn next_id_or_keyword(&mut self) -> TokenKind {
         if !self.cursor.stopped_at.1.is_alphabetic() {
             let c = self.cursor.stopped_at.1;
-            let display_idx = self.id_pool.get(&c.to_string());
+            let pool_idx = self.id_pool.get(&c.to_string());
             self.next_cursor();
             self.errs.push(LexerError {
                 token_idx: self.current_token_idx,
@@ -386,7 +391,7 @@ impl<'a> LexerIter<'a> {
                 len: 1,
                 kind: LexerErrorKind::UnknownToken,
             });
-            return TokenKind::Id(display_idx);
+            return TokenKind::Id(pool_idx);
         }
 
         let start = self.stopped_at_bidx;
@@ -588,9 +593,17 @@ mod tests {
         let mut str_pool = DataPool::new();
         for symbol in SymbolKind::iter() {
             let symbol_val = symbol.get_variant_docs().unwrap();
-            let Token { span, val, kind } = LexerIter::new(symbol_val, &mut id_pool, &mut str_pool)
+            let Token {
+                span,
+                kind,
+                start_byte,
+                end_byte,
+            } = LexerIter::new(symbol_val, &mut id_pool, &mut str_pool)
                 .next()
                 .unwrap();
+
+            let val = &symbol_val[start_byte..end_byte];
+
             assert_eq!(
                 span,
                 Span {
@@ -615,7 +628,14 @@ mod tests {
         let mut symbols_iter = SymbolKind::iter();
         let mut columns = 0;
 
-        for Token { span, val, kind } in tokens {
+        for Token {
+            span,
+            kind,
+            start_byte,
+            end_byte,
+        } in tokens
+        {
+            let val = &symbols_line[start_byte..end_byte];
             let symbol = symbols_iter.next().unwrap();
             let symbol_val = symbol.get_variant_docs().unwrap();
 
@@ -653,7 +673,14 @@ mod tests {
         let mut symbols_iter = SymbolKind::iter();
         let mut lines = 0;
 
-        while let Some(Token { span, val, kind }) = tokens.next() {
+        while let Some(Token {
+            span,
+            kind,
+            start_byte,
+            end_byte,
+        }) = tokens.next()
+        {
+            let val = &symbols_line[start_byte..end_byte];
             let symbol = symbols_iter.next().unwrap();
             let symbol_val = symbol.get_variant_docs().unwrap();
 
@@ -677,7 +704,12 @@ mod tests {
             assert_eq!(val, symbol_val);
             assert_eq!(kind, TokenKind::Symbol(symbol));
 
-            let Token { span, val, kind } = tokens.next().unwrap();
+            let Token {
+                span,
+                kind,
+                start_byte,
+                end_byte,
+            } = tokens.next().unwrap();
 
             assert_eq!(
                 span,
@@ -707,10 +739,17 @@ mod tests {
         let mut str_pool = DataPool::new();
         for keyword in KeywordKind::iter() {
             let keyword_val = keyword.get_variant_docs().unwrap();
-            let Token { span, val, kind } =
-                LexerIter::new(keyword_val, &mut id_pool, &mut str_pool)
-                    .next()
-                    .unwrap();
+            let Token {
+                span,
+                kind,
+                start_byte,
+                end_byte,
+            } = LexerIter::new(keyword_val, &mut id_pool, &mut str_pool)
+                .next()
+                .unwrap();
+
+            let val = &keyword_val[start_byte..end_byte];
+
             assert_eq!(
                 span,
                 Span {

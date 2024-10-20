@@ -12,15 +12,15 @@ where
     fn parse(iter: &mut TokensIter) -> Self;
 }
 
-pub(crate) type ParseResult<T> = Result<T, ParseErr>;
+pub type ParseResult<T> = Result<T, ParseErr>;
 
 #[derive(Clone, Debug)]
-pub(crate) struct ParseErr {
-    pub(crate) found_token_index: usize,
+pub struct ParseErr {
+    pub found_token_index: usize,
 }
 
 impl ParseErr {
-    pub(crate) fn eof<T>() -> ParseResult<T> {
+    pub fn eof<T>() -> ParseResult<T> {
         Err(ParseErr {
             found_token_index: usize::MAX,
         })
@@ -54,26 +54,26 @@ impl ParseErr {
 /// # Errors
 /// The parser will handle unexpected tokens by attempting recovery or including them in the results if recovery fails.
 #[derive(Debug)]
-pub(crate) struct ZeroOrMany<Tree, Terminator>
+pub struct ZeroOrMany<Tree, Terminator>
 where
     ParseResult<Tree>: NazmcParse,
     ParseResult<Terminator>: NazmcParse,
 {
-    pub(crate) items: Vec<ParseResult<Tree>>,
-    pub(crate) terminator: ParseResult<Terminator>,
+    pub items: Vec<ParseResult<Tree>>,
+    pub terminator: ParseResult<Terminator>,
 }
 
 /// `OneOrMany` represents a sequence that starts with at least one occurrence of a specific AST node type, followed by a terminator.
 /// It ensures that at least the first item is successfully parsed. The implementation may change in the future and might be rewritten in terms of other components.
 #[derive(Debug)]
-pub(crate) struct OneOrMany<Tree, Terminator>
+pub struct OneOrMany<Tree, Terminator>
 where
     ParseResult<Tree>: NazmcParse,
     ParseResult<Terminator>: NazmcParse,
 {
-    pub(crate) first: ParseResult<Tree>,
-    pub(crate) rest: Vec<ParseResult<Tree>>,
-    pub(crate) terminator: ParseResult<Terminator>,
+    pub first: ParseResult<Tree>,
+    pub rest: Vec<ParseResult<Tree>>,
+    pub terminator: ParseResult<Terminator>,
 }
 
 /// Implementations of the `NazmcParse` trait for different parsing structures.
@@ -195,13 +195,14 @@ where
 #[cfg(test)]
 mod tests {
 
+    use nazmc_data_pool::DataPool;
     use nazmc_parse_derive::{NazmcParse, SpannedAndCheck};
 
     use super::super::*;
     use super::*;
 
     #[derive(NazmcParse)]
-    pub(crate) enum TermBinOp {
+    pub enum TermBinOp {
         Plus(PlusSymbol),
         Minus(Box<MinusSymbol>),
     }
@@ -233,17 +234,17 @@ mod tests {
     }
 
     #[derive(NazmcParse, Debug)]
-    pub(crate) struct SimpleFn {
-        pub(crate) _fn: FnKeyword,
-        pub(crate) _id: ParseResult<Id>,
-        pub(crate) _params_decl: ParseResult<FnParamsDecl>,
+    pub struct SimpleFn {
+        pub _fn: FnKeyword,
+        pub _id: ParseResult<Id>,
+        pub _params_decl: ParseResult<FnParamsDecl>,
     }
 
     #[derive(SpannedAndCheck, Debug)]
-    pub(crate) struct FnParamsDecl {
-        pub(crate) _open_paren: OpenParenthesisSymbol,
-        pub(crate) _params: Option<FnParams>,
-        pub(crate) _close_paren: ParseResult<CloseParenthesisSymbol>,
+    pub struct FnParamsDecl {
+        pub _open_paren: OpenParenthesisSymbol,
+        pub _params: Option<FnParams>,
+        pub _close_paren: ParseResult<CloseParenthesisSymbol>,
     }
 
     impl NazmcParse for ParseResult<FnParamsDecl> {
@@ -295,10 +296,10 @@ mod tests {
     }
 
     #[derive(SpannedAndCheck, Debug)]
-    pub(crate) struct FnParams {
-        pub(crate) _first_param: ParseResult<FnParam>,
-        pub(crate) _rest_params: Vec<ParseResult<CommaWithFnParam>>,
-        pub(crate) _trailing_comma: Option<CommaSymbol>,
+    pub struct FnParams {
+        pub _first_param: ParseResult<FnParam>,
+        pub _rest_params: Vec<ParseResult<CommaWithFnParam>>,
+        pub _trailing_comma: Option<CommaSymbol>,
     }
 
     impl NazmcParse for ParseResult<FnParams> {
@@ -308,40 +309,40 @@ mod tests {
     }
 
     #[derive(NazmcParse, Debug)]
-    pub(crate) struct FnParamsDeclImpl {
-        pub(crate) _open_paren: OpenParenthesisSymbol,
-        pub(crate) _fn_param_close: ParseResult<CloseFnParamsDecl>,
+    pub struct FnParamsDeclImpl {
+        pub _open_paren: OpenParenthesisSymbol,
+        pub _fn_param_close: ParseResult<CloseFnParamsDecl>,
     }
 
     #[derive(NazmcParse, Debug)]
-    pub(crate) enum CloseFnParamsDecl {
+    pub enum CloseFnParamsDecl {
         NoParams(CloseParenthesisSymbol),
         WithParams(Box<FnDeclWithParams>),
     }
 
     #[derive(NazmcParse, Debug)]
-    pub(crate) struct FnDeclWithParams {
-        pub(crate) _first_param: ParseResult<FnParam>,
-        pub(crate) _params: ZeroOrMany<CommaWithFnParam, CommaWithCloseParenthesis>,
+    pub struct FnDeclWithParams {
+        pub _first_param: ParseResult<FnParam>,
+        pub _params: ZeroOrMany<CommaWithFnParam, CommaWithCloseParenthesis>,
     }
 
     #[derive(NazmcParse, Debug)]
-    pub(crate) struct CommaWithFnParam {
+    pub struct CommaWithFnParam {
         _comma: CommaSymbol,
         _fn_param: FnParam,
     }
 
     #[derive(NazmcParse, Debug)]
-    pub(crate) struct CommaWithCloseParenthesis {
+    pub struct CommaWithCloseParenthesis {
         _comma: Option<CommaSymbol>,
         _close_paren: CloseParenthesisSymbol,
     }
 
     #[derive(NazmcParse, Debug)]
-    pub(crate) struct FnParam {
-        pub(crate) _name: Id,
-        pub(crate) _colon: ParseResult<ColonSymbol>,
-        pub(crate) _type: ParseResult<Id>,
+    pub struct FnParam {
+        pub _name: Id,
+        pub _colon: ParseResult<ColonSymbol>,
+        pub _type: ParseResult<Id>,
     }
 
     #[test]

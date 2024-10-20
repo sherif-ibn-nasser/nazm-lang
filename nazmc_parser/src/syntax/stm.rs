@@ -4,6 +4,9 @@ use super::*;
 pub(crate) enum Stm {
     Semicolon(SemicolonSymbol),
     Let(LetStm),
+    While(WhileStm),
+    If(IfExpr),
+    When(WhenExpr),
     Expr(ExprStm),
 }
 
@@ -52,19 +55,23 @@ pub(crate) struct LetAssign {
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) enum ExprStm {
-    WithBlock(ExprWithBlockStm),
-    Any(AnyExprStm),
+pub(crate) struct WhileStm {
+    pub(crate) while_keyword: WhileKeyword,
+    pub(crate) conditional_block: ConditionalBlock,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct ExprWithBlockStm {
-    pub(crate) expr: ExprWithBlock,
-    pub(crate) semicolon: Option<SemicolonSymbol>,
+pub struct DoWhileStm {
+    // TODO
+    pub(crate) do_keyword: DoKeyword,
+    /// This must be checked that it doesn't have a lambda arrow
+    pub(crate) block: ParseResult<LambdaExpr>,
+    pub(crate) while_keyword: ParseResult<WhileKeyword>,
+    pub(crate) condition: ParseResult<Expr>,
 }
 
 #[derive(NazmcParse, Debug)]
-pub(crate) struct AnyExprStm {
+pub(crate) struct ExprStm {
     pub(crate) expr: Expr,
     pub(crate) semicolon: ParseResult<SemicolonSymbol>,
 }

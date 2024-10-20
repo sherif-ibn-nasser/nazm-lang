@@ -1,71 +1,65 @@
+use ast_generator::lower_file;
 use error::*;
-use nazmc_data_pool::{DataPool, Init};
-use nazmc_diagnostics::{span::SpanCursor, CodeWindow, Diagnostic};
+use nazmc_diagnostics::{
+    eprint_diagnostics, fmt_diagnostics, span::SpanCursor, CodeWindow, Diagnostic,
+};
 use nazmc_lexer::*;
-use std::path::Path;
+use std::{io::Write, panic};
 use syntax::File;
 
+pub mod ast;
+mod ast_generator;
 pub(crate) mod parse_methods;
 pub(crate) mod syntax;
 pub(crate) mod tokens_iter;
 
-pub(crate) use nazmc_diagnostics::{span::Span, PhaseDiagnostics};
+pub(crate) use nazmc_diagnostics::span::Span;
 pub(crate) use nazmc_parse_derive::*;
 pub(crate) use parse_methods::*;
 pub(crate) use syntax::*;
 pub(crate) use tokens_iter::TokensIter;
 
-pub struct ParseCtx<'a> {
-    file_path: &'a Path,
-    file_content: &'a str,
-}
+pub fn parse(
+    tokens: Vec<Token>,
+    file_path: &str,
+    file_content: &str,
+    file_lines: &[String],
+    lexer_errors: Vec<LexerError>,
+) -> Result<ast::File, String> {
+    let mut reporter = ParseErrorsReporter {
+        file_path,
+        file_lines: &file_lines,
+        file_content,
+        tokens: &tokens,
+        diagnostics: vec![],
+    };
 
-impl<'a> ParseCtx<'a> {
-    pub fn new(file_path: &'a Path, file_content: &'a str) -> Self {
-        Self {
-            file_path,
-            file_content,
-        }
-    }
+    reporter.report_lexer_errors(&lexer_errors);
 
-    pub fn parse(&mut self, id_pool: &mut DataPool<Init>, str_pool: &mut DataPool<Init>) {
-        let (tokens, file_lines, lexer_errors) =
-            LexerIter::new(self.file_content, id_pool, str_pool).collect_all();
+    let mut tokens_iter = TokensIter::new(&tokens);
 
-        let mut reporter = ParseErrorsReporter::new(self.file_path, &file_lines, &tokens);
+    tokens_iter.next_non_space_or_comment(); // To init recent()
 
-        reporter.report_lexer_errors(&lexer_errors);
+    let file = ParseResult::<File>::parse(&mut tokens_iter).unwrap();
 
-        let mut tokens_iter = TokensIter::new(&tokens);
+    reporter.check_file(&file);
 
-        tokens_iter.next_non_space_or_comment(); // To init recent()
-
-        let ZeroOrMany {
-            items,
-            terminator: _,
-        } = ParseResult::<File>::parse(&mut tokens_iter)
-            .unwrap()
-            .content;
-
-        reporter.check_file_items(&items);
-
-        println!("{}", reporter.diagnostics);
+    if reporter.diagnostics.is_empty() {
+        Ok(lower_file(file))
+    } else {
+        Err(fmt_diagnostics(reporter.diagnostics))
     }
 }
 
 struct ParseErrorsReporter<'a> {
-    tokens: &'a [Token<'a>],
-    diagnostics: PhaseDiagnostics<'a>,
+    tokens: &'a [Token],
+    file_path: &'a str,
+    file_lines: &'a [String],
+    file_content: &'a str,
+    diagnostics: Vec<Diagnostic<'a>>,
 }
 
 impl<'a> ParseErrorsReporter<'a> {
-    fn new(file_path: &'a Path, file_lines: &'a [&'a str], tokens: &'a [Token<'a>]) -> Self {
-        Self {
-            tokens,
-            diagnostics: PhaseDiagnostics::new(file_path, file_lines),
-        }
-    }
-
     fn report(
         &mut self,
         msg: String,
@@ -73,7 +67,7 @@ impl<'a> ParseErrorsReporter<'a> {
         primary_label: String,
         secondary_labels: Vec<(Span, Vec<String>)>,
     ) {
-        let mut code_window = CodeWindow::new(span.start);
+        let mut code_window = CodeWindow::new(self.file_path, &self.file_lines, span.start);
 
         code_window.mark_error(span, vec![primary_label]);
 
@@ -81,7 +75,7 @@ impl<'a> ParseErrorsReporter<'a> {
             code_window.mark_secondary(span, multiline_label);
         }
 
-        let diagnostic = Diagnostic::error(msg, Some(code_window));
+        let diagnostic = Diagnostic::error(msg, vec![code_window]);
 
         self.diagnostics.push(diagnostic);
     }
@@ -217,10 +211,10 @@ impl<'a> ParseErrorsReporter<'a> {
                         vec![],
                     );
 
-                    self.diagnostics.chain_on_last(Diagnostic::help(
+                    self.diagnostics.last_mut().unwrap().chain(Diagnostic::help(
                         "اللاحقات الصالحة للعدد هى (ص، ص1، ص2، ص4، ص8، ط، ط1، ط2، ط4، ط8، ع4، ع8)"
                             .to_string(),
-                        None,
+                        vec![],
                     ));
                 }
                 LexerErrorKind::InvalidFloatSuffix => {
@@ -231,9 +225,9 @@ impl<'a> ParseErrorsReporter<'a> {
                         vec![],
                     );
 
-                    self.diagnostics.chain_on_last(Diagnostic::help(
+                    self.diagnostics.last_mut().unwrap().chain(Diagnostic::help(
                         "اللاحقات الصالحة للعدد العشري هى (ع4، ع8)".to_string(),
-                        None,
+                        vec![],
                     ));
                 }
                 LexerErrorKind::InvalidIntSuffix => {
@@ -244,10 +238,10 @@ impl<'a> ParseErrorsReporter<'a> {
                         vec![],
                     );
 
-                    self.diagnostics.chain_on_last(Diagnostic::help(
+                    self.diagnostics.last_mut().unwrap().chain(Diagnostic::help(
                         "اللاحقات الصالحة للعدد الصحيح هى (ص، ص1، ص2، ص4، ص8، ط، ط1، ط2، ط4، ط8)"
                             .to_string(),
-                        None,
+                        vec![],
                     ));
                 }
                 LexerErrorKind::InvalidDigitForBase(base) => {
@@ -287,9 +281,9 @@ impl<'a> ParseErrorsReporter<'a> {
                         NumKind::U8(_) | NumKind::UnspecifiedInt(_) => u64::MAX.to_string(),
                     };
 
-                    self.diagnostics.chain_on_last(Diagnostic::help(
+                    self.diagnostics.last_mut().unwrap().chain(Diagnostic::help(
                         format!("أكبر قيمة من نفس نوع العدد هى `{}`", max_num_str),
-                        None,
+                        vec![],
                     ));
                 }
                 LexerErrorKind::DigitsEndWithCommma => {
@@ -319,7 +313,11 @@ impl<'a> ParseErrorsReporter<'a> {
         let (found_token_span, found_token_val, primary_label) =
             if err.found_token_index < self.tokens.len() {
                 let token = &self.tokens[err.found_token_index];
-                (token.span, token.val, "رمز غير متوقع".to_string())
+                (
+                    token.span,
+                    &self.file_content[token.start_byte..token.end_byte],
+                    "رمز غير متوقع".to_string(),
+                )
             } else {
                 let last_span = self.tokens[self.tokens.len() - 1].span;
                 (
@@ -387,6 +385,75 @@ impl<'a> ParseErrorsReporter<'a> {
             "يجب إغلاق هذا القوس".to_string(),
             vec![],
         );
+    }
+
+    fn check_file(&mut self, file: &File) {
+        for import in &file.imports {
+            if let Err(err) = &import.top {
+                self.report_expected("اسم حزمة", err, vec![]);
+                return;
+            }
+
+            let mut last_star_symbol_span = None;
+
+            match &import.sec {
+                Ok(a) => match &a.seg {
+                    Ok(b) => {
+                        if let PathSegInImportStm::Star(s) = b {
+                            last_star_symbol_span = Some(s.span)
+                        }
+                    }
+                    Err(err) => self.report_expected("اسم أو *", err, vec![]),
+                },
+                Err(_) => {
+                    self.report(
+                        "يُتوقع `::` ثم اسم عنصر أو `*` بعد الحزمة".to_string(),
+                        if let Ok(t) = &import.top {
+                            t.span
+                        } else {
+                            unreachable!()
+                        },
+                        "قُم بعدها بإضافة `::` ثم اسم عنصر أو `*`".to_string(),
+                        vec![],
+                    );
+                    return;
+                }
+            }
+
+            for seg in &import.segs {
+                match &seg.seg {
+                    Ok(a) => {
+                        if let PathSegInImportStm::Star(s) = a {
+                            if let Some(span) = last_star_symbol_span {
+                                self.report(
+                                    "الرمز `*` يجب أن يكون في آخر المسار".to_string(),
+                                    span,
+                                    "".to_string(),
+                                    vec![],
+                                );
+                                return;
+                            }
+                            last_star_symbol_span = Some(s.span)
+                        }
+                    }
+                    Err(_) => {
+                        self.report(
+                            "يُتوقع `::` ثم اسم عنصر أو `*` بعد الحزمة".to_string(),
+                            if let Ok(t) = &import.top {
+                                t.span
+                            } else {
+                                unreachable!()
+                            },
+                            "قُم بعدها بإضافة `::` ثم اسم عنصر أو `*`".to_string(),
+                            vec![],
+                        );
+                    }
+                }
+            }
+
+            self.check_semicolon_result(&import.semicolon);
+        }
+        self.check_file_items(&file.content.items);
     }
 
     fn check_file_items(&mut self, items: &[ParseResult<FileItem>]) {
@@ -820,10 +887,22 @@ impl<'a> ParseErrorsReporter<'a> {
                             self.check_semicolon_result(semicolon);
                         }
                     }
-                    Stm::Expr(ExprStm::WithBlock(ExprWithBlockStm { expr, semicolon: _ })) => {
-                        self.check_expr_with_block(expr);
+                    Stm::While(while_stm) => {
+                        match &while_stm.conditional_block.condition {
+                            Ok(expr) => self.check_expr(expr),
+                            Err(err) => {
+                                self.report_expected("تعبير برمجي (شرط `طالما`)", err, vec![])
+                            }
+                        }
+
+                        match &while_stm.conditional_block.block {
+                            Ok(block) => self.check_block(block),
+                            Err(err) => self.report_expected("محتوى `طالما`", err, vec![]),
+                        }
                     }
-                    Stm::Expr(ExprStm::Any(AnyExprStm { expr, semicolon })) => {
+                    Stm::If(if_expr) => self.check_if_expr(if_expr),
+                    Stm::When(when_expr) => self.check_when_expr(when_expr),
+                    Stm::Expr(ExprStm { expr, semicolon }) => {
                         self.check_expr(expr);
                         self.check_semicolon_result(semicolon);
                     }
@@ -855,7 +934,11 @@ impl<'a> ParseErrorsReporter<'a> {
             let (found_token_span, found_token_val, secondary_label) =
                 if err.found_token_index < self.tokens.len() {
                     let token = &self.tokens[err.found_token_index];
-                    (token.span, token.val, "رمز غير متوقع".to_string())
+                    (
+                        token.span,
+                        &self.file_content[token.start_byte..token.end_byte],
+                        "رمز غير متوقع".to_string(),
+                    )
                 } else {
                     let last_span = self.tokens[self.tokens.len() - 1].span;
                     (
@@ -946,8 +1029,9 @@ impl<'a> ParseErrorsReporter<'a> {
             AtomicExpr::Literal(_) | AtomicExpr::On(_) | AtomicExpr::Continue(_) => {}
             AtomicExpr::Paren(paren_expr) => self.check_paren_expr(paren_expr),
             AtomicExpr::Path(simple_path) => self.check_simple_path(simple_path),
-            AtomicExpr::WithBlock(expr_with_block) => self.check_expr_with_block(expr_with_block),
             AtomicExpr::Lambda(lambda_expr) => self.check_lambda_expr(lambda_expr),
+            AtomicExpr::If(if_expr) => self.check_if_expr(if_expr),
+            AtomicExpr::When(when_expr) => self.check_when_expr(when_expr),
             AtomicExpr::Break(BreakExpr {
                 break_keyword: _,
                 expr,
@@ -1048,64 +1132,47 @@ impl<'a> ParseErrorsReporter<'a> {
         }
     }
 
-    fn check_expr_with_block(&mut self, expr: &ExprWithBlock) {
-        match expr {
-            ExprWithBlock::If(if_expr) => {
-                match &if_expr.conditional_block.condition {
-                    Ok(expr) => self.check_expr(expr),
-                    Err(err) => self.report_expected("تعبير برمجي (شرط `لو`)", err, vec![]),
-                }
-
-                match &if_expr.conditional_block.block {
-                    Ok(block) => self.check_block(block),
-                    Err(err) => self.report_expected("محتوى `لو`", err, vec![]),
-                }
-
-                for ElseIfClause {
-                    conditional_block, ..
-                } in &if_expr.else_ifs
-                {
-                    match &conditional_block.condition {
-                        Ok(expr) => self.check_expr(expr),
-                        Err(err) => {
-                            self.report_expected("تعبير برمجي (شرط `وإلا لو`)", err, vec![])
-                        }
-                    }
-
-                    match &conditional_block.block {
-                        Ok(block) => self.check_block(block),
-                        Err(err) => self.report_expected("محتوى `وإلا لو`", err, vec![]),
-                    }
-                }
-
-                if let Some(ElseClause {
-                    else_keyword: _,
-                    block,
-                }) = &if_expr.else_cluase
-                {
-                    match block {
-                        Ok(block) => self.check_block(block),
-                        Err(err) => self.report_expected("محتوى `وإلا`", err, vec![]),
-                    }
-                }
-            }
-            ExprWithBlock::While(WhileExpr {
-                while_keyword: _,
-                conditional_block,
-            }) => {
-                match &conditional_block.condition {
-                    Ok(expr) => self.check_expr(expr),
-                    Err(err) => self.report_expected("تعبير برمجي (شرط `طالما`)", err, vec![]),
-                }
-
-                match &conditional_block.block {
-                    Ok(block) => self.check_block(block),
-                    Err(err) => self.report_expected("محتوى `طالما`", err, vec![]),
-                }
-            }
-            ExprWithBlock::When(_) => todo!(),    // TODO
-            ExprWithBlock::DoWhile(_) => todo!(), // TODO
+    fn check_if_expr(&mut self, if_expr: &IfExpr) {
+        match &if_expr.conditional_block.condition {
+            Ok(expr) => self.check_expr(expr),
+            Err(err) => self.report_expected("تعبير برمجي (شرط `لو`)", err, vec![]),
         }
+
+        match &if_expr.conditional_block.block {
+            Ok(block) => self.check_block(block),
+            Err(err) => self.report_expected("محتوى `لو`", err, vec![]),
+        }
+
+        for ElseIfClause {
+            conditional_block, ..
+        } in &if_expr.else_ifs
+        {
+            match &conditional_block.condition {
+                Ok(expr) => self.check_expr(expr),
+                Err(err) => self.report_expected("تعبير برمجي (شرط `وإلا لو`)", err, vec![]),
+            }
+
+            match &conditional_block.block {
+                Ok(block) => self.check_block(block),
+                Err(err) => self.report_expected("محتوى `وإلا لو`", err, vec![]),
+            }
+        }
+
+        if let Some(ElseClause {
+            else_keyword: _,
+            block,
+        }) = &if_expr.else_cluase
+        {
+            match block {
+                Ok(block) => self.check_block(block),
+                Err(err) => self.report_expected("محتوى `وإلا`", err, vec![]),
+            }
+        }
+    }
+
+    fn check_when_expr(&mut self, _when_expr: &WhenExpr) {
+        // TODO
+        todo!()
     }
 
     fn check_lambda_expr(&mut self, lambda: &LambdaExpr) {

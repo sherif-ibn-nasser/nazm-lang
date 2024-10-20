@@ -2,7 +2,7 @@ use super::*;
 use paste::paste;
 
 pub(crate) mod punctuated;
-pub(crate) use punctuated::*;
+use punctuated::*;
 
 pub(crate) mod terminal;
 pub(crate) use terminal::*;
@@ -34,5 +34,27 @@ generateTrailingCommaWithCloseDelimiter!(RArrowSymbol);
 
 #[derive(NazmcParse, Debug)]
 pub(crate) struct File {
+    pub(crate) imports: Vec<ImportStm>,
     pub(crate) content: ZeroOrMany<FileItem, Eof>,
+}
+
+#[derive(NazmcParse, Debug)]
+pub(crate) struct ImportStm {
+    pub(crate) import_keyword: ImportKeyword,
+    pub(crate) top: ParseResult<Id>,
+    pub(crate) sec: ParseResult<DoubleColonsWithPathSegInImportStm>,
+    pub(crate) segs: Vec<DoubleColonsWithPathSegInImportStm>,
+    pub(crate) semicolon: ParseResult<SemicolonSymbol>,
+}
+
+#[derive(NazmcParse, Debug)]
+pub(crate) struct DoubleColonsWithPathSegInImportStm {
+    pub(crate) double_colons: DoubleColonsSymbol,
+    pub(crate) seg: ParseResult<PathSegInImportStm>,
+}
+
+#[derive(NazmcParse, Debug)]
+pub(crate) enum PathSegInImportStm {
+    Id(Id),
+    Star(StarSymbol),
 }

@@ -7,5 +7,5 @@ edition = "2021"
 itertools = "*"
 documented = "*"
 strum = { version = "*", features = ["derive"] }
-nazmc_diagnostics = { path = "../nazmc_diagnostics" }
 nazmc_data_pool = { path = "../nazmc_data_pool" }
+nazmc_diagnostics = { path = "../nazmc_diagnostics" }

@@ -4,10 +4,12 @@ use nazmc_diagnostics::span::*;
 use strum::EnumIter;
 
 #[derive(Clone, PartialEq, Debug, Default)]
-pub struct Token<'a> {
-    pub val: &'a str,
+pub struct Token {
+    // pub val: &'a str,
     pub span: Span,
     pub kind: TokenKind,
+    pub start_byte: usize,
+    pub end_byte: usize,
 }
 
 #[derive(Clone, PartialEq, Debug, Default)]
@@ -150,4 +152,6 @@ pub enum KeywordKind {
     Continue,
     /// أرجع
     Return,
+    /// استيراد
+    Import,
 }

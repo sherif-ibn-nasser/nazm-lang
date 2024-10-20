@@ -45,14 +45,14 @@ impl NazmcParse for ParseResult<LambdaExpr> {
 
         let pop = matches!(
             stms.last(),
-            Some(Ok(Stm::Expr(ExprStm::Any(AnyExprStm {
+            Some(Ok(Stm::Expr(ExprStm {
                 semicolon: Err(_),
                 ..
-            }))))
+            })))
         );
 
         let last_expr = if pop {
-            let Some(Ok(Stm::Expr(ExprStm::Any(AnyExprStm { expr, .. })))) = stms.pop() else {
+            let Some(Ok(Stm::Expr(ExprStm { expr, .. }))) = stms.pop() else {
                 unreachable!()
             };
             Some(expr)

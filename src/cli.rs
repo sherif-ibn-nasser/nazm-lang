@@ -13,12 +13,16 @@ struct Cli {
     file: PathBuf,
 }
 
-fn print_err(msg: String) {
+#[inline]
+pub fn format_err(msg: String) -> String {
     let err = "خطأ".bold();
     let err_col = ":".bold();
-    let err_dot = ".".bold();
+    format!("{}{} {}", err.bright_red(), err_col, msg)
+}
 
-    println!("{}{} {}{}", err.bright_red(), err_col, msg, err_dot)
+#[inline]
+pub fn print_err(msg: String) {
+    eprintln!("{}", format_err(msg));
 }
 
 pub fn read_file() -> (PathBuf, String) {
