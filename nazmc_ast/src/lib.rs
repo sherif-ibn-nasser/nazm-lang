@@ -4,8 +4,8 @@ use thin_vec::ThinVec;
 
 #[derive(Clone)]
 pub struct File {
-    pub imports: ThinVec<ModPathWithItem>,
-    pub star_imports: ThinVec<ModPath>,
+    pub imports: ThinVec<PkgPathWithItem>,
+    pub star_imports: ThinVec<PkgPath>,
     pub items: ThinVec<Item>,
 }
 
@@ -25,14 +25,14 @@ pub enum ItemKind {
 }
 
 #[derive(Clone)]
-pub struct ModPath {
+pub struct PkgPath {
     pub ids: ThinVec<PoolIdx>,
     pub spans: ThinVec<Span>,
 }
 
 #[derive(Clone)]
-pub struct ModPathWithItem {
-    pub mod_path: ModPath,
+pub struct PkgPathWithItem {
+    pub pkg_path: PkgPath,
     pub item: ASTId,
 }
 
@@ -56,7 +56,7 @@ pub enum BindingKind {
 
 #[derive(Clone)]
 pub enum Type {
-    Path(ModPathWithItem),
+    Path(PkgPathWithItem),
     Unit(Option<Span>),
     Tuple(ThinVec<Type>, Span),
     Paren(Box<Type>, Span),
@@ -124,9 +124,9 @@ pub struct Expr {
 pub enum ExprKind {
     Literal(LiteralExpr),
     Parens(Box<Expr>),
-    Path(Box<ModPathWithItem>),
+    Path(Box<PkgPathWithItem>),
     Call(Box<CallExpr>),
-    UnitStruct(Box<ModPathWithItem>),
+    UnitStruct(Box<PkgPathWithItem>),
     TupleStruct(Box<TupleStructExpr>),
     FieldsStruct(Box<FieldsStructExpr>),
     Field(Box<FieldExpr>),
@@ -179,13 +179,13 @@ pub struct CallExpr {
 
 #[derive(Clone)]
 pub struct TupleStructExpr {
-    pub path: ModPathWithItem,
+    pub path: PkgPathWithItem,
     pub args: ThinVec<Expr>,
 }
 
 #[derive(Clone)]
 pub struct FieldsStructExpr {
-    pub path: ModPathWithItem,
+    pub path: PkgPathWithItem,
     pub fields: ThinVec<(ASTId, Expr)>,
 }
 

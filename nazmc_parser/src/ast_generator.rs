@@ -19,14 +19,14 @@ pub(crate) fn lower_file(file: File) -> nazmc_ast::File {
 fn lower_imports(
     imports_stms: Vec<ImportStm>,
 ) -> (
-    ThinVec<nazmc_ast::ModPathWithItem>,
-    ThinVec<nazmc_ast::ModPath>,
+    ThinVec<nazmc_ast::PkgPathWithItem>,
+    ThinVec<nazmc_ast::PkgPath>,
 ) {
     let mut imports = ThinVec::new();
     let mut star_imports = ThinVec::new();
 
     for import_stm in imports_stms {
-        let mut mod_path = nazmc_ast::ModPath {
+        let mut mod_path = nazmc_ast::PkgPath {
             ids: ThinVec::new(),
             spans: ThinVec::new(),
         };
@@ -68,8 +68,8 @@ fn lower_imports(
             let item_id = mod_path.ids.pop().unwrap();
             let item_span = mod_path.spans.pop().unwrap();
 
-            imports.push(nazmc_ast::ModPathWithItem {
-                mod_path,
+            imports.push(nazmc_ast::PkgPathWithItem {
+                pkg_path: mod_path,
                 item: nazmc_ast::ASTId {
                     span: item_span,
                     id: item_id,
@@ -349,8 +349,8 @@ fn lower_type(typ: Type) -> nazmc_ast::Type {
     }
 }
 
-fn lower_simple_path(mut simple_path: SimplePath) -> nazmc_ast::ModPathWithItem {
-    let mut mod_path = nazmc_ast::ModPath {
+fn lower_simple_path(mut simple_path: SimplePath) -> nazmc_ast::PkgPathWithItem {
+    let mut mod_path = nazmc_ast::PkgPath {
         ids: ThinVec::new(),
         spans: ThinVec::new(),
     };
@@ -360,7 +360,10 @@ fn lower_simple_path(mut simple_path: SimplePath) -> nazmc_ast::ModPathWithItem 
             span: simple_path.top.span,
             id: simple_path.top.data.val,
         };
-        nazmc_ast::ModPathWithItem { mod_path, item }
+        nazmc_ast::PkgPathWithItem {
+            pkg_path: mod_path,
+            item,
+        }
     } else {
         let item = simple_path.inners.pop().unwrap().inner.unwrap();
 
@@ -375,7 +378,10 @@ fn lower_simple_path(mut simple_path: SimplePath) -> nazmc_ast::ModPathWithItem 
             mod_path.spans.push(inner.span);
         }
 
-        nazmc_ast::ModPathWithItem { mod_path, item }
+        nazmc_ast::PkgPathWithItem {
+            pkg_path: mod_path,
+            item,
+        }
     }
 }
 
@@ -817,10 +823,10 @@ fn lower_atomic_expr(atomic_expr: AtomicExpr) -> nazmc_ast::Expr {
         AtomicExpr::Path(simple_path) => {
             let path = lower_simple_path(simple_path);
 
-            let span = if path.mod_path.spans.is_empty() {
+            let span = if path.pkg_path.spans.is_empty() {
                 path.item.span
             } else {
-                path.mod_path
+                path.pkg_path
                     .spans
                     .first()
                     .unwrap()
@@ -1043,8 +1049,8 @@ fn lower_struct_expr(struct_expr: StructExpr) -> nazmc_ast::Expr {
                 } else {
                     nazmc_ast::Expr {
                         span: name.span,
-                        kind: nazmc_ast::ExprKind::Path(Box::new(nazmc_ast::ModPathWithItem {
-                            mod_path: nazmc_ast::ModPath {
+                        kind: nazmc_ast::ExprKind::Path(Box::new(nazmc_ast::PkgPathWithItem {
+                            pkg_path: nazmc_ast::PkgPath {
                                 ids: ThinVec::new(),
                                 spans: ThinVec::new(),
                             },

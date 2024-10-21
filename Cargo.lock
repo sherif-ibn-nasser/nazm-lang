@@ -119,6 +119,7 @@ dependencies = [
  "owo-colors",
  "serde",
  "serde_yaml",
+ "thin-vec",
 ]
 
 [[package]]
@@ -195,6 +196,7 @@ dependencies = [
  "nazmc_ast",
  "nazmc_data_pool",
  "nazmc_diagnostics",
+ "thin-vec",
 ]
 
 [[package]]

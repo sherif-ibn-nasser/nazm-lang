@@ -15,6 +15,7 @@ use std::{
     fs, panic,
     process::{exit, Command},
 };
+use thin_vec::ThinVec;
 
 fn collect_paths(paths: Vec<Value>, prefix: &str, collected_paths: &mut Vec<String>) {
     for path in paths {
@@ -127,7 +128,7 @@ fn main() {
         let mut package_path = file_path
             .split_terminator('/')
             .map(|s| id_pool.get(s))
-            .collect::<Vec<_>>();
+            .collect::<ThinVec<_>>();
 
         package_path.pop(); // remove the actual file
 
@@ -182,267 +183,16 @@ fn main() {
     let id_pool = id_pool.build();
     let str_pool = str_pool.build();
 
-    nazmc_resolve::check_conflicts(&packages_to_parsed_files, &parsed_files, &id_pool);
+    let packages_to_items =
+        nazmc_resolve::check_conflicts(&packages_to_parsed_files, &parsed_files, &id_pool);
 
-    // let jhs = files_paths
-    //     .into_iter()
-    //     .map(|file_path| {
-    //         let mut mod_path = file_path
-    //             .split_terminator('/')
-    //             .map(|s| id_pool.get(s))
-    //             .collect::<Vec<_>>();
-
-    //         mod_path.pop(); // remove the actual file
-
-    //         let mod_idx = mods.len();
-    //         let mod_idx = *mods.entry(mod_path).or_insert(mod_idx);
-
-    //         std::thread::spawn(move || {})
-    //     })
-    //     .collect::<Vec<_>>();
-
-    // let mut parsed_files = ThinVec::with_capacity(jhs.len());
-    // let mut parsed_mods: ThinVec<ThinVec<_>> = ThinVec::with_capacity(mods.len());
-    // for _ in 0..mods.len() {
-    //     parsed_mods.push(ThinVec::new());
-    // }
-
-    // // Wait for threads to finish
-    // jhs.into_iter().for_each(|jh| {
-    //     let r = jh.join();
-    //     match r {
-    //         Ok((mod_idx, path, lines, Ok(ast))) => {
-    //             let file_idx = parsed_files.len();
-    //             parsed_files.push(ParsedFile { path, lines, ast });
-    //             parsed_mods[mod_idx].push(file_idx);
-    //         }
-    //         Ok((.., Err(dd))) => {
-    //             diagnostics.push(dd);
-    //             fail_after_parsing = true
-    //         }
-    //         Err(_) => fail_after_parsing = true,
-    //     }
-    // });
-
-    // for file_path in files_paths {
-    //     let mut mod_path = file_path
-    //         .split_terminator('/')
-    //         .map(|s| id_pool.get(s))
-    //         .collect::<Vec<_>>();
-
-    //     mod_path.pop(); // remove the actual file
-
-    //     let mod_idx = mods.len();
-    //     let mod_idx = *mods.entry(mod_path).or_insert(mod_idx);
-
-    //     let file_path = format!("{file_path}.نظم");
-    //     let Ok(file_content) = fs::read_to_string(&file_path) else {
-    //         panic::set_hook(Box::new(|_| {}));
-    //         print_err(format!(
-    //             "{} {}{}",
-    //             "لا يمكن قراءة الملف".bold(),
-    //             file_path.bright_red().bold(),
-    //             " أو أنه غير موجود".bold()
-    //         ));
-    //         panic!()
-    //     };
-
-    //     let (tokens, file_lines, lexer_errors) =
-    //         LexerIter::new(&file_content, &mut id_pool, &mut str_pool).collect_all();
-
-    //     std::thread::spawn(move || {
-    //         let file = parse(&file_path, tokens, &file_lines, lexer_errors);
-
-    //         (mod_idx, file_path, file_lines, file)
-    //     });
-    // }
-
-    // let iter = files_paths
-    //     .into_iter()
-    //     // Lex and parse
-    //     .map(|file_path| {
-    //         let mut mod_path = file_path
-    //             .split_terminator('/')
-    //             .map(|s| id_pool.get(s))
-    //             .collect::<Vec<_>>();
-
-    //         mod_path.pop(); // remove the actual file
-
-    //         let mod_idx = mods.len();
-    //         let mod_idx = *mods.entry(mod_path).or_insert(mod_idx);
-
-    //         let file_path = format!("{file_path}.نظم");
-    //         let Ok(file_content) = fs::read_to_string(&file_path) else {
-    //             panic::set_hook(Box::new(|_| {}));
-    //             print_err(format!(
-    //                 "{} {}{}",
-    //                 "لا يمكن قراءة الملف".bold(),
-    //                 file_path.bright_red().bold(),
-    //                 " أو أنه غير موجود".bold()
-    //             ));
-    //             panic!()
-    //         };
-
-    //         let (tokens, file_lines, lexer_errors) =
-    //             LexerIter::new(&file_content, &mut id_pool, &mut str_pool).collect_all();
-
-    //         std::thread::spawn(move || {
-    //             let file = parse(&file_path, tokens, &file_lines, lexer_errors);
-
-    //             (mod_idx, file_path, file_lines, file)
-    //         })
-    //     })
-    //     .collect::<Vec<_>>()
-    //     .into_iter()
-    //     // Wait for thread to finish
-    //     .map(|jh| jh.join())
-    //     .collect::<Vec<_>>()
-    //     .into_iter();
-
-    // let id_pool = id_pool.build();
-
-    // // Map files, mods and items in each mod and encoding them
-    // iter.for_each(|r| {
-    //     let Ok((mod_idx, file_path, file_lines, file)) = r else {
-    //         exit(1)
-    //     };
-
-    //     let file_idx = files.len();
-
-    //     file.content
-    //         .items
-    //         .iter()
-    //         .enumerate()
-    //         .for_each(|(idx_in_file, item)| {
-    //             let Ok(item) = item else {
-    //                 unreachable!();
-    //             };
-
-    //             let item = match item {
-    //                 syntax::FileItem::WithVisModifier(item_with_vis) => {
-    //                     let Ok(item) = &item_with_vis.item else {
-    //                         unreachable!()
-    //                     };
-
-    //                     item
-    //                 }
-    //                 syntax::FileItem::WithoutModifier(item) => item,
-    //                 _ => return, // i.e. continue
-    //             };
-
-    //             let Ok(name) = (match item {
-    //                 syntax::Item::Struct(s) => &s.name,
-    //                 syntax::Item::Fn(f) => &f.name,
-    //             }) else {
-    //                 unreachable!()
-    //             };
-
-    //             let name_pool_idx = name.data.val;
-
-    //             items_to_mods
-    //                 .entry(name_pool_idx)
-    //                 .or_default()
-    //                 .push(ItemMapToMod {
-    //                     mod_idx,
-    //                     file_idx,
-    //                     idx_in_file,
-    //                 });
-    //         });
-
-    //     files.push((file_path, file_lines, file, mod_idx));
-    // });
-
-    // let mut diagnostics = vec![];
-
-    // // Check duplicate items across mod files
-    // // FIXME: Could we multithread that?!
-    // for (item_name_idx, item_to_mods) in items_to_mods.iter_mut() {
-    //     item_to_mods.sort_by(|a, b| a.mod_idx.cmp(&b.mod_idx));
-
-    //     let name = &id_pool[*item_name_idx];
-
-    //     item_to_mods
-    //         .chunk_by(|a, b| a.mod_idx == b.mod_idx)
-    //         .for_each(|slice| {
-    //             if slice.len() == 1 {
-    //                 return;
-    //             }
-    //             let msg = format!("يوجد أكثر من عنصر بنفس الاسم `{}` في نفس الحزمة", name);
-
-    //             let mut diagnostic = Diagnostic::error(msg, vec![]);
-
-    //             let mut occurunces = 1;
-
-    //             let mut slice = slice.to_vec();
-
-    //             slice.sort_by(|a, b| a.file_idx.cmp(&b.file_idx));
-
-    //             slice
-    //                 .chunk_by(|a, b| a.file_idx == b.file_idx)
-    //                 .for_each(|slice2| {
-    //                     let (file_path, file_lines, file, file_mod_idx) =
-    //                         &files[slice2[0].file_idx];
-
-    //                     let get_item_name_span_by_idx = |idx: usize| {
-    //                         let Ok(item_syntax_tree) = &file.content.items[slice2[idx].idx_in_file]
-    //                         else {
-    //                             unreachable!()
-    //                         };
-
-    //                         let item = match item_syntax_tree {
-    //                             syntax::FileItem::WithVisModifier(item_with_vis) => {
-    //                                 let Ok(item) = &item_with_vis.item else {
-    //                                     unreachable!()
-    //                                 };
-
-    //                                 item
-    //                             }
-    //                             syntax::FileItem::WithoutModifier(item) => item,
-    //                         };
-
-    //                         let Ok(name) = (match item {
-    //                             syntax::Item::Struct(s) => &s.name,
-    //                             syntax::Item::Fn(f) => &f.name,
-    //                         }) else {
-    //                             unreachable!()
-    //                         };
-    //                         name.span
-    //                     };
-
-    //                     let mut code_window = CodeWindow::new(
-    //                         file_path,
-    //                         file_lines,
-    //                         get_item_name_span_by_idx(0).start,
-    //                     );
-
-    //                     for (i, _) in slice2.iter().enumerate() {
-    //                         let span = get_item_name_span_by_idx(i);
-    //                         let occurence_str = match occurunces {
-    //                             1 => "هنا تم العثور على أول عنصر بهذا الاسم".to_string(),
-    //                             2 => "هنا تم العثور على نفس الاسم للمرة الثانية".to_string(),
-    //                             3 => "هنا تم العثور على نفس الاسم للمرة الثالثة".to_string(),
-    //                             4 => "هنا تم العثور على نفس الاسم للمرة الرابعة".to_string(),
-    //                             5 => "هنا تم العثور على نفس الاسم للمرة الخامسة".to_string(),
-    //                             6 => "هنا تم العثور على نفس الاسم للمرة السادسة".to_string(),
-    //                             7 => "هنا تم العثور على نفس الاسم للمرة السابعة".to_string(),
-    //                             8 => "هنا تم العثور على نفس الاسم للمرة الثامنة".to_string(),
-    //                             9 => "هنا تم العثور على نفس الاسم للمرة التاسعة".to_string(),
-    //                             10 => "هنا تم العثور على نفس الاسم للمرة العاشرة".to_string(),
-    //                             o => format!("هنا تم العثور على نفس الاسم للمرة {}", o),
-    //                         };
-    //                         if occurunces == 1 {
-    //                             code_window.mark_error(span, vec![occurence_str]);
-    //                         } else {
-    //                             code_window.mark_secondary(span, vec![occurence_str]);
-    //                         }
-    //                         occurunces += 1;
-    //                     }
-
-    //                     diagnostic.push_code_window(code_window);
-    //                 });
-    //             diagnostics.push(diagnostic);
-    //         });
-    // }
+    nazmc_resolve::resolve_imports(
+        &id_pool,
+        &packages,
+        &packages_to_parsed_files,
+        &packages_to_items,
+        &parsed_files,
+    );
 
     // let mut unresolved_imports = vec![];
     // let mut resolved_imports = vec![];

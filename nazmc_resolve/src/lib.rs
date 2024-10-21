@@ -2,6 +2,7 @@ use std::{collections::HashMap, process::exit};
 
 use nazmc_data_pool::{Built, DataPool, PoolIdx};
 use nazmc_diagnostics::{eprint_diagnostics, span::Span, CodeWindow, Diagnostic};
+use thin_vec::ThinVec;
 
 #[derive(Clone)]
 pub struct ParsedFile {
@@ -23,12 +24,6 @@ struct ItemMapToMod {
     mod_idx: usize,
     file_idx: usize,
     idx_in_file: usize,
-}
-
-struct UnresolvedImport {
-    first_invalid_seg: PoolIdx,
-    first_invalid_seg_span: Span,
-    file_idx: usize,
 }
 
 struct ResolvedImport {
@@ -69,7 +64,7 @@ pub fn check_conflicts(
 
         let items_in_package = &mut packages_to_items[package_idx];
 
-        for parsed_file_idx in parsed_files_in_package.iter() {
+        for parsed_file_idx in parsed_files_in_package {
             let parsed_file = &parsed_files[*parsed_file_idx];
 
             for (item_idx, item) in parsed_file.ast.items.iter().enumerate() {
@@ -153,4 +148,89 @@ pub fn check_conflicts(
     }
 
     packages_to_items
+}
+
+pub fn resolve_imports<'a, 'b>(
+    id_pool: &DataPool<Built>,
+    packages: &HashMap<ThinVec<PoolIdx>, usize>,
+    packages_to_parsed_files: &[Vec<usize>],
+    packages_to_items: &[HashMap<PoolIdx, ItemInFile>],
+    parsed_files: &'a [ParsedFile],
+) {
+    let mut diagnostics = vec![];
+
+    let unresolved_import_err = |file: &'a ParsedFile, id: PoolIdx, span: Span| {
+        let name = &id_pool[id];
+        let msg = format!("لم يتم العثور على الاسم `{}` في المسار", name);
+
+        let mut code_window = CodeWindow::new(&file.path, &file.lines, span.start);
+
+        code_window.mark_error(
+            span,
+            vec!["هذا الاسم غير موجود داخل المسار المحدد".to_string()],
+        );
+
+        Diagnostic::error(msg, vec![code_window])
+    };
+
+    let pkg_path_err = |file: &'a ParsedFile,
+                        mut pkg_path: ThinVec<PoolIdx>,
+                        mut pkg_path_spans: ThinVec<Span>| {
+        while let Some(first_invalid_seg) = pkg_path.pop() {
+            let first_invalid_seg_span = pkg_path_spans.pop().unwrap();
+
+            if packages.contains_key(&pkg_path) {
+                return unresolved_import_err(&file, first_invalid_seg, first_invalid_seg_span);
+            }
+        }
+        unreachable!()
+    };
+
+    for (package_idx, parsed_files_in_package) in packages_to_parsed_files.iter().enumerate() {
+        for parsed_file_idx in parsed_files_in_package {
+            let file = &parsed_files[*parsed_file_idx];
+
+            for import in &file.ast.imports {
+                match packages.get(&import.pkg_path.ids) {
+                    Some(resolved_package_idx) => {
+                        match packages_to_items[*resolved_package_idx].get(&import.item.id) {
+                            Some(ItemInFile { file_idx, item_idx }) => todo!(),
+                            None => {
+                                diagnostics.push(unresolved_import_err(
+                                    &file,
+                                    import.item.id,
+                                    import.item.span,
+                                ));
+                            }
+                        }
+                    }
+                    None => {
+                        diagnostics.push(pkg_path_err(
+                            &file,
+                            import.pkg_path.ids.clone(),
+                            import.pkg_path.spans.clone(),
+                        ));
+                    }
+                }
+            }
+
+            for import in &file.ast.star_imports {
+                match packages.get(&import.ids) {
+                    Some(resolved_package_idx) => todo!(),
+                    None => {
+                        diagnostics.push(pkg_path_err(
+                            &file,
+                            import.ids.clone(),
+                            import.spans.clone(),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    if !diagnostics.is_empty() {
+        eprint_diagnostics(diagnostics);
+        exit(1)
+    }
 }

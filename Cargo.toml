@@ -17,3 +17,4 @@ nazmc_nir = { path = "nazmc_nir" }
 nazmc_resolve = { path = "nazmc_resolve" }
 serde = { version = "*", features = ["derive"] }
 serde_yaml = "*"
+thin-vec = "*"
