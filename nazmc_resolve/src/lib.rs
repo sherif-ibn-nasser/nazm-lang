@@ -112,9 +112,12 @@ pub fn check_conflicts(
         let mut diagnostic = Diagnostic::error(msg, vec![]);
         let mut occurrences = 1;
 
-        for (file_idx, spans) in name_conflicts_in_single_package {
+        for (file_idx, mut spans) in name_conflicts_in_single_package {
             let file = &parsed_files[file_idx];
+
             let mut code_window = CodeWindow::new(&file.path, &file.lines, spans[0].start);
+
+            nazmc_diagnostics::span::sort_spans(&mut spans);
 
             for span in spans {
                 let occurrence_str = match occurrences {
@@ -276,7 +279,7 @@ pub fn resolve_imports<'a, 'b>(
     for (file_idx, name_conflicts_in_single_file) in conflicts {
         let file = &parsed_files[file_idx];
 
-        for (conflicting_name, spans) in name_conflicts_in_single_file {
+        for (conflicting_name, mut spans) in name_conflicts_in_single_file {
             let name = &id_pool[conflicting_name];
             let msg = format!("يوجد أكثر من عنصر بنفس الاسم `{}` في نفس الملف", name);
             let mut diagnostic = Diagnostic::error(msg, vec![]);
@@ -284,7 +287,7 @@ pub fn resolve_imports<'a, 'b>(
 
             let mut code_window = CodeWindow::new(&file.path, &file.lines, spans[0].start);
 
-            // TODO: Sort spans
+            nazmc_diagnostics::span::sort_spans(&mut spans);
 
             for span in spans {
                 let occurrence_str = match occurrences {
