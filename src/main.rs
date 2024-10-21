@@ -117,8 +117,6 @@ fn main() {
     let mut packages_to_parsed_files = vec![];
     let mut diagnostics: Vec<String> = vec![];
     let mut fail_after_parsing = false;
-    // let mut ast_items_counter = ASTItemsCounter::default();
-    // let mut items_to_mods: HashMap<PoolIdx, Vec<_>> = HashMap::new();
 
     // Register the main fn id to index 0 and the implicit lambda param name to index 1
     id_pool.get("البداية");
@@ -201,7 +199,7 @@ fn main() {
         &parsed_files,
     );
 
-    resolver.resolve();
+    let mut nrt = resolver.resolve();
 
     // let (file_path, file_content) = cli::read_file();
 
