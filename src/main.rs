@@ -183,11 +183,22 @@ fn main() {
     let id_pool = id_pool.build();
     let str_pool = str_pool.build();
 
+    let mut packages_names = ThinVec::with_capacity(packages.len());
+    for (pkg, idx) in &packages {
+        if *idx >= packages_names.len() {
+            for _ in packages_names.len()..=*idx {
+                packages_names.push(ThinVec::default());
+            }
+        }
+        packages_names[*idx] = pkg.clone();
+    }
+
     let packages_to_items =
         nazmc_resolve::check_conflicts(&packages_to_parsed_files, &parsed_files, &id_pool);
 
     nazmc_resolve::resolve_imports(
         &id_pool,
+        &packages_names,
         &packages,
         &packages_to_parsed_files,
         &packages_to_items,

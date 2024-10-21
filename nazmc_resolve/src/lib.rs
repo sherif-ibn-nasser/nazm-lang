@@ -1,7 +1,6 @@
-use std::{collections::HashMap, process::exit};
-
 use nazmc_data_pool::{Built, DataPool, PoolIdx};
 use nazmc_diagnostics::{eprint_diagnostics, span::Span, CodeWindow, Diagnostic};
+use std::{collections::HashMap, process::exit};
 use thin_vec::ThinVec;
 
 #[derive(Clone)]
@@ -159,6 +158,7 @@ pub fn check_conflicts(
 
 pub fn resolve_imports<'a, 'b>(
     id_pool: &DataPool<Built>,
+    packages_names: &[ThinVec<PoolIdx>],
     packages: &HashMap<ThinVec<PoolIdx>, usize>,
     packages_to_parsed_files: &[Vec<usize>],
     packages_to_items: &[HashMap<PoolIdx, ItemInFile>],
@@ -177,7 +177,41 @@ pub fn resolve_imports<'a, 'b>(
             vec!["هذا الاسم غير موجود داخل المسار المحدد".to_string()],
         );
 
-        Diagnostic::error(msg, vec![code_window])
+        let mut diagnostic = Diagnostic::error(msg, vec![code_window]);
+
+        let mut possible_paths = vec![];
+
+        for (pkg_idx, pkg_to_items) in packages_to_items.iter().enumerate() {
+            if let Some(found_item) = pkg_to_items.get(&id) {
+                let item_file = &parsed_files[found_item.file_idx];
+                let item_ast = &item_file.ast.items[found_item.item_idx];
+                let item_span_cursor = item_ast.name.span.start;
+                let item_kind_str = match item_ast.kind {
+                    nazmc_ast::ItemKind::UnitStruct |
+                    nazmc_ast::ItemKind::TupleStruct(_)|
+                    nazmc_ast::ItemKind::FieldsStruct(_) => "الهيكل",
+                    nazmc_ast::ItemKind::Fn(_) => "الدالة",
+                };
+                let pkg_name = &packages_names[pkg_idx].iter().map(|id| &id_pool[*id]).collect::<Vec<_>>().join("::");
+                let name = &id_pool[id];
+                let item_path = format!("{}:{}:{}", &item_file.path, item_span_cursor.line +1 , item_span_cursor.col +1);
+                let path = format!("\t- {} {}::{} في {}", item_kind_str, pkg_name, name, item_path);
+
+                possible_paths.push(path);
+            }
+        }
+
+        if !possible_paths.is_empty(){
+            let mut help = Diagnostic::help(format!("تم العثور على عناصر مشابهة بنفس الاسم في المسارات التالية:"), vec![]);
+
+            for t in possible_paths {
+                help.chain_free_text(t);
+            }
+
+            diagnostic.chain(help);
+        }
+
+        diagnostic
     };
 
     let pkg_path_err = |file: &'a ParsedFile,
@@ -187,7 +221,7 @@ pub fn resolve_imports<'a, 'b>(
             let first_invalid_seg_span = pkg_path_spans.pop().unwrap();
 
             if packages.contains_key(&pkg_path) {
-                return unresolved_import_err(&file, first_invalid_seg, first_invalid_seg_span);
+                return unresolved_import_err(&file,first_invalid_seg, first_invalid_seg_span);
             }
         }
         unreachable!()
@@ -206,11 +240,62 @@ pub fn resolve_imports<'a, 'b>(
                     Some(resolved_package_idx) => {
                         match packages_to_items[*resolved_package_idx].get(&import.item.id) {
                             Some(resolved_item) => {
-                                resolved_imports_in_file.push(ResolvedImport {
-                                    pkg_idx: *resolved_package_idx,
-                                    item: *resolved_item,
-                                    alias: *item_alias,
-                                });
+
+                                let item_resolved_file = &parsed_files[resolved_item.file_idx];
+
+                                let resolved_item_ast =
+                                    &item_resolved_file.ast.items[resolved_item.item_idx];
+
+                                if !matches!(resolved_item_ast.vis, nazmc_ast::VisModifier::Default) || pkg_idx == *resolved_package_idx {
+                                    resolved_imports_in_file.push(ResolvedImport {
+                                        pkg_idx: *resolved_package_idx,
+                                        item: *resolved_item,
+                                        alias: *item_alias,
+                                    });
+                                    continue;
+                                }
+
+                                let name = &id_pool[import.item.id];
+                                let msg = match resolved_item_ast.kind {
+                                    nazmc_ast::ItemKind::UnitStruct
+                                    | nazmc_ast::ItemKind::TupleStruct(_)
+                                    | nazmc_ast::ItemKind::FieldsStruct(_) => {
+                                        format!("لا يمكن الوصول إلى هيكل `{}` لأنه خاص بالحزمة التابع لها" ,name)
+                                    }
+                                    nazmc_ast::ItemKind::Fn(_) => 
+                                    format!("لا يمكن الوصول إلى دالة `{}` لأنها خاصة بالحزمة التابعة لها" ,name),
+                                };
+                                let mut code_window = CodeWindow::new(
+                                    &parsed_file.path,
+                                    &parsed_file.lines,
+                                    import.item.span.start,
+                                );
+                                code_window.mark_error(import.item.span, vec![]);
+                                let mut diagnostic =
+                                    Diagnostic::error(msg, vec![code_window]);
+
+                                let item_kind_str = match resolved_item_ast.kind {
+                                    nazmc_ast::ItemKind::UnitStruct
+                                    | nazmc_ast::ItemKind::TupleStruct(_)
+                                    | nazmc_ast::ItemKind::FieldsStruct(_) => {
+                                        "الهيكل".to_string()
+                                    }
+                                    nazmc_ast::ItemKind::Fn(_) => "الدالة".to_string(),
+                                };
+                                let help_msg =
+                                    format!("تم العثور على {} هنا", item_kind_str);
+                                let mut help_code_window = CodeWindow::new(
+                                    &item_resolved_file.path,
+                                    &item_resolved_file.lines,
+                                    resolved_item_ast.name.span.start,
+                                );
+                                help_code_window
+                                    .mark_note(resolved_item_ast.name.span, vec![]);
+                                let help =
+                                    Diagnostic::note(help_msg, vec![help_code_window]);
+                                diagnostic.chain(help);
+                                diagnostics.push(diagnostic);
+                                
                             }
                             None => {
                                 diagnostics.push(unresolved_import_err(
