@@ -4,7 +4,8 @@ use thin_vec::ThinVec;
 
 #[derive(Clone)]
 pub struct File {
-    pub imports: ThinVec<PkgPathWithItem>,
+    /// The imports and the aliases of them
+    pub imports: ThinVec<(PkgPathWithItem, ASTId)>,
     pub star_imports: ThinVec<PkgPath>,
     pub items: ThinVec<Item>,
 }
@@ -36,7 +37,7 @@ pub struct PkgPathWithItem {
     pub item: ASTId,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct ASTId {
     pub span: Span,
     pub id: PoolIdx,

@@ -19,7 +19,7 @@ pub(crate) fn lower_file(file: File) -> nazmc_ast::File {
 fn lower_imports(
     imports_stms: Vec<ImportStm>,
 ) -> (
-    ThinVec<nazmc_ast::PkgPathWithItem>,
+    ThinVec<(nazmc_ast::PkgPathWithItem, nazmc_ast::ASTId)>,
     ThinVec<nazmc_ast::PkgPath>,
 ) {
     let mut imports = ThinVec::new();
@@ -68,13 +68,20 @@ fn lower_imports(
             let item_id = mod_path.ids.pop().unwrap();
             let item_span = mod_path.spans.pop().unwrap();
 
-            imports.push(nazmc_ast::PkgPathWithItem {
+            let import = nazmc_ast::PkgPathWithItem {
                 pkg_path: mod_path,
                 item: nazmc_ast::ASTId {
                     span: item_span,
                     id: item_id,
                 },
-            });
+            };
+
+            let alias = nazmc_ast::ASTId {
+                span: item_span,
+                id: item_id,
+            };
+
+            imports.push((import, alias));
         }
     }
     (imports, star_imports)
