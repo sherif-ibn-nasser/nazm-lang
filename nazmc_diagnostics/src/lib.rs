@@ -1,5 +1,5 @@
 use owo_colors::OwoColorize;
-use std::fmt::{write, Display};
+use std::fmt::Display;
 mod code_window;
 pub mod span;
 pub use code_window::CodeWindow;

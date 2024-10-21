@@ -18,18 +18,6 @@ struct ASTItemsCounter {
     fns: usize,
 }
 
-#[derive(Clone)]
-struct ItemMapToMod {
-    mod_idx: usize,
-    file_idx: usize,
-    idx_in_file: usize,
-}
-
-struct ResolvedStarImport {
-    file_idx: usize,
-    mod_idx: usize,
-}
-
 #[derive(Clone, Copy)]
 pub struct FileItemKindAndIdx(u64);
 
@@ -82,27 +70,28 @@ struct ResolvedImport {
 }
 
 pub struct NameResolver<'a> {
+    /// The pool used to preserve ids string values
     id_pool: &'a DataPool<Built>,
+    /// A map from pkgs ids segments to the pkgs indexes
     packages: &'a HashMap<ThinVec<PoolIdx>, usize>,
+    /// A map from the pkgs indexes to their segments
     packages_names: &'a [ThinVec<PoolIdx>],
-    /// First index is the pkg index
+    /// A map from the pkgs indexes to the inner files indexes
     packages_to_parsed_files: &'a [Vec<usize>],
+    /// The parsed filese array
     parsed_files: &'a [ParsedFile],
-    /// The index of this vector is the package index
-    ///
-    /// Each package has a map of ids to their occurrence in the package (the file index and the item index in that file)
+    /// Each pkg has a map of ids to their occurrence in the package (the file index and the item index in that file)
     packages_to_items: Vec<HashMap<PoolIdx, ItemInFile>>,
-    /// First index is the pkg index
-    ///
-    /// The second is the file index in the files vector of pkgs.
-    /// Index `packages_to_parsed_files` with pkg index  first then with this index
-    /// to get the absoulute file index
-    ///
-    /// The third is the index of the resolved import
-    resolved_imports: Vec<Vec<Vec<ResolvedImport>>>,
-    /// The `usize` is the resolved pkg index
-    resolved_star_imports: Vec<Vec<Vec<usize>>>,
+    /// Each pkg will have HashMap<usize, Vec<ResolvedImport>>,
+    /// which is the map of file idx to its resolved imports
+    resolved_imports: Vec<HashMap<usize, Vec<ResolvedImport>>>,
+    /// Each pkg will have HashMap<usize, Vec<usize>>,
+    /// which is the map of file idx to its resolved pkgs indexes
+    resolved_star_imports: Vec<HashMap<usize, Vec<usize>>>,
+    /// The diagnostics which will be filled in different phases
     diagnostics: Vec<Diagnostic<'a>>,
+    /// The counter for items (used to construct NIR)
+    ast_counter: ASTItemsCounter,
 }
 
 impl<'a> NameResolver<'a> {
@@ -119,10 +108,11 @@ impl<'a> NameResolver<'a> {
             packages_names,
             packages_to_parsed_files,
             parsed_files,
-            packages_to_items: vec![HashMap::default(); packages.len()],
-            resolved_imports: vec![vec![]; packages.len()],
-            resolved_star_imports: vec![vec![]; packages.len()],
+            packages_to_items: vec![HashMap::new(); packages.len()],
+            resolved_imports: vec![HashMap::new(); packages.len()],
+            resolved_star_imports: vec![HashMap::new(); packages.len()],
             diagnostics: vec![],
+            ast_counter: ASTItemsCounter::default(),
         }
     }
 
@@ -151,16 +141,9 @@ impl<'a> NameResolver<'a> {
         //                          |      conflicting name
         //                          package idx
 
-        let mut ast_counter = ASTItemsCounter::default();
-
         for (pkg_idx, parsed_files_in_package) in self.packages_to_parsed_files.iter().enumerate() {
             for parsed_file_idx in parsed_files_in_package {
-                self.check_conflicts_in_file(
-                    *parsed_file_idx,
-                    pkg_idx,
-                    &mut conflicts,
-                    &mut ast_counter,
-                );
+                self.check_conflicts_in_file(*parsed_file_idx, pkg_idx, &mut conflicts);
             }
         }
 
@@ -186,7 +169,6 @@ impl<'a> NameResolver<'a> {
         parsed_file_idx: usize,
         pkg_idx: usize,
         conflicts: &mut HashMap<(usize, PoolIdx), HashMap<usize, Vec<Span>>>,
-        ast_counter: &mut ASTItemsCounter,
     ) {
         let items_in_package = &mut self.packages_to_items[pkg_idx];
         let parsed_file = &self.parsed_files[parsed_file_idx];
@@ -215,18 +197,18 @@ impl<'a> NameResolver<'a> {
                     let (kind, index) = match item.kind {
                         nazmc_ast::ItemKind::UnitStruct => (
                             FileItemKindAndIdx::UNIT_STRUCT,
-                            &mut ast_counter.unit_structs,
+                            &mut self.ast_counter.unit_structs,
                         ),
                         nazmc_ast::ItemKind::TupleStruct(_) => (
                             FileItemKindAndIdx::TUPLE_STRUCT,
-                            &mut ast_counter.tuple_structs,
+                            &mut self.ast_counter.tuple_structs,
                         ),
                         nazmc_ast::ItemKind::FieldsStruct(_) => (
                             FileItemKindAndIdx::FIELDS_STRUCT,
-                            &mut ast_counter.fields_structs,
+                            &mut self.ast_counter.fields_structs,
                         ),
                         nazmc_ast::ItemKind::Fn(_) => {
-                            (FileItemKindAndIdx::FN, &mut ast_counter.fns)
+                            (FileItemKindAndIdx::FN, &mut self.ast_counter.fns)
                         }
                     };
 
@@ -250,11 +232,8 @@ impl<'a> NameResolver<'a> {
     fn resolve_imports(&mut self) {
         for (pkg_idx, parsed_files_in_package) in self.packages_to_parsed_files.iter().enumerate() {
             for parsed_file_idx in parsed_files_in_package.iter() {
-                let parsed_file = &self.parsed_files[*parsed_file_idx];
-                self.resolved_imports[pkg_idx].push(vec![]);
-                self.resolved_star_imports[pkg_idx].push(vec![]);
-                self.resolve_file_imports(parsed_file, pkg_idx);
-                self.resolve_file_star_imports(parsed_file, pkg_idx);
+                self.resolve_file_imports(pkg_idx, *parsed_file_idx);
+                self.resolve_file_star_imports(pkg_idx, *parsed_file_idx);
             }
         }
 
@@ -266,7 +245,7 @@ impl<'a> NameResolver<'a> {
         //                         file idx
 
         for (pkg_idx, files_in_pkg) in self.resolved_imports.iter().enumerate() {
-            for (i, resolved_imports) in files_in_pkg.iter().enumerate() {
+            for (parsed_file_idx, resolved_imports) in files_in_pkg.iter() {
                 for resolved_import in resolved_imports {
                     let alias = &resolved_import.alias;
 
@@ -275,11 +254,10 @@ impl<'a> NameResolver<'a> {
                         continue;
                     };
 
-                    let parsed_file_idx = self.packages_to_parsed_files[pkg_idx][i];
-                    let parsed_file = &self.parsed_files[parsed_file_idx];
+                    let parsed_file = &self.parsed_files[*parsed_file_idx];
 
                     conflicts
-                        .entry(parsed_file_idx)
+                        .entry(*parsed_file_idx)
                         .or_default()
                         .entry(alias.id)
                         .or_insert_with(|| {
@@ -309,7 +287,8 @@ impl<'a> NameResolver<'a> {
     }
 
     #[inline]
-    fn resolve_file_star_imports(&mut self, parsed_file: &'a ParsedFile, pkg_idx: usize) {
+    fn resolve_file_star_imports(&mut self, pkg_idx: usize, parsed_file_idx: usize) {
+        let parsed_file = &self.parsed_files[parsed_file_idx];
         for import in &parsed_file.ast.star_imports {
             let Some(resolved_package_idx) = self.packages.get(&import.ids) else {
                 self.add_pkg_path_err(&parsed_file, import.ids.clone(), import.spans.clone());
@@ -317,14 +296,15 @@ impl<'a> NameResolver<'a> {
             };
 
             self.resolved_star_imports[pkg_idx]
-                .last_mut()
-                .unwrap()
+                .entry(parsed_file_idx)
+                .or_default()
                 .push(*resolved_package_idx);
         }
     }
 
     #[inline]
-    fn resolve_file_imports(&mut self, parsed_file: &'a ParsedFile, pkg_idx: usize) {
+    fn resolve_file_imports(&mut self, pkg_idx: usize, parsed_file_idx: usize) {
+        let parsed_file = &self.parsed_files[parsed_file_idx];
         for (import, item_alias) in &parsed_file.ast.imports {
             let Some(resolved_package_idx) = self.packages.get(&import.pkg_path.ids) else {
                 self.add_pkg_path_err(
@@ -357,8 +337,8 @@ impl<'a> NameResolver<'a> {
                 );
             } else {
                 self.resolved_imports[pkg_idx]
-                    .last_mut()
-                    .unwrap()
+                    .entry(parsed_file_idx)
+                    .or_default()
                     .push(ResolvedImport {
                         pkg_idx: *resolved_package_idx,
                         item: *resolved_item,
