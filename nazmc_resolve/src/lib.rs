@@ -85,13 +85,23 @@ pub struct NameResolver<'a> {
     id_pool: &'a DataPool<Built>,
     packages: &'a HashMap<ThinVec<PoolIdx>, usize>,
     packages_names: &'a [ThinVec<PoolIdx>],
+    /// First index is the pkg index
     packages_to_parsed_files: &'a [Vec<usize>],
     parsed_files: &'a [ParsedFile],
     /// The index of this vector is the package index
     ///
     /// Each package has a map of ids to their occurrence in the package (the file index and the item index in that file)
     packages_to_items: Vec<HashMap<PoolIdx, ItemInFile>>,
+    /// First index is the pkg index
+    ///
+    /// The second is the file index in the files vector of pkgs.
+    /// Index `packages_to_parsed_files` with pkg index  first then with this index
+    /// to get the absoulute file index
+    ///
+    /// The third is the index of the resolved import
     resolved_imports: Vec<Vec<Vec<ResolvedImport>>>,
+    /// The `usize` is the resolved pkg index
+    resolved_star_imports: Vec<Vec<Vec<usize>>>,
     diagnostics: Vec<Diagnostic<'a>>,
 }
 
@@ -109,8 +119,9 @@ impl<'a> NameResolver<'a> {
             packages_names,
             packages_to_parsed_files,
             parsed_files,
-            packages_to_items: Vec::with_capacity(packages.len()),
+            packages_to_items: vec![HashMap::default(); packages.len()],
             resolved_imports: vec![vec![]; packages.len()],
+            resolved_star_imports: vec![vec![]; packages.len()],
             diagnostics: vec![],
         }
     }
@@ -143,70 +154,13 @@ impl<'a> NameResolver<'a> {
         let mut ast_counter = ASTItemsCounter::default();
 
         for (pkg_idx, parsed_files_in_package) in self.packages_to_parsed_files.iter().enumerate() {
-            self.packages_to_items.push(HashMap::default());
-
-            let items_in_package = &mut self.packages_to_items[pkg_idx];
-
             for parsed_file_idx in parsed_files_in_package {
-                let parsed_file = &self.parsed_files[*parsed_file_idx];
-
-                for (item_idx, item) in parsed_file.ast.items.iter().enumerate() {
-                    match items_in_package.get(&item.name.id) {
-                        Some(first_occurrence) => {
-                            conflicts
-                                .entry((pkg_idx, item.name.id))
-                                .or_insert_with(|| {
-                                    let first_occurrence_span =
-                                        self.parsed_files[first_occurrence.file_idx].ast.items
-                                            [first_occurrence.item_idx]
-                                            .name
-                                            .span;
-
-                                    let mut h = HashMap::new();
-                                    h.insert(
-                                        first_occurrence.file_idx,
-                                        vec![first_occurrence_span],
-                                    );
-                                    h
-                                })
-                                .entry(*parsed_file_idx)
-                                .or_default()
-                                .push(item.name.span);
-                        }
-                        None => {
-                            let (kind, index) = match item.kind {
-                                nazmc_ast::ItemKind::UnitStruct => (
-                                    FileItemKindAndIdx::UNIT_STRUCT,
-                                    &mut ast_counter.unit_structs,
-                                ),
-                                nazmc_ast::ItemKind::TupleStruct(_) => (
-                                    FileItemKindAndIdx::TUPLE_STRUCT,
-                                    &mut ast_counter.tuple_structs,
-                                ),
-                                nazmc_ast::ItemKind::FieldsStruct(_) => (
-                                    FileItemKindAndIdx::FIELDS_STRUCT,
-                                    &mut ast_counter.fields_structs,
-                                ),
-                                nazmc_ast::ItemKind::Fn(_) => {
-                                    (FileItemKindAndIdx::FN, &mut ast_counter.fns)
-                                }
-                            };
-
-                            let kind_and_idx = FileItemKindAndIdx::new(kind, *index);
-
-                            *index += 1;
-
-                            items_in_package.insert(
-                                item.name.id,
-                                ItemInFile {
-                                    kind_and_idx,
-                                    file_idx: *parsed_file_idx,
-                                    item_idx,
-                                },
-                            );
-                        }
-                    }
-                }
+                self.check_conflicts_in_file(
+                    *parsed_file_idx,
+                    pkg_idx,
+                    &mut conflicts,
+                    &mut ast_counter,
+                );
             }
         }
 
@@ -226,70 +180,81 @@ impl<'a> NameResolver<'a> {
         }
     }
 
+    #[inline]
+    fn check_conflicts_in_file(
+        &mut self,
+        parsed_file_idx: usize,
+        pkg_idx: usize,
+        conflicts: &mut HashMap<(usize, PoolIdx), HashMap<usize, Vec<Span>>>,
+        ast_counter: &mut ASTItemsCounter,
+    ) {
+        let items_in_package = &mut self.packages_to_items[pkg_idx];
+        let parsed_file = &self.parsed_files[parsed_file_idx];
+
+        for (item_idx, item) in parsed_file.ast.items.iter().enumerate() {
+            match items_in_package.get(&item.name.id) {
+                Some(first_occurrence) => {
+                    conflicts
+                        .entry((pkg_idx, item.name.id))
+                        .or_insert_with(|| {
+                            let first_occurrence_span =
+                                self.parsed_files[first_occurrence.file_idx].ast.items
+                                    [first_occurrence.item_idx]
+                                    .name
+                                    .span;
+
+                            let mut h = HashMap::new();
+                            h.insert(first_occurrence.file_idx, vec![first_occurrence_span]);
+                            h
+                        })
+                        .entry(parsed_file_idx)
+                        .or_default()
+                        .push(item.name.span);
+                }
+                None => {
+                    let (kind, index) = match item.kind {
+                        nazmc_ast::ItemKind::UnitStruct => (
+                            FileItemKindAndIdx::UNIT_STRUCT,
+                            &mut ast_counter.unit_structs,
+                        ),
+                        nazmc_ast::ItemKind::TupleStruct(_) => (
+                            FileItemKindAndIdx::TUPLE_STRUCT,
+                            &mut ast_counter.tuple_structs,
+                        ),
+                        nazmc_ast::ItemKind::FieldsStruct(_) => (
+                            FileItemKindAndIdx::FIELDS_STRUCT,
+                            &mut ast_counter.fields_structs,
+                        ),
+                        nazmc_ast::ItemKind::Fn(_) => {
+                            (FileItemKindAndIdx::FN, &mut ast_counter.fns)
+                        }
+                    };
+
+                    let kind_and_idx = FileItemKindAndIdx::new(kind, *index);
+
+                    *index += 1;
+
+                    items_in_package.insert(
+                        item.name.id,
+                        ItemInFile {
+                            kind_and_idx,
+                            file_idx: parsed_file_idx,
+                            item_idx,
+                        },
+                    );
+                }
+            }
+        }
+    }
+
     fn resolve_imports(&mut self) {
         for (pkg_idx, parsed_files_in_package) in self.packages_to_parsed_files.iter().enumerate() {
             for parsed_file_idx in parsed_files_in_package.iter() {
                 let parsed_file = &self.parsed_files[*parsed_file_idx];
                 self.resolved_imports[pkg_idx].push(vec![]);
-
-                for import in &parsed_file.ast.star_imports {
-                    let Some(resolved_package_idx) = self.packages.get(&import.ids) else {
-                        self.add_pkg_path_err(
-                            &parsed_file,
-                            import.ids.clone(),
-                            import.spans.clone(),
-                        );
-                        continue;
-                    };
-
-                    // TODO
-                }
-
-                for (import, item_alias) in &parsed_file.ast.imports {
-                    let Some(resolved_package_idx) = self.packages.get(&import.pkg_path.ids) else {
-                        self.add_pkg_path_err(
-                            &parsed_file,
-                            import.pkg_path.ids.clone(),
-                            import.pkg_path.spans.clone(),
-                        );
-                        continue;
-                    };
-
-                    let Some(resolved_item) =
-                        self.packages_to_items[*resolved_package_idx].get(&import.item.id)
-                    else {
-                        self.add_unresolved_import_err(
-                            &parsed_file,
-                            import.item.id,
-                            import.item.span,
-                        );
-                        continue;
-                    };
-
-                    let item_resolved_file = &self.parsed_files[resolved_item.file_idx];
-
-                    let resolved_item_ast = &item_resolved_file.ast.items[resolved_item.item_idx];
-
-                    if pkg_idx != *resolved_package_idx
-                        && matches!(resolved_item_ast.vis, nazmc_ast::VisModifier::Default)
-                    {
-                        self.add_encapsulation_err(
-                            parsed_file,
-                            item_resolved_file,
-                            import,
-                            resolved_item_ast,
-                        );
-                    } else {
-                        self.resolved_imports[pkg_idx]
-                            .last_mut()
-                            .unwrap()
-                            .push(ResolvedImport {
-                                pkg_idx: *resolved_package_idx,
-                                item: *resolved_item,
-                                alias: *item_alias,
-                            });
-                    }
-                }
+                self.resolved_star_imports[pkg_idx].push(vec![]);
+                self.resolve_file_imports(parsed_file, pkg_idx);
+                self.resolve_file_star_imports(parsed_file, pkg_idx);
             }
         }
 
@@ -339,6 +304,66 @@ impl<'a> NameResolver<'a> {
                 let code_window = occurrences_code_window(parsed_file, &mut occurrences, spans);
                 diagnostic.push_code_window(code_window);
                 self.diagnostics.push(diagnostic);
+            }
+        }
+    }
+
+    #[inline]
+    fn resolve_file_star_imports(&mut self, parsed_file: &'a ParsedFile, pkg_idx: usize) {
+        for import in &parsed_file.ast.star_imports {
+            let Some(resolved_package_idx) = self.packages.get(&import.ids) else {
+                self.add_pkg_path_err(&parsed_file, import.ids.clone(), import.spans.clone());
+                continue;
+            };
+
+            self.resolved_star_imports[pkg_idx]
+                .last_mut()
+                .unwrap()
+                .push(*resolved_package_idx);
+        }
+    }
+
+    #[inline]
+    fn resolve_file_imports(&mut self, parsed_file: &'a ParsedFile, pkg_idx: usize) {
+        for (import, item_alias) in &parsed_file.ast.imports {
+            let Some(resolved_package_idx) = self.packages.get(&import.pkg_path.ids) else {
+                self.add_pkg_path_err(
+                    &parsed_file,
+                    import.pkg_path.ids.clone(),
+                    import.pkg_path.spans.clone(),
+                );
+                continue;
+            };
+
+            let Some(resolved_item) =
+                self.packages_to_items[*resolved_package_idx].get(&import.item.id)
+            else {
+                self.add_unresolved_import_err(&parsed_file, import.item.id, import.item.span);
+                continue;
+            };
+
+            let item_resolved_file = &self.parsed_files[resolved_item.file_idx];
+
+            let resolved_item_ast = &item_resolved_file.ast.items[resolved_item.item_idx];
+
+            if pkg_idx != *resolved_package_idx
+                && matches!(resolved_item_ast.vis, nazmc_ast::VisModifier::Default)
+            {
+                self.add_encapsulation_err(
+                    parsed_file,
+                    item_resolved_file,
+                    import,
+                    resolved_item_ast,
+                );
+            } else {
+                self.resolved_imports[pkg_idx]
+                    .last_mut()
+                    .unwrap()
+                    .push(ResolvedImport {
+                        pkg_idx: *resolved_package_idx,
+                        item: *resolved_item,
+                        alias: *item_alias,
+                    });
             }
         }
     }
