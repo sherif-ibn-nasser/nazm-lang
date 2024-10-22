@@ -42,12 +42,12 @@ impl<'a> CodeWindow<'a> {
     }
 
     pub fn mark_help(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
-        self.mark(span, '=', Style::new().bold().green(), labels);
+        self.mark(span, '=', Style::new().bold().cyan(), labels);
         self
     }
 
     pub fn mark_note(&mut self, span: Span, labels: Vec<String>) -> &mut Self {
-        self.mark(span, '~', Style::new().bold().cyan(), labels);
+        self.mark(span, '~', Style::new().bold().green(), labels);
         self
     }
 

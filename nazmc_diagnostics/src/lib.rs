@@ -31,6 +31,7 @@ pub struct Diagnostic<'a> {
     msg: String,
     code_windows: Vec<CodeWindow<'a>>,
     chained_diagnostics: Vec<Diagnostic<'a>>,
+    free_texts: Vec<String>,
 }
 
 impl<'a> Diagnostic<'a> {
@@ -42,6 +43,10 @@ impl<'a> Diagnostic<'a> {
         Self::new(DiagnosticLevel::Help, msg, code_windows)
     }
 
+    pub fn note(msg: String, code_windows: Vec<CodeWindow<'a>>) -> Self {
+        Self::new(DiagnosticLevel::Note, msg, code_windows)
+    }
+
     #[inline]
     fn new(level: DiagnosticLevel, msg: String, code_windows: Vec<CodeWindow<'a>>) -> Self {
         Diagnostic {
@@ -49,11 +54,17 @@ impl<'a> Diagnostic<'a> {
             msg,
             code_windows,
             chained_diagnostics: vec![],
+            free_texts: vec![],
         }
     }
 
     pub fn chain(&mut self, with: Diagnostic<'a>) -> &mut Self {
         self.chained_diagnostics.push(with);
+        self
+    }
+
+    pub fn chain_free_text(&mut self, text: String) -> &mut Self {
+        self.free_texts.push(text);
         self
     }
 
@@ -84,8 +95,8 @@ impl<'a> Display for Diagnostic<'a> {
                 "]".bold()
             ),
             DiagnosticLevel::Warning => write!(f, "{}", "خطأ".bold().red()),
-            DiagnosticLevel::Help => write!(f, "{}", "مساعدة".bold().green()),
-            DiagnosticLevel::Note => write!(f, "{}", "ملحوظة".bold().cyan()),
+            DiagnosticLevel::Note => write!(f, "{}", "ملحوظة".bold().green()),
+            DiagnosticLevel::Help => write!(f, "{}", "مساعدة".bold().cyan()),
         };
 
         let _ = write!(f, "{} {}", ":".bold(), self.msg.bold());
@@ -96,6 +107,10 @@ impl<'a> Display for Diagnostic<'a> {
 
         for chained_diagnostic in &self.chained_diagnostics {
             let _ = write!(f, "\n{}", chained_diagnostic);
+        }
+
+        for t in &self.free_texts {
+            let _ = write!(f, "\n{}", t);
         }
 
         Ok(())

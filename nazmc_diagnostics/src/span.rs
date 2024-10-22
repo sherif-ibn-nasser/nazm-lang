@@ -70,3 +70,14 @@ impl Span {
         }
     }
 }
+
+#[inline]
+pub fn sort_spans(spans: &mut [Span]) {
+    spans.sort_by_key(|a| a.start.line);
+
+    spans
+        .chunk_by_mut(|a, b| a.start.line == b.start.line)
+        .for_each(|f| {
+            f.sort_by_key(|a| a.start.col);
+        });
+}

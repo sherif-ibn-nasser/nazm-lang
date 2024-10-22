@@ -1,31 +1,43 @@
 use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::{Span, SpanCursor};
-use nazmc_lexer::LiteralKind;
 use thin_vec::ThinVec;
 
 #[derive(Clone)]
 pub struct File {
-    pub imports: ThinVec<ModPathWithItem>,
-    pub star_imports: ThinVec<ModPath>,
-    pub unit_structs: ThinVec<UnitStruct>,
-    pub tuple_structs: ThinVec<TupleStruct>,
-    pub fields_structs: ThinVec<FieldsStruct>,
-    pub fns: ThinVec<Fn>,
+    /// The imports and the aliases of them
+    pub imports: ThinVec<(PkgPathWithItem, ASTId)>,
+    pub star_imports: ThinVec<PkgPath>,
+    pub items: ThinVec<Item>,
 }
 
 #[derive(Clone)]
-pub struct ModPath {
+pub struct Item {
+    pub name: ASTId,
+    pub vis: VisModifier,
+    pub kind: ItemKind,
+}
+
+#[derive(Clone)]
+pub enum ItemKind {
+    UnitStruct,
+    TupleStruct(TupleStruct),
+    FieldsStruct(FieldsStruct),
+    Fn(Fn),
+}
+
+#[derive(Clone)]
+pub struct PkgPath {
     pub ids: ThinVec<PoolIdx>,
     pub spans: ThinVec<Span>,
 }
 
 #[derive(Clone)]
-pub struct ModPathWithItem {
-    pub mod_path: ModPath,
+pub struct PkgPathWithItem {
+    pub pkg_path: PkgPath,
     pub item: ASTId,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct ASTId {
     pub span: Span,
     pub id: PoolIdx,
@@ -45,7 +57,7 @@ pub enum BindingKind {
 
 #[derive(Clone)]
 pub enum Type {
-    Path(ModPathWithItem),
+    Path(PkgPathWithItem),
     Unit(Option<Span>),
     Tuple(ThinVec<Type>, Span),
     Paren(Box<Type>, Span),
@@ -58,7 +70,7 @@ pub enum Type {
     Lambda(ThinVec<Type>, Box<Type>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum VisModifier {
     Default,
     Public,
@@ -66,29 +78,17 @@ pub enum VisModifier {
 }
 
 #[derive(Clone)]
-pub struct UnitStruct {
-    pub vis: VisModifier,
-    pub name: ASTId,
-}
-
-#[derive(Clone)]
 pub struct TupleStruct {
-    pub vis: VisModifier,
-    pub name: ASTId,
     pub types: ThinVec<(VisModifier, Type)>,
 }
 
 #[derive(Clone)]
 pub struct FieldsStruct {
-    pub vis: VisModifier,
-    pub name: ASTId,
     pub fields: ThinVec<(VisModifier, ASTId, Type)>,
 }
 
 #[derive(Clone)]
 pub struct Fn {
-    pub vis: VisModifier,
-    pub name: ASTId,
     pub params: ThinVec<(ASTId, Type)>,
     pub return_type: Type,
     pub body: Scope,
@@ -123,11 +123,11 @@ pub struct Expr {
 
 #[derive(Clone)]
 pub enum ExprKind {
-    Literal(LiteralKind),
+    Literal(LiteralExpr),
     Parens(Box<Expr>),
-    Path(Box<ModPathWithItem>),
+    Path(Box<PkgPathWithItem>),
     Call(Box<CallExpr>),
-    UnitStruct(Box<ModPathWithItem>),
+    UnitStruct(Box<PkgPathWithItem>),
     TupleStruct(Box<TupleStructExpr>),
     FieldsStruct(Box<FieldsStructExpr>),
     Field(Box<FieldExpr>),
@@ -146,6 +146,32 @@ pub enum ExprKind {
 }
 
 #[derive(Clone)]
+pub enum LiteralExpr {
+    Str(PoolIdx),
+    Char(char),
+    Bool(bool),
+    Num(NumKind),
+}
+
+#[derive(Clone)]
+pub enum NumKind {
+    F4(f32),
+    F8(f64),
+    I(isize),
+    I1(i8),
+    I2(i16),
+    I4(i32),
+    I8(i64),
+    U(usize),
+    U1(u8),
+    U2(u16),
+    U4(u32),
+    U8(u64),
+    UnspecifiedInt(u64),
+    UnspecifiedFloat(f64),
+}
+
+#[derive(Clone)]
 pub struct CallExpr {
     pub on: Expr,
     pub args: ThinVec<Expr>,
@@ -154,13 +180,13 @@ pub struct CallExpr {
 
 #[derive(Clone)]
 pub struct TupleStructExpr {
-    pub path: ModPathWithItem,
+    pub path: PkgPathWithItem,
     pub args: ThinVec<Expr>,
 }
 
 #[derive(Clone)]
 pub struct FieldsStructExpr {
-    pub path: ModPathWithItem,
+    pub path: PkgPathWithItem,
     pub fields: ThinVec<(ASTId, Expr)>,
 }
 

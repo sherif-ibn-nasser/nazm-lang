@@ -7,7 +7,6 @@ use nazmc_lexer::*;
 use std::{io::Write, panic};
 use syntax::File;
 
-pub mod ast;
 mod ast_generator;
 pub(crate) mod parse_methods;
 pub(crate) mod syntax;
@@ -25,7 +24,7 @@ pub fn parse(
     file_content: &str,
     file_lines: &[String],
     lexer_errors: Vec<LexerError>,
-) -> Result<ast::File, String> {
+) -> Result<nazmc_ast::File, String> {
     let mut reporter = ParseErrorsReporter {
         file_path,
         file_lines: &file_lines,
