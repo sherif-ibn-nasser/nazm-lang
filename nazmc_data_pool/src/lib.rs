@@ -6,8 +6,9 @@ use itertools::Itertools;
 pub struct PoolIdx(usize);
 
 impl PoolIdx {
-    pub const MAIN: Self = Self(0);
-    pub const LAMBDA_IMPLICIT_PARAM: Self = Self(1);
+    pub const UNIT: Self = Self(0);
+    pub const MAIN: Self = Self(1);
+    pub const LAMBDA_IMPLICIT_PARAM: Self = Self(2);
 }
 
 mod private {

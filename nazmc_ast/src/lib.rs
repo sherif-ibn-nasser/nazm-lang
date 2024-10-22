@@ -58,7 +58,7 @@ pub enum BindingKind {
 #[derive(Clone)]
 pub enum Type {
     Path(PkgPathWithItem),
-    Unit(Option<Span>),
+    Unit(Span),
     Tuple(ThinVec<Type>, Span),
     Paren(Box<Type>, Span),
     Slice(Box<Type>, Span),
@@ -67,7 +67,7 @@ pub enum Type {
     Ref(Box<Type>, Span),
     PtrMut(Box<Type>, Span),
     RefMut(Box<Type>, Span),
-    Lambda(ThinVec<Type>, Box<Type>),
+    Lambda(ThinVec<Type>, Box<Type>, Span),
 }
 
 #[derive(Clone, Copy)]

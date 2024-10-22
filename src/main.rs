@@ -4,6 +4,7 @@ use nazmc_data_pool::DataPool;
 use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::Span;
 use nazmc_lexer::LexerIter;
+use nazmc_lower_nir::NIRBuilder;
 use nazmc_parser::parse;
 use owo_colors::OwoColorize;
 use serde::Deserialize;
@@ -118,7 +119,10 @@ fn main() {
     let mut diagnostics: Vec<String> = vec![];
     let mut fail_after_parsing = false;
 
-    // Register the main fn id to index 0 and the implicit lambda param name to index 1
+    // Register the unit type name to index 0
+    // main fn id to index 1
+    // the implicit lambda param name to index 2
+    id_pool.get("()");
     id_pool.get("البداية");
     id_pool.get("س");
 
@@ -201,6 +205,14 @@ fn main() {
 
     let mut nrt = resolver.resolve();
 
+    let nir_builder = NIRBuilder::new(
+        &id_pool,
+        packages,
+        packages_names,
+        packages_to_parsed_files,
+        parsed_files,
+        nrt,
+    );
     // let (file_path, file_content) = cli::read_file();
 
     // nazmc_parser::parse_file(&file_path, &file_content, &mut id_pool, &mut str_pool);

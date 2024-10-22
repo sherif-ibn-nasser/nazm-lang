@@ -1,9 +1,9 @@
-use exprs::{Expr, Exprs};
-use nazmc_data_pool::PoolIdx;
-use nazmc_diagnostics::span::Span;
-use stms::{Stm, Stms};
-use thin_vec::ThinVec;
-use types::{Type, Types};
+pub use exprs::*;
+pub use nazmc_data_pool::PoolIdx;
+pub use nazmc_diagnostics::span::Span;
+pub use stms::*;
+pub use thin_vec::ThinVec;
+pub use types::*;
 
 mod exprs;
 mod stms;
@@ -11,8 +11,8 @@ mod types;
 
 #[derive(Default)]
 pub struct NIR {
-    pub imports: ThinVec<ModPathWithItem>,
-    pub star_imports: ThinVec<ModPath>,
+    // pub imports: ThinVec<PkgPathWithItem>,
+    // pub star_imports: ThinVec<PkgPath>,
     pub types: Types,
     pub unit_structs: ThinVec<UnitStruct>,
     pub tuple_structs: ThinVec<TupleStruct>,
@@ -23,14 +23,9 @@ pub struct NIR {
     pub exprs: Exprs,
 }
 
-pub struct ModPath {
-    pub ids: ThinVec<PoolIdx>,
-    pub spans: ThinVec<Span>,
-}
-
-pub struct ModPathWithItem {
-    pub mod_path: ModPath,
-    pub item: NIRId,
+pub struct ItemInPkg {
+    pub pkg_idx: usize,
+    pub id: PoolIdx,
 }
 
 pub struct NIRId {

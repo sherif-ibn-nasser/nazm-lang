@@ -1,4 +1,4 @@
-use crate::{stms::Binding, ConditionalScope, ModPathWithItem, NIRId, Scope};
+use crate::{stms::Binding, ConditionalScope, NIRId, ItemInPkg, Scope};
 use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::{Span, SpanCursor};
 use thin_vec::ThinVec;
@@ -56,10 +56,10 @@ impl ExprKindAndIndex {
 pub struct Exprs {
     pub literals: ThinVec<LiteralExpr>,
     pub parens: ThinVec<ParensExpr>,
-    pub paths: ThinVec<ModPathWithItem>,
+    pub paths: ThinVec<ItemInPkg>,
     pub path_calls: ThinVec<PathCallExpr>,
     pub method_calls: ThinVec<MethodCallExpr>,
-    pub unit_structs: ThinVec<ModPathWithItem>,
+    pub unit_structs: ThinVec<ItemInPkg>,
     pub tuple_structs: ThinVec<TupleStructExpr>,
     pub fields_structs: ThinVec<FieldsStructExpr>,
     pub fields: ThinVec<FieldExpr>,
@@ -103,7 +103,7 @@ pub struct ParensExpr {
 }
 
 pub struct PathCallExpr {
-    pub path: ModPathWithItem,
+    pub path: ItemInPkg,
     pub args: ThinVec<Expr>,
     pub parens_span: Span,
 }
@@ -115,12 +115,12 @@ pub struct MethodCallExpr {
 }
 
 pub struct TupleStructExpr {
-    pub path: ModPathWithItem,
+    pub path: ItemInPkg,
     pub args: ThinVec<Expr>,
 }
 
 pub struct FieldsStructExpr {
-    pub path: ModPathWithItem,
+    pub path: ItemInPkg,
     pub fields: ThinVec<FieldInStructExpr>,
 }
 

@@ -1,6 +1,7 @@
 use crate::*;
 use nazmc_ast;
 use nazmc_data_pool::PoolIdx;
+use nazmc_diagnostics::span;
 use thin_vec::ThinVec;
 
 pub(crate) fn lower_file(file: File) -> nazmc_ast::File {
@@ -204,7 +205,7 @@ fn lower_file_items(file_items: Vec<ParseResult<FileItem>>) -> ThinVec<nazmc_ast
                 let return_type = if let Some(ColonWithType { colon: _, typ }) = f.return_type {
                     lower_type(typ.unwrap())
                 } else {
-                    nazmc_ast::Type::Unit(None)
+                    nazmc_ast::Type::Unit(f.body.as_ref().unwrap().open_curly.span)
                 };
 
                 let body = lower_lambda_as_body(f.body.unwrap());
@@ -336,7 +337,21 @@ fn lower_type(typ: Type) -> nazmc_ast::Type {
             if let Some(lambda_type) = paren_type.lambda {
                 let return_type = Box::new(lower_type(lambda_type.typ.unwrap()));
 
-                nazmc_ast::Type::Lambda(types, return_type)
+                let span = match return_type.as_ref() {
+                    nazmc_ast::Type::Path(pkg_path_with_item) => pkg_path_with_item.item.span,
+                    nazmc_ast::Type::Unit(span) => *span,
+                    nazmc_ast::Type::Tuple(thin_vec, span) => *span,
+                    nazmc_ast::Type::Paren(_, span) => *span,
+                    nazmc_ast::Type::Slice(_, span) => *span,
+                    nazmc_ast::Type::Array(_, expr, span) => *span,
+                    nazmc_ast::Type::Ptr(_, span) => *span,
+                    nazmc_ast::Type::Ref(_, span) => *span,
+                    nazmc_ast::Type::PtrMut(_, span) => *span,
+                    nazmc_ast::Type::RefMut(_, span) => *span,
+                    nazmc_ast::Type::Lambda(thin_vec, _, span) => *span,
+                };
+
+                nazmc_ast::Type::Lambda(types, return_type, span)
             } else {
                 let parens_span = paren_type
                     .tuple
@@ -345,7 +360,7 @@ fn lower_type(typ: Type) -> nazmc_ast::Type {
                     .merged_with(&paren_type.tuple.close_delim.unwrap().span);
 
                 if types.is_empty() {
-                    nazmc_ast::Type::Unit(Some(parens_span))
+                    nazmc_ast::Type::Unit(parens_span)
                 } else if !trailing_comma_in_types && types.len() == 1 {
                     nazmc_ast::Type::Paren(Box::new(types.pop().unwrap()), parens_span)
                 } else {

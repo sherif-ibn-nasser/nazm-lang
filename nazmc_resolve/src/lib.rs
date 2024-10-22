@@ -18,8 +18,8 @@ pub struct ASTItemsCounter {
     pub fns: usize,
 }
 
-#[derive(Clone, Copy)]
-pub struct FileItemKindAndIdx(u64);
+#[derive(Default, Clone, Copy)]
+pub struct FileItemKindAndIdx(pub u64);
 
 impl FileItemKindAndIdx {
     const KIND_BITS: u64 = 4;
@@ -65,8 +65,8 @@ pub struct ResolvedImport {
     pub pkg_idx: usize,
     /// The resolved item
     pub item: ItemInFile,
-    /// The alias of the resolved item
-    pub alias: nazmc_ast::ASTId,
+    /// The span of the resolved item in its file
+    pub span: Span,
 }
 
 pub struct NameResolver<'a> {
@@ -90,7 +90,7 @@ pub struct NameResolutionTree {
     pub packages_to_items: Vec<HashMap<PoolIdx, ItemInFile>>,
     /// Each pkg will have HashMap<usize, Vec<ResolvedImport>>,
     /// which is the map of file idx to its resolved imports
-    pub resolved_imports: Vec<HashMap<usize, Vec<ResolvedImport>>>,
+    pub resolved_imports: Vec<HashMap<usize, HashMap<PoolIdx, ResolvedImport>>>,
     /// Each pkg will have HashMap<usize, Vec<usize>>,
     /// which is the map of file idx to its resolved pkgs indexes
     pub resolved_star_imports: Vec<HashMap<usize, Vec<usize>>>,
@@ -238,13 +238,6 @@ impl<'a> NameResolver<'a> {
     }
 
     fn resolve_imports(&mut self) {
-        for (pkg_idx, parsed_files_in_package) in self.packages_to_parsed_files.iter().enumerate() {
-            for parsed_file_idx in parsed_files_in_package.iter() {
-                self.resolve_file_imports(pkg_idx, *parsed_file_idx);
-                self.resolve_file_star_imports(pkg_idx, *parsed_file_idx);
-            }
-        }
-
         let mut conflicts: HashMap<usize, HashMap<PoolIdx, Vec<Span>>> = HashMap::new();
         //                         ^^^^^          ^^^^^^^  ^^^^^^^^^
         //                         |              |        |
@@ -252,13 +245,17 @@ impl<'a> NameResolver<'a> {
         //                         |              conflicting name
         //                         file idx
 
+        for (pkg_idx, parsed_files_in_package) in self.packages_to_parsed_files.iter().enumerate() {
+            for parsed_file_idx in parsed_files_in_package.iter() {
+                self.resolve_file_imports(pkg_idx, *parsed_file_idx, &mut conflicts);
+                self.resolve_file_star_imports(pkg_idx, *parsed_file_idx);
+            }
+        }
+
         for (pkg_idx, files_in_pkg) in self.nrt.resolved_imports.iter().enumerate() {
             for (parsed_file_idx, resolved_imports) in files_in_pkg.iter() {
-                for resolved_import in resolved_imports {
-                    let alias = &resolved_import.alias;
-
-                    let Some(item_with_same_id) =
-                        self.nrt.packages_to_items[pkg_idx].get(&alias.id)
+                for (alias, resolved_import) in resolved_imports {
+                    let Some(item_with_same_id) = self.nrt.packages_to_items[pkg_idx].get(&alias)
                     else {
                         continue;
                     };
@@ -268,14 +265,14 @@ impl<'a> NameResolver<'a> {
                     conflicts
                         .entry(*parsed_file_idx)
                         .or_default()
-                        .entry(alias.id)
+                        .entry(*alias)
                         .or_insert_with(|| {
                             let first_occurrence_span =
                                 parsed_file.ast.items[item_with_same_id.item_idx].name.span;
 
                             vec![first_occurrence_span]
                         })
-                        .push(alias.span);
+                        .push(resolved_import.span);
                 }
             }
         }
@@ -312,7 +309,12 @@ impl<'a> NameResolver<'a> {
     }
 
     #[inline]
-    fn resolve_file_imports(&mut self, pkg_idx: usize, parsed_file_idx: usize) {
+    fn resolve_file_imports(
+        &mut self,
+        pkg_idx: usize,
+        parsed_file_idx: usize,
+        conflicts: &mut HashMap<usize, HashMap<PoolIdx, Vec<Span>>>,
+    ) {
         let parsed_file = &self.parsed_files[parsed_file_idx];
         for (import, item_alias) in &parsed_file.ast.imports {
             let Some(resolved_package_idx) = self.packages.get(&import.pkg_path.ids) else {
@@ -345,14 +347,27 @@ impl<'a> NameResolver<'a> {
                     resolved_item_ast,
                 );
             } else {
-                self.nrt.resolved_imports[pkg_idx]
+                let imports = self.nrt.resolved_imports[pkg_idx]
                     .entry(parsed_file_idx)
-                    .or_default()
-                    .push(ResolvedImport {
-                        pkg_idx: *resolved_package_idx,
-                        item: *resolved_item,
-                        alias: *item_alias,
-                    });
+                    .or_default();
+
+                if let Some(import_with_same_id) = imports.get(&item_alias.id) {
+                    conflicts
+                        .entry(parsed_file_idx)
+                        .or_default()
+                        .entry(item_alias.id)
+                        .or_insert_with(|| vec![import_with_same_id.span])
+                        .push(item_alias.span);
+                } else {
+                    imports.insert(
+                        item_alias.id,
+                        ResolvedImport {
+                            pkg_idx: *resolved_package_idx,
+                            item: *resolved_item,
+                            span: item_alias.span,
+                        },
+                    );
+                }
             }
         }
     }
