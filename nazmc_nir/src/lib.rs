@@ -1,5 +1,5 @@
 pub use exprs::*;
-pub use nazmc_data_pool::PoolIdx;
+use nazmc_data_pool::IdKey;
 pub use nazmc_diagnostics::span::Span;
 pub use stms::*;
 pub use thin_vec::ThinVec;
@@ -25,12 +25,12 @@ pub struct NIR {
 
 pub struct ItemInPkg {
     pub pkg_idx: usize,
-    pub id: PoolIdx,
+    pub id: IdKey,
 }
 
 pub struct NIRId {
     pub span: Span,
-    pub id: PoolIdx,
+    pub id: IdKey,
 }
 
 pub enum VisModifier {

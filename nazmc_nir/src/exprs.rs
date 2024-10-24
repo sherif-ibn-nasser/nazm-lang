@@ -1,5 +1,5 @@
 use crate::{stms::Binding, ConditionalScope, ItemInPkg, NIRId, Scope};
-use nazmc_data_pool::PoolIdx;
+use nazmc_data_pool::StrKey;
 use nazmc_diagnostics::span::{Span, SpanCursor};
 use thin_vec::ThinVec;
 
@@ -79,7 +79,7 @@ pub struct Exprs {
 }
 
 pub enum LiteralExpr {
-    Str(PoolIdx),
+    Str(StrKey),
     Char(char),
     Bool(bool),
     Num(NumKind),

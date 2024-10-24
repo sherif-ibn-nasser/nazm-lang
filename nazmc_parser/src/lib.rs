@@ -1,5 +1,6 @@
 use ast_generator::ASTGenerator;
 use error::*;
+use nazmc_data_pool::{IdKey, IdPool};
 use nazmc_diagnostics::{
     file_info::FileInfo, fmt_diagnostics, span::SpanCursor, CodeWindow, Diagnostic,
 };
@@ -25,6 +26,7 @@ pub fn parse(
     lexer_errors: Vec<LexerError>,
     ast: &mut nazmc_ast::AST,
     name_conflicts: &mut NameConflicts,
+    lambda_implicit_param_key: IdKey,
     pkg_idx: usize,
     file_idx: usize,
 ) -> Result<(), String> {
@@ -51,6 +53,7 @@ pub fn parse(
             file_idx,
             ast,
             name_conflicts,
+            lambda_implicit_param_key,
         }
         .lower_file(file);
 

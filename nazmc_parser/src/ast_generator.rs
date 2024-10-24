@@ -1,9 +1,9 @@
 use crate::*;
-use nazmc_data_pool::PoolIdx;
+use nazmc_data_pool::IdKey;
 use std::collections::HashMap;
 use thin_vec::ThinVec;
 
-pub type NameConflicts = HashMap<usize, HashMap<PoolIdx, HashMap<usize, Vec<Span>>>>;
+pub type NameConflicts = HashMap<usize, HashMap<IdKey, HashMap<usize, Vec<Span>>>>;
 //                               ^^^^^          ^^^^^^^          ^^^^^      ^^^^ spans found in each file
 //                               |              |                |
 //                               |              |                file idx: All conflicts in a file that belong to the same pkg
@@ -15,6 +15,7 @@ pub(crate) struct ASTGenerator<'a> {
     pub(crate) file_idx: usize,
     pub(crate) ast: &'a mut nazmc_ast::AST,
     pub(crate) name_conflicts: &'a mut NameConflicts,
+    pub(crate) lambda_implicit_param_key: IdKey,
 }
 
 impl<'a> ASTGenerator<'a> {
@@ -238,7 +239,7 @@ impl<'a> ASTGenerator<'a> {
         }
     }
 
-    fn check_if_name_conflicts(&mut self, id: PoolIdx, id_span: Span) -> bool {
+    fn check_if_name_conflicts(&mut self, id: IdKey, id_span: Span) -> bool {
         let Some(item_with_same_id) = self.ast.pkgs_to_items[self.pkg_idx].get(&id) else {
             return false;
         };
@@ -1182,7 +1183,7 @@ impl<'a> ASTGenerator<'a> {
             params.push(nazmc_ast::Binding {
                 kind: nazmc_ast::BindingKind::Id(nazmc_ast::ASTId {
                     span: lambda_expr.open_curly.span,
-                    id: PoolIdx::LAMBDA_IMPLICIT_PARAM,
+                    id: self.lambda_implicit_param_key,
                 }),
                 typ: None,
             });

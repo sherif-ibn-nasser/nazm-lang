@@ -1,6 +1,5 @@
 use super::*;
-use nazmc_ast::NumKind;
-use nazmc_data_pool::PoolIdx;
+use nazmc_data_pool::IdKey;
 use paste::paste;
 use std::fmt::Debug;
 
@@ -141,7 +140,7 @@ create_symbol_parser!(Hash);
 
 #[derive(Debug)]
 pub(crate) struct IdToken {
-    pub(crate) val: PoolIdx,
+    pub(crate) val: IdKey,
 }
 
 #[derive(Debug)]

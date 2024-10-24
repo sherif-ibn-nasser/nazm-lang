@@ -1,5 +1,4 @@
 use crate::{Expr, ItemInPkg};
-use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::Span;
 use thin_vec::ThinVec;
 
@@ -19,10 +18,10 @@ impl Default for Types {
     fn default() -> Self {
         let mut paths = ThinVec::default();
 
-        paths.push(ItemInPkg {
-            pkg_idx: 0,
-            id: PoolIdx::UNIT,
-        });
+        // paths.push(ItemInPkg {
+        //     pkg_idx: 0,
+        //     id: PoolIdx::UNIT,
+        // });
 
         Self {
             paths,

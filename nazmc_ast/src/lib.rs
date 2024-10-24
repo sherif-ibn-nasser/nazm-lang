@@ -1,5 +1,5 @@
 pub use item::Item;
-use nazmc_data_pool::PoolIdx;
+use nazmc_data_pool::{IdKey, StrKey};
 use nazmc_diagnostics::span::{Span, SpanCursor};
 use std::collections::HashMap;
 use thin_vec::ThinVec;
@@ -8,7 +8,7 @@ mod item;
 #[derive(Default)]
 pub struct AST {
     /// The list of maps of items names and their kind, visibility and index
-    pub pkgs_to_items: ThinVec<HashMap<PoolIdx, Item>>,
+    pub pkgs_to_items: ThinVec<HashMap<IdKey, Item>>,
     /// The list of imports stms for each file
     pub imports: ThinVec<ThinVec<ImportStm>>,
     /// The list of star imports for each file
@@ -40,7 +40,7 @@ pub struct PkgPath {
     /// The file idx where this path is located
     pub file_idx: usize,
     /// The segmentes of the path
-    pub ids: ThinVec<PoolIdx>,
+    pub ids: ThinVec<IdKey>,
     /// The spans of the segments of the path
     pub spans: ThinVec<Span>,
 }
@@ -59,7 +59,7 @@ pub struct ImportStm {
 #[derive(Clone, Copy)]
 pub struct ASTId {
     pub span: Span,
-    pub id: PoolIdx,
+    pub id: IdKey,
 }
 
 #[derive(Clone)]
@@ -184,7 +184,7 @@ pub enum ExprKind {
 
 #[derive(Clone, Copy)]
 pub enum LiteralExpr {
-    Str(PoolIdx),
+    Str(StrKey),
     Char(char),
     Bool(bool),
     Num(NumKind),

@@ -1,6 +1,6 @@
 mod cli;
 use cli::print_err;
-use nazmc_data_pool::DataPool;
+use nazmc_data_pool::{IdPool, StrPool};
 use nazmc_diagnostics::file_info::FileInfo;
 use nazmc_lexer::LexerIter;
 use nazmc_parser::parse;
@@ -109,8 +109,8 @@ fn main() {
     io::stderr().write_all(output).unwrap();
 
     let files_paths = get_file_paths();
-    let mut id_pool = DataPool::new();
-    let mut str_pool = DataPool::new();
+    let mut id_pool = IdPool::with_key();
+    let mut str_pool = StrPool::with_key();
     let mut pkgs = HashMap::new();
     let mut files_infos = vec![];
     let mut ast = nazmc_ast::AST::default();
@@ -121,9 +121,9 @@ fn main() {
     // Register the unit type name to index 0
     // main fn id to index 1
     // the implicit lambda param name to index 2
-    id_pool.get("()");
-    id_pool.get("البداية");
-    id_pool.get("س");
+    id_pool.insert("()".to_string());
+    id_pool.insert("البداية".to_string());
+    let implicit_lambda_param = id_pool.insert("س".to_string());
 
     files_paths
         .into_iter()
@@ -131,7 +131,7 @@ fn main() {
         .for_each(|(file_idx, file_path)| {
             let mut pkg_path = file_path
                 .split_terminator('/')
-                .map(|s| id_pool.get(s))
+                .map(|s| id_pool.insert(s.to_string()))
                 .collect::<ThinVec<_>>();
 
             pkg_path.pop(); // remove the actual file
@@ -163,6 +163,7 @@ fn main() {
                 lexer_errors,
                 &mut ast,
                 &mut name_conflicts,
+                implicit_lambda_param,
                 pkg_idx,
                 file_idx,
             ) {
@@ -192,9 +193,6 @@ fn main() {
         }
         exit(1)
     }
-
-    let id_pool = id_pool.build();
-    let str_pool = str_pool.build();
 
     let mut pkgs_names = ThinVec::with_capacity(pkgs.len());
     for (pkg, idx) in &pkgs {
