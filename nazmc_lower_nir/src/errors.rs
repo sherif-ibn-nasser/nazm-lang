@@ -7,7 +7,7 @@ pub(crate) struct NIRBuilderErrors {
     pkg_paths_errs: Vec<PkgPathErr>,
     unresolved_item_errs: Vec<UnresolvedItemErr>,
     encapsulation_errs: Vec<EncapsulationErr>,
-    path_struct_is_expected: Vec<StructIsExpectedInPathErr>,
+    wrong_file_item_found: Vec<WrongFileItemFoundErr>,
 }
 
 impl NIRBuilderErrors {
@@ -46,18 +46,17 @@ impl NIRBuilderErrors {
         });
     }
 
-    pub(crate) fn report_struct_is_expected_in_path(
+    pub(crate) fn report_wrong_file_item_found_err(
         &mut self,
         file_idx: usize,
         span: Span,
-        found_type: u64,
+        found_kind: u64,
     ) {
-        self.path_struct_is_expected
-            .push(StructIsExpectedInPathErr {
-                file_idx,
-                span,
-                found_type,
-            });
+        self.wrong_file_item_found.push(WrongFileItemFoundErr {
+            file_idx,
+            span,
+            found_kind,
+        });
     }
 }
 
@@ -81,8 +80,8 @@ pub(crate) struct EncapsulationErr {
     span: Span,
 }
 
-pub(crate) struct StructIsExpectedInPathErr {
+pub(crate) struct WrongFileItemFoundErr {
     file_idx: usize,
     span: Span,
-    found_type: u64,
+    found_kind: u64,
 }

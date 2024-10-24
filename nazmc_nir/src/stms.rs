@@ -1,4 +1,3 @@
-use nazmc_diagnostics::span::Span;
 use thin_vec::ThinVec;
 
 use crate::{
@@ -14,7 +13,6 @@ pub struct Stm {
 #[derive(Default)]
 pub struct Stms {
     pub lets: ThinVec<LetStm>,
-    pub let_muts: ThinVec<LetStm>,
     pub ifs: ThinVec<IfExpr>,
     pub whiles: ThinVec<ConditionalScope>,
     pub exprs: ThinVec<Expr>,
@@ -27,10 +25,11 @@ pub struct LetStm {
 
 pub struct Binding {
     pub kind: BindingKind,
-    pub typ: Type,
+    pub typ: Option<Type>,
 }
 
 pub enum BindingKind {
-    Name(NIRId),
-    TupleDestruction(ThinVec<Binding>, Span),
+    Id(NIRId),
+    MutId(NIRId),
+    CompilerId,
 }

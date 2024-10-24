@@ -1,7 +1,6 @@
 use crate::*;
 use nazmc_ast;
 use nazmc_data_pool::PoolIdx;
-use nazmc_diagnostics::span;
 use thin_vec::ThinVec;
 
 pub(crate) fn lower_file(file: File) -> nazmc_ast::File {
@@ -340,15 +339,15 @@ fn lower_type(typ: Type) -> nazmc_ast::Type {
                 let span = match return_type.as_ref() {
                     nazmc_ast::Type::Path(pkg_path_with_item) => pkg_path_with_item.item.span,
                     nazmc_ast::Type::Unit(span) => *span,
-                    nazmc_ast::Type::Tuple(thin_vec, span) => *span,
+                    nazmc_ast::Type::Tuple(_, span) => *span,
                     nazmc_ast::Type::Paren(_, span) => *span,
                     nazmc_ast::Type::Slice(_, span) => *span,
-                    nazmc_ast::Type::Array(_, expr, span) => *span,
+                    nazmc_ast::Type::Array(.., span) => *span,
                     nazmc_ast::Type::Ptr(_, span) => *span,
                     nazmc_ast::Type::Ref(_, span) => *span,
                     nazmc_ast::Type::PtrMut(_, span) => *span,
                     nazmc_ast::Type::RefMut(_, span) => *span,
-                    nazmc_ast::Type::Lambda(thin_vec, _, span) => *span,
+                    nazmc_ast::Type::Lambda(_, _, span) => *span,
                 };
 
                 nazmc_ast::Type::Lambda(types, return_type, span)
@@ -428,13 +427,9 @@ fn lower_lambda_stms_and_return_expr(
                     .let_assign
                     .map(|a| Box::new(lower_expr(a.expr.unwrap())));
 
-                let let_stm_ = Box::new(nazmc_ast::LetStm { binding, assign });
+                let let_stm = Box::new(nazmc_ast::LetStm { binding, assign });
 
-                if let_stm.mut_keyword.is_some() {
-                    nazmc_ast::Stm::LetMut(let_stm_)
-                } else {
-                    nazmc_ast::Stm::Let(let_stm_)
-                }
+                nazmc_ast::Stm::Let(let_stm)
             }
             Stm::While(while_stm) => nazmc_ast::Stm::While(Box::new((
                 lower_expr(while_stm.conditional_block.condition.unwrap()),
@@ -469,6 +464,13 @@ fn lower_binding_kind(kind: BindingKind) -> nazmc_ast::BindingKind {
             span: id.span,
             id: id.data.val,
         }),
+        BindingKind::MutId(mut_id) => nazmc_ast::BindingKind::MutId {
+            id: nazmc_ast::ASTId {
+                span: mut_id.id.as_ref().unwrap().span,
+                id: mut_id.id.unwrap().data.val,
+            },
+            mut_span: mut_id.mut_keyword.span,
+        },
         BindingKind::Destructed(destructed_tuple) => {
             let span = destructed_tuple
                 .open_delim
@@ -656,19 +658,31 @@ fn lower_inner_access_expr(
     inner_access_exprs: Vec<InnerAccessExpr>,
 ) -> nazmc_ast::Expr {
     for inner_access_expr in inner_access_exprs {
-        let name = inner_access_expr.inner.unwrap();
+        let field = inner_access_expr.field.unwrap();
 
-        let name = nazmc_ast::ASTId {
-            span: name.span,
-            id: name.data.val,
+        let expr = match field {
+            InnerAccessField::Id(id) => {
+                let name = nazmc_ast::ASTId {
+                    span: id.span,
+                    id: id.data.val,
+                };
+
+                nazmc_ast::Expr {
+                    span: on.span.merged_with(&name.span),
+                    kind: nazmc_ast::ExprKind::Field(Box::new(nazmc_ast::FieldExpr { on, name })),
+                }
+            }
+            InnerAccessField::TupleIdx(idx) => nazmc_ast::Expr {
+                span: on.span.merged_with(&idx.span),
+                kind: nazmc_ast::ExprKind::TupleIdx(Box::new(nazmc_ast::TupleIdxExpr {
+                    on,
+                    idx: idx.data,
+                    idx_span: idx.span,
+                })),
+            },
         };
 
-        let field_expr = nazmc_ast::Expr {
-            span: on.span.merged_with(&name.span),
-            kind: nazmc_ast::ExprKind::Field(Box::new(nazmc_ast::FieldExpr { on, name })),
-        };
-
-        on = lower_post_ops_exprs(field_expr, inner_access_expr.post_ops);
+        on = lower_post_ops_exprs(expr, inner_access_expr.post_ops);
     }
     on
 }
@@ -743,15 +757,15 @@ fn lower_post_ops_exprs(mut on: nazmc_ast::Expr, ops: Vec<PostOpExpr>) -> nazmc_
 
                 let index = lower_expr(idx_expr.expr.unwrap());
 
-                let index = nazmc_ast::IndexExpr {
+                let index = nazmc_ast::IdxExpr {
                     on,
-                    index,
+                    idx: index,
                     brackets_span,
                 };
 
                 on = nazmc_ast::Expr {
                     span,
-                    kind: nazmc_ast::ExprKind::Index(Box::new(index)),
+                    kind: nazmc_ast::ExprKind::Idx(Box::new(index)),
                 };
             }
         }

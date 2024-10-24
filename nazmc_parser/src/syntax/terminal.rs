@@ -1,4 +1,5 @@
 use super::*;
+use nazmc_ast::NumKind;
 use nazmc_data_pool::PoolIdx;
 use paste::paste;
 use std::fmt::Debug;
@@ -31,7 +32,7 @@ macro_rules! create_keyword_parser {
 
             pub(crate) type [<$keyword Keyword>] = Terminal<[<$keyword KeywordToken>]>;
 
-            impl NazmcParse for ParseResult<Terminal<[<$keyword KeywordToken>]>>{
+            impl NazmcParse for ParseResult<[<$keyword Keyword>]>{
 
                 fn parse(iter: &mut TokensIter) -> Self {
 
@@ -68,7 +69,7 @@ macro_rules! create_symbol_parser {
 
             pub(crate) type [<$symbol Symbol>] = Terminal<[<$symbol SymbolToken>]>;
 
-            impl NazmcParse for ParseResult<Terminal<[<$symbol SymbolToken>]>>{
+            impl NazmcParse for ParseResult<[<$symbol Symbol>]>{
 
                 fn parse(iter: &mut TokensIter) -> Self {
 
@@ -218,6 +219,7 @@ impl private::Sealed for UnaryOpToken {}
 impl private::Sealed for LiteralKind {}
 impl private::Sealed for VisModifierToken {}
 impl private::Sealed for EOFToken {}
+impl private::Sealed for usize {}
 
 impl TerminalGuard for IdToken {}
 impl TerminalGuard for DoubleColonsSymbolToken {}
@@ -227,6 +229,7 @@ impl TerminalGuard for UnaryOpToken {}
 impl TerminalGuard for LiteralKind {}
 impl TerminalGuard for VisModifierToken {}
 impl TerminalGuard for EOFToken {}
+impl TerminalGuard for usize {}
 
 pub(crate) type Id = Terminal<IdToken>;
 pub(crate) type DoubleColonsSymbol = Terminal<DoubleColonsSymbolToken>;
@@ -236,6 +239,7 @@ pub(crate) type UnaryOp = Terminal<UnaryOpToken>;
 pub(crate) type LiteralExpr = Terminal<LiteralKind>;
 pub(crate) type VisModifier = Terminal<VisModifierToken>;
 pub(crate) type Eof = Terminal<EOFToken>;
+pub(crate) type TupleIdx = Terminal<usize>;
 
 macro_rules! match_peek_symbols {
     ($iter:ident, $symbol0:ident, $symbol1:ident, $symbol2:ident) => {
@@ -260,7 +264,7 @@ macro_rules! match_peek_symbols {
     };
 }
 
-impl NazmcParse for ParseResult<Terminal<IdToken>> {
+impl NazmcParse for ParseResult<Id> {
     fn parse(iter: &mut TokensIter) -> Self {
         match iter.recent() {
             Some(Token {
@@ -591,6 +595,32 @@ impl NazmcParse for ParseResult<Eof> {
     }
 }
 
+impl NazmcParse for ParseResult<TupleIdx> {
+    fn parse(iter: &mut TokensIter) -> Self {
+        match iter.recent() {
+            Some(Token {
+                span,
+                kind:
+                    TokenKind::Literal(LiteralKind::Num(nazmc_lexer::NumKind::UnspecifiedInt(int))),
+                start_byte,
+                end_byte,
+            }) if iter.content[*start_byte..*end_byte]
+                .chars()
+                .all(|c| c.is_ascii_digit()) =>
+            {
+                Ok(Terminal {
+                    span: *span,
+                    data: *int as usize,
+                })
+            }
+            Some(_) => Err(ParseErr {
+                found_token_index: iter.peek_idx - 1,
+            }),
+            None => ParseErr::eof(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -606,7 +636,7 @@ mod tests {
         let lexer = LexerIter::new(content, &mut id_pool, &mut str_pool);
 
         let (tokens, ..) = lexer.collect_all();
-        let mut iter = TokensIter::new(&tokens);
+        let mut iter = TokensIter::new(&tokens, &content);
         iter.next(); // Initialize the value of recent
 
         let _fn = ParseResult::<FnKeyword>::parse(&mut iter);
@@ -632,7 +662,7 @@ mod tests {
         let lexer = LexerIter::new(content, &mut id_pool, &mut str_pool);
 
         let (tokens, ..) = lexer.collect_all();
-        let mut iter = TokensIter::new(&tokens);
+        let mut iter = TokensIter::new(&tokens, &content);
         iter.next(); // Initialize the value of recent
 
         let _fn = ParseResult::<FnKeyword>::parse(&mut iter);

@@ -1,10 +1,10 @@
-use crate::{stms::Binding, ConditionalScope, NIRId, ItemInPkg, Scope};
+use crate::{stms::Binding, ConditionalScope, ItemInPkg, NIRId, Scope};
 use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::{Span, SpanCursor};
 use thin_vec::ThinVec;
 
 pub struct Expr {
-    pub kind_and_index: ExprKindAndIndex,
+    pub kind_and_idx: ExprKindAndIndex,
     pub span: Span,
 }
 
@@ -19,22 +19,27 @@ impl ExprKindAndIndex {
     // Possible kinds
     pub const UNIT: u64 = 0 << Self::KIND_SHIFT;
     pub const LITERAL: u64 = 1 << Self::KIND_SHIFT;
-    pub const PARENS: u64 = 2 << Self::KIND_SHIFT;
-    pub const PATH_CALL: u64 = 3 << Self::KIND_SHIFT;
-    pub const METHOD_CALL: u64 = 4 << Self::KIND_SHIFT;
+    pub const LOCAL_VAR: u64 = 2 << Self::KIND_SHIFT;
+    pub const PATH: u64 = 3 << Self::KIND_SHIFT;
+    pub const CALL: u64 = 4 << Self::KIND_SHIFT;
     pub const UNIT_STRUCT: u64 = 5 << Self::KIND_SHIFT;
     pub const TUPLE_STRUCT: u64 = 6 << Self::KIND_SHIFT;
     pub const FIELDS_STRUCT: u64 = 7 << Self::KIND_SHIFT;
     pub const FIELD: u64 = 8 << Self::KIND_SHIFT;
     pub const INDEX: u64 = 9 << Self::KIND_SHIFT;
-    pub const ARRAY_ELEMENTS: u64 = 10 << Self::KIND_SHIFT;
-    pub const ARRAY_ELEMENTS_SIZED: u64 = 11 << Self::KIND_SHIFT;
-    pub const TUPLE_EXPR: u64 = 12 << Self::KIND_SHIFT;
-    pub const RETURN_WITH_VALUE: u64 = 13 << Self::KIND_SHIFT;
-    pub const IF_EXPR: u64 = 14 << Self::KIND_SHIFT;
-    pub const LAMBDA_EXPR: u64 = 15 << Self::KIND_SHIFT;
-    pub const UNARY_EXPR: u64 = 16 << Self::KIND_SHIFT;
-    pub const BIN_EXPR: u64 = 17 << Self::KIND_SHIFT;
+    pub const TUPLE_INDEX: u64 = 10 << Self::KIND_SHIFT;
+    pub const ARRAY_ELEMENTS: u64 = 11 << Self::KIND_SHIFT;
+    pub const ARRAY_ELEMENTS_SIZED: u64 = 12 << Self::KIND_SHIFT;
+    pub const TUPLE: u64 = 13 << Self::KIND_SHIFT;
+    pub const RETURN_WITH_VALUE: u64 = 14 << Self::KIND_SHIFT;
+    pub const IF_EXPR: u64 = 15 << Self::KIND_SHIFT;
+    pub const LAMBDA_EXPR: u64 = 16 << Self::KIND_SHIFT;
+    pub const UNARY_EXPR: u64 = 17 << Self::KIND_SHIFT;
+    pub const BIN_EXPR: u64 = 18 << Self::KIND_SHIFT;
+    pub const ON: u64 = 19 << Self::KIND_SHIFT;
+    pub const BREAK: u64 = 20 << Self::KIND_SHIFT;
+    pub const CONTINUE: u64 = 21 << Self::KIND_SHIFT;
+    pub const RETURN: u64 = 22 << Self::KIND_SHIFT;
 
     // Create a new encoded value for a given kind and index
     pub fn new(kind: u64, index: usize) -> Self {
@@ -55,15 +60,14 @@ impl ExprKindAndIndex {
 #[derive(Default)]
 pub struct Exprs {
     pub literals: ThinVec<LiteralExpr>,
-    pub parens: ThinVec<ParensExpr>,
     pub paths: ThinVec<ItemInPkg>,
-    pub path_calls: ThinVec<PathCallExpr>,
-    pub method_calls: ThinVec<MethodCallExpr>,
+    pub calls: ThinVec<CallExpr>,
     pub unit_structs: ThinVec<ItemInPkg>,
     pub tuple_structs: ThinVec<TupleStructExpr>,
     pub fields_structs: ThinVec<FieldsStructExpr>,
     pub fields: ThinVec<FieldExpr>,
     pub indexes: ThinVec<IndexExpr>,
+    pub tuple_indexes: ThinVec<TupleIndexExpr>,
     pub array_elements: ThinVec<ArrayElementsExpr>,
     pub array_elements_sized: ThinVec<ArrayElementsSizedExpr>,
     pub tuples: ThinVec<TupleExpr>,
@@ -98,17 +102,7 @@ pub enum NumKind {
     UnspecifiedFloat(f64),
 }
 
-pub struct ParensExpr {
-    pub expr: Expr,
-}
-
-pub struct PathCallExpr {
-    pub path: ItemInPkg,
-    pub args: ThinVec<Expr>,
-    pub parens_span: Span,
-}
-
-pub struct MethodCallExpr {
+pub struct CallExpr {
     pub on: Expr,
     pub args: ThinVec<Expr>,
     pub parens_span: Span,
@@ -138,6 +132,12 @@ pub struct IndexExpr {
     pub on: Expr,
     pub idx: Expr,
     pub brackets_span: Span,
+}
+
+pub struct TupleIndexExpr {
+    pub on: Expr,
+    pub idx: usize,
+    pub idx_span: Span,
 }
 
 pub struct ArrayElementsExpr {

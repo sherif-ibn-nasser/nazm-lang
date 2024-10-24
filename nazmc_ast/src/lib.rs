@@ -52,6 +52,7 @@ pub struct Binding {
 #[derive(Clone)]
 pub enum BindingKind {
     Id(ASTId),
+    MutId { id: ASTId, mut_span: Span },
     Tuple(ThinVec<BindingKind>, Span),
 }
 
@@ -103,7 +104,6 @@ pub struct Scope {
 #[derive(Clone)]
 pub enum Stm {
     Let(Box<LetStm>),
-    LetMut(Box<LetStm>),
     While(Box<(Expr, Scope)>),
     If(Box<IfExpr>),
     Expr(Box<Expr>),
@@ -131,7 +131,8 @@ pub enum ExprKind {
     TupleStruct(Box<TupleStructExpr>),
     FieldsStruct(Box<FieldsStructExpr>),
     Field(Box<FieldExpr>),
-    Index(Box<IndexExpr>),
+    Idx(Box<IdxExpr>),
+    TupleIdx(Box<TupleIdxExpr>),
     Tuple(ThinVec<Expr>),
     ArrayElemnts(ThinVec<Expr>),
     ArrayElemntsSized(Box<ArrayElementsSizedExpr>),
@@ -145,7 +146,7 @@ pub enum ExprKind {
     On,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum LiteralExpr {
     Str(PoolIdx),
     Char(char),
@@ -153,7 +154,7 @@ pub enum LiteralExpr {
     Num(NumKind),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum NumKind {
     F4(f32),
     F8(f64),
@@ -197,9 +198,16 @@ pub struct FieldExpr {
 }
 
 #[derive(Clone)]
-pub struct IndexExpr {
+pub struct TupleIdxExpr {
     pub on: Expr,
-    pub index: Expr,
+    pub idx: usize,
+    pub idx_span: Span,
+}
+
+#[derive(Clone)]
+pub struct IdxExpr {
+    pub on: Expr,
+    pub idx: Expr,
     pub brackets_span: Span,
 }
 

@@ -39,13 +39,13 @@ impl Default for Types {
 }
 
 pub struct Type {
-    pub kind_and_idx: TypeKind,
+    pub kind_and_idx: TypeKindAndIndex,
     pub span: Span,
 }
 
-pub struct TypeKind(u64);
+pub struct TypeKindAndIndex(u64);
 
-impl TypeKind {
+impl TypeKindAndIndex {
     const KIND_BITS: u64 = 4;
     const KIND_SHIFT: u64 = 64 - Self::KIND_BITS;
     const KIND_MASK: u64 = 0b11 << Self::KIND_SHIFT;

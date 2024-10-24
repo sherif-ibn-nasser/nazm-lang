@@ -35,7 +35,7 @@ pub fn parse(
 
     reporter.report_lexer_errors(&lexer_errors);
 
-    let mut tokens_iter = TokensIter::new(&tokens);
+    let mut tokens_iter = TokensIter::new(&tokens, &file_content);
 
     tokens_iter.next_non_space_or_comment(); // To init recent()
 
@@ -712,6 +712,7 @@ impl<'a> ParseErrorsReporter<'a> {
                     }) => {
                         let first_span = match &first.kind {
                             BindingKind::Id(terminal) => terminal.span,
+                            BindingKind::MutId(mut_id_binding) => mut_id_binding.mut_keyword.span,
                             BindingKind::Destructed(destructed_tuple) => {
                                 destructed_tuple.open_delim.span
                             }
@@ -726,6 +727,10 @@ impl<'a> ParseErrorsReporter<'a> {
                         } else if !rest.is_empty() {
                             match &rest[rest.len() - 1].item.kind {
                                 BindingKind::Id(terminal) => terminal.span.end,
+                                BindingKind::MutId(mut_id_binding) => match &mut_id_binding.id {
+                                    Ok(id) => id.span.end,
+                                    Err(_) => mut_id_binding.mut_keyword.span.end,
+                                },
                                 BindingKind::Destructed(destructed_tuple) => {
                                     destructed_tuple.open_delim.span.end
                                 }
@@ -825,6 +830,12 @@ impl<'a> ParseErrorsReporter<'a> {
     }
 
     fn check_binding_kind(&mut self, binding_kind: &BindingKind) {
+        if let BindingKind::MutId(MutIdBinding { mut_keyword: _, id }) = binding_kind {
+            if let Err(err) = id {
+                self.report_expected("مُعرِّف", err, vec![]);
+                return;
+            }
+        }
         if let BindingKind::Destructed(destructed_tuple) = binding_kind {
             if let Some(PunctuatedBindingKind {
                 first_item,
@@ -867,7 +878,6 @@ impl<'a> ParseErrorsReporter<'a> {
                     Stm::Semicolon(_) => {}
                     Stm::Let(LetStm {
                         let_keyword: _,
-                        mut_keyword: _,
                         binding,
                         let_assign,
                         semicolon,
@@ -991,11 +1001,11 @@ impl<'a> ParseErrorsReporter<'a> {
 
         for InnerAccessExpr {
             dot: _,
-            inner,
+            field,
             post_ops,
         } in &expr.inner_access
         {
-            if let Err(err) = inner {
+            if let Err(err) = field {
                 self.report_expected("مُعرِّف", err, vec![]);
             }
 

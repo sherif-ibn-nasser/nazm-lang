@@ -22,7 +22,7 @@ pub struct ASTItemsCounter {
 pub struct FileItemKindAndIdx(pub u64);
 
 impl FileItemKindAndIdx {
-    const KIND_BITS: u64 = 4;
+    const KIND_BITS: u64 = 5;
     const KIND_SHIFT: u64 = 64 - Self::KIND_BITS;
     const KIND_MASK: u64 = 0b11 << Self::KIND_SHIFT;
     const INDEX_MASK: u64 = !Self::KIND_MASK;
@@ -32,6 +32,8 @@ impl FileItemKindAndIdx {
     pub const TUPLE_STRUCT: u64 = 1 << Self::KIND_SHIFT;
     pub const FIELDS_STRUCT: u64 = 2 << Self::KIND_SHIFT;
     pub const FN: u64 = 3 << Self::KIND_SHIFT;
+    pub const CONST: u64 = 4 << Self::KIND_SHIFT;
+    pub const STATIC: u64 = 5 << Self::KIND_SHIFT;
 
     // Create a new encoded value for a given kind and index
     pub fn new(kind: u64, index: usize) -> Self {
