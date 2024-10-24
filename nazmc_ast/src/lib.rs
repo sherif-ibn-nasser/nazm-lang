@@ -1,40 +1,59 @@
+pub use item::Item;
 use nazmc_data_pool::PoolIdx;
 use nazmc_diagnostics::span::{Span, SpanCursor};
+use std::collections::HashMap;
 use thin_vec::ThinVec;
+mod item;
 
-#[derive(Clone)]
-pub struct File {
-    /// The imports and the aliases of them
-    pub imports: ThinVec<(PkgPathWithItem, ASTId)>,
-    pub star_imports: ThinVec<PkgPath>,
-    pub items: ThinVec<Item>,
-}
-
-#[derive(Clone)]
-pub struct Item {
-    pub name: ASTId,
-    pub vis: VisModifier,
-    pub kind: ItemKind,
-}
-
-#[derive(Clone)]
-pub enum ItemKind {
-    UnitStruct,
-    TupleStruct(TupleStruct),
-    FieldsStruct(FieldsStruct),
-    Fn(Fn),
+#[derive(Default)]
+pub struct AST {
+    /// The list of maps of items names and their kind, visibility and index
+    pub pkgs_to_items: ThinVec<HashMap<PoolIdx, Item>>,
+    /// The list of imports stms for each file
+    pub imports: ThinVec<ThinVec<ImportStm>>,
+    /// The list of star imports for each file
+    pub star_imports: ThinVec<ThinVec<PkgPath>>,
+    /// The list of all types paths
+    pub types_paths: ThinVec<ItemPath>,
+    /// The list of all unit struct expressions paths
+    pub unit_structs_paths_exprs: ThinVec<ItemPath>,
+    /// The list of all tuple struct expressions paths
+    pub tuple_structs_paths_exprs: ThinVec<ItemPath>,
+    /// The list of all fields struct expressions paths
+    pub field_structs_paths_exprs: ThinVec<ItemPath>,
+    /// The list of all paths expressions
+    pub paths_exprs: ThinVec<ItemPath>,
+    /// All unit structs
+    pub unit_structs: ThinVec<UnitStruct>,
+    /// All tuple structs
+    pub tuple_structs: ThinVec<TupleStruct>,
+    /// All fields structs
+    pub fields_structs: ThinVec<FieldsStruct>,
+    /// All fns
+    pub fns: ThinVec<Fn>,
 }
 
 #[derive(Clone)]
 pub struct PkgPath {
+    /// The pkg idx where this path is located
+    pub pkg_idx: usize,
+    /// The file idx where this path is located
+    pub file_idx: usize,
+    /// The segmentes of the path
     pub ids: ThinVec<PoolIdx>,
+    /// The spans of the segments of the path
     pub spans: ThinVec<Span>,
 }
 
 #[derive(Clone)]
-pub struct PkgPathWithItem {
+pub struct ItemPath {
     pub pkg_path: PkgPath,
     pub item: ASTId,
+}
+
+pub struct ImportStm {
+    pub item_path: ItemPath,
+    pub alias: ASTId,
 }
 
 #[derive(Clone, Copy)]
@@ -58,7 +77,8 @@ pub enum BindingKind {
 
 #[derive(Clone)]
 pub enum Type {
-    Path(PkgPathWithItem),
+    /// Holds the ItemPath index in `AST::types_paths`
+    Path(usize),
     Unit(Span),
     Tuple(ThinVec<Type>, Span),
     Paren(Box<Type>, Span),
@@ -78,18 +98,32 @@ pub enum VisModifier {
     Private,
 }
 
+#[derive(Clone, Copy)]
+pub struct ItemInfo {
+    pub file_idx: usize,
+    pub id_span: Span,
+}
+
+#[derive(Clone)]
+pub struct UnitStruct {
+    pub info: ItemInfo,
+}
+
 #[derive(Clone)]
 pub struct TupleStruct {
+    pub info: ItemInfo,
     pub types: ThinVec<(VisModifier, Type)>,
 }
 
 #[derive(Clone)]
 pub struct FieldsStruct {
+    pub info: ItemInfo,
     pub fields: ThinVec<(VisModifier, ASTId, Type)>,
 }
 
 #[derive(Clone)]
 pub struct Fn {
+    pub info: ItemInfo,
     pub params: ThinVec<(ASTId, Type)>,
     pub return_type: Type,
     pub body: Scope,
@@ -125,9 +159,11 @@ pub struct Expr {
 pub enum ExprKind {
     Literal(LiteralExpr),
     Parens(Box<Expr>),
-    Path(Box<PkgPathWithItem>),
+    /// Holds the ItemPath index
+    Path(usize),
     Call(Box<CallExpr>),
-    UnitStruct(Box<PkgPathWithItem>),
+    /// Holds the ItemPath index
+    UnitStruct(usize),
     TupleStruct(Box<TupleStructExpr>),
     FieldsStruct(Box<FieldsStructExpr>),
     Field(Box<FieldExpr>),
@@ -181,13 +217,13 @@ pub struct CallExpr {
 
 #[derive(Clone)]
 pub struct TupleStructExpr {
-    pub path: PkgPathWithItem,
+    pub item_path_idx: usize,
     pub args: ThinVec<Expr>,
 }
 
 #[derive(Clone)]
 pub struct FieldsStructExpr {
-    pub path: PkgPathWithItem,
+    pub item_path_idx: usize,
     pub fields: ThinVec<(ASTId, Expr)>,
 }
 

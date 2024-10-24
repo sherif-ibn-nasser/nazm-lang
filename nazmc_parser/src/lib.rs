@@ -1,10 +1,9 @@
-use ast_generator::lower_file;
+use ast_generator::ASTGenerator;
 use error::*;
 use nazmc_diagnostics::{
-    eprint_diagnostics, fmt_diagnostics, span::SpanCursor, CodeWindow, Diagnostic,
+    file_info::FileInfo, fmt_diagnostics, span::SpanCursor, CodeWindow, Diagnostic,
 };
 use nazmc_lexer::*;
-use std::{io::Write, panic};
 use syntax::File;
 
 mod ast_generator;
@@ -12,6 +11,7 @@ pub(crate) mod parse_methods;
 pub(crate) mod syntax;
 pub(crate) mod tokens_iter;
 
+pub use ast_generator::NameConflicts;
 pub(crate) use nazmc_diagnostics::span::Span;
 pub(crate) use nazmc_parse_derive::*;
 pub(crate) use parse_methods::*;
@@ -20,14 +20,16 @@ pub(crate) use tokens_iter::TokensIter;
 
 pub fn parse(
     tokens: Vec<Token>,
-    file_path: &str,
+    file_info: &FileInfo,
     file_content: &str,
-    file_lines: &[String],
     lexer_errors: Vec<LexerError>,
-) -> Result<nazmc_ast::File, String> {
+    ast: &mut nazmc_ast::AST,
+    name_conflicts: &mut NameConflicts,
+    pkg_idx: usize,
+    file_idx: usize,
+) -> Result<(), String> {
     let mut reporter = ParseErrorsReporter {
-        file_path,
-        file_lines: &file_lines,
+        file_info,
         file_content,
         tokens: &tokens,
         diagnostics: vec![],
@@ -44,7 +46,15 @@ pub fn parse(
     reporter.check_file(&file);
 
     if reporter.diagnostics.is_empty() {
-        Ok(lower_file(file))
+        ASTGenerator {
+            pkg_idx,
+            file_idx,
+            ast,
+            name_conflicts,
+        }
+        .lower_file(file);
+
+        Ok(())
     } else {
         Err(fmt_diagnostics(reporter.diagnostics))
     }
@@ -52,8 +62,7 @@ pub fn parse(
 
 struct ParseErrorsReporter<'a> {
     tokens: &'a [Token],
-    file_path: &'a str,
-    file_lines: &'a [String],
+    file_info: &'a FileInfo,
     file_content: &'a str,
     diagnostics: Vec<Diagnostic<'a>>,
 }
@@ -66,7 +75,7 @@ impl<'a> ParseErrorsReporter<'a> {
         primary_label: String,
         secondary_labels: Vec<(Span, Vec<String>)>,
     ) {
-        let mut code_window = CodeWindow::new(self.file_path, &self.file_lines, span.start);
+        let mut code_window = CodeWindow::new(self.file_info, span.start);
 
         code_window.mark_error(span, vec![primary_label]);
 

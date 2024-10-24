@@ -1,10 +1,8 @@
 mod cli;
 use cli::print_err;
 use nazmc_data_pool::DataPool;
-use nazmc_data_pool::PoolIdx;
-use nazmc_diagnostics::span::Span;
+use nazmc_diagnostics::file_info::FileInfo;
 use nazmc_lexer::LexerIter;
-use nazmc_lower_nir::NIRBuilder;
 use nazmc_parser::parse;
 use owo_colors::OwoColorize;
 use serde::Deserialize;
@@ -113,11 +111,12 @@ fn main() {
     let files_paths = get_file_paths();
     let mut id_pool = DataPool::new();
     let mut str_pool = DataPool::new();
-    let mut packages = HashMap::new();
-    let mut parsed_files = vec![];
-    let mut packages_to_parsed_files = vec![];
+    let mut pkgs = HashMap::new();
+    let mut files_infos = vec![];
+    let mut ast = nazmc_ast::AST::default();
     let mut diagnostics: Vec<String> = vec![];
     let mut fail_after_parsing = false;
+    let mut name_conflicts = nazmc_parser::NameConflicts::new();
 
     // Register the unit type name to index 0
     // main fn id to index 1
@@ -126,50 +125,62 @@ fn main() {
     id_pool.get("البداية");
     id_pool.get("س");
 
-    files_paths.into_iter().for_each(|file_path| {
-        let mut package_path = file_path
-            .split_terminator('/')
-            .map(|s| id_pool.get(s))
-            .collect::<ThinVec<_>>();
+    files_paths
+        .into_iter()
+        .enumerate()
+        .for_each(|(file_idx, file_path)| {
+            let mut pkg_path = file_path
+                .split_terminator('/')
+                .map(|s| id_pool.get(s))
+                .collect::<ThinVec<_>>();
 
-        package_path.pop(); // remove the actual file
+            pkg_path.pop(); // remove the actual file
 
-        let package_idx = packages.len();
-        let package_idx = *packages.entry(package_path).or_insert(package_idx);
+            let pkg_idx = pkgs.len();
+            let pkg_idx = *pkgs.entry(pkg_path).or_insert(pkg_idx);
 
-        let path = format!("{file_path}.نظم");
-        let Ok(file_content) = fs::read_to_string(&path) else {
-            panic::set_hook(Box::new(|_| {}));
-            print_err(format!(
-                "{} {}{}",
-                "لا يمكن قراءة الملف".bold(),
-                path.bright_red().bold(),
-                " أو أنه غير موجود".bold()
-            ));
-            panic!()
-        };
+            let path = format!("{file_path}.نظم");
+            let Ok(file_content) = fs::read_to_string(&path) else {
+                panic::set_hook(Box::new(|_| {}));
+                print_err(format!(
+                    "{} {}{}",
+                    "لا يمكن قراءة الملف".bold(),
+                    path.bright_red().bold(),
+                    " أو أنه غير موجود".bold()
+                ));
+                panic!()
+            };
 
-        let (tokens, lines, lexer_errors) =
-            LexerIter::new(&file_content, &mut id_pool, &mut str_pool).collect_all();
+            let (tokens, lines, lexer_errors) =
+                LexerIter::new(&file_content, &mut id_pool, &mut str_pool).collect_all();
 
-        let ast = parse(tokens, &path, &file_content, &lines, lexer_errors);
+            let file_info = FileInfo { path, lines };
 
-        match ast {
-            Ok(ast) => {
-                if package_idx >= packages_to_parsed_files.len() {
-                    packages_to_parsed_files.resize(package_idx + 1, vec![]);
+            match parse(
+                tokens,
+                &file_info,
+                &file_content,
+                lexer_errors,
+                &mut ast,
+                &mut name_conflicts,
+                pkg_idx,
+                file_idx,
+            ) {
+                Ok(_) => {
+                    // if pkg_idx >= pkgs_to_files_indexes.len() {
+                    //     pkgs_to_files_indexes.resize(pkg_idx + 1, vec![]);
+                    // }
+
+                    files_infos.push(file_info);
+                    // files_asts.push(nazmc_resolve::ParsedFile { path, lines, ast });
+                    // pkgs_to_files_indexes[pkg_idx].push(file_idx);
                 }
-
-                let file_idx = parsed_files.len();
-                parsed_files.push(nazmc_resolve::ParsedFile { path, lines, ast });
-                packages_to_parsed_files[package_idx].push(file_idx);
+                Err(d) => {
+                    diagnostics.push(d);
+                    fail_after_parsing = true;
+                }
             }
-            Err(d) => {
-                diagnostics.push(d);
-                fail_after_parsing = true;
-            }
-        }
-    });
+        });
 
     if fail_after_parsing {
         let last_idx = diagnostics.len() - 1;
@@ -185,34 +196,34 @@ fn main() {
     let id_pool = id_pool.build();
     let str_pool = str_pool.build();
 
-    let mut packages_names = ThinVec::with_capacity(packages.len());
-    for (pkg, idx) in &packages {
-        if *idx >= packages_names.len() {
-            for _ in packages_names.len()..=*idx {
-                packages_names.push(ThinVec::default());
+    let mut pkgs_names = ThinVec::with_capacity(pkgs.len());
+    for (pkg, idx) in &pkgs {
+        if *idx >= pkgs_names.len() {
+            for _ in pkgs_names.len()..=*idx {
+                pkgs_names.push(ThinVec::default());
             }
         }
-        packages_names[*idx] = pkg.clone();
+        pkgs_names[*idx] = pkg.clone();
     }
 
-    let resolver = nazmc_resolve::NameResolver::new(
-        &id_pool,
-        &packages,
-        &packages_names,
-        &packages_to_parsed_files,
-        &parsed_files,
-    );
+    // let resolver = nazmc_resolve::NameResolver::new(
+    //     &id_pool,
+    //     &pkgs,
+    //     &pkgs_names,
+    //     &pkgs_to_files_indexes,
+    //     &files_asts,
+    // );
 
-    let mut nrt = resolver.resolve();
+    // let mut nrt = resolver.resolve();
 
-    let nir_builder = NIRBuilder::new(
-        &id_pool,
-        packages,
-        packages_names,
-        packages_to_parsed_files,
-        parsed_files,
-        nrt,
-    );
+    // let nir_builder = NIRBuilder::new(
+    //     &id_pool,
+    //     pkgs,
+    //     pkgs_names,
+    //     pkgs_to_files_indexes,
+    //     files_asts,
+    //     nrt,
+    // );
     // let (file_path, file_content) = cli::read_file();
 
     // nazmc_parser::parse_file(&file_path, &file_content, &mut id_pool, &mut str_pool);
